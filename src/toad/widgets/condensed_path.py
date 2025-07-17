@@ -29,13 +29,13 @@ def radiate_range(total: int) -> Iterable[tuple[int, int]]:
             yield (left + 1, right)
 
 
-def condense_path(prefix: str, path: str, width: int) -> str:
+def condense_path(path: str, width: int, *, prefix: str = "") -> str:
     """Condense a path to fit within the given cell width.
 
     Args:
-        prefix: A string to be prepended to the result.
         path: The path to condense.
-        width: Cell width.
+        width: Maximum cell width.
+        prefix: A string to be prepended to the result.
 
     Returns:
         A condensed string.
@@ -67,5 +67,5 @@ class CondensedPath(Static):
             path = "~/" + path[len(user_root) :]
         self.tooltip = path
         if self.is_mounted:
-            condensed_path = Content(condense_path("📁", path, self.size.width))
+            condensed_path = Content(condense_path(path, self.size.width))
             self.update(condensed_path)

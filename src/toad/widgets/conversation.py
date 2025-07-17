@@ -50,3 +50,4 @@ class Conversation(containers.VerticalScroll):
 
     async def post(self, widget: Widget) -> None:
         await self.contents.mount(widget)
+        self.contents.anchor()

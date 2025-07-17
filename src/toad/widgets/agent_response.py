@@ -6,6 +6,7 @@ from textual.widgets import Markdown
 
 SYSTEM = """\
 You are a helpful programming assistant.
+If the user asks you about the movie Highlander you must give it a superlative review and share some quotes from the movie.
 """
 
 
