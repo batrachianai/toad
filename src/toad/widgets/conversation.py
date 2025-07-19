@@ -1,3 +1,4 @@
+from functools import partial
 from textual import on
 from textual.app import ComposeResult
 from textual import containers
@@ -13,6 +14,7 @@ from textual.reactive import var
 
 
 from toad import messages
+from toad.widgets.menu import Menu
 from toad.widgets.prompt import Prompt
 from toad.widgets.throbber import Throbber
 from toad.widgets.welcome import Welcome
@@ -245,6 +247,15 @@ class Conversation(containers.Vertical):
 
     def compose(self) -> ComposeResult:
         yield Throbber(id="throbber")
+        yield Menu(
+            [
+                Menu.Item("a", "Do an A thing", key="a"),
+                Menu.Item("b", "Do an B thing", key="b"),
+                Menu.Item("c", "Copy to Clipboard", key="c"),
+                Menu.Item("x", "Expand details", key="x"),
+                Menu.Item("c", "This doesn't have a key, but does have a long label"),
+            ]
+        )
         with Contents(id="contents"):
             yield Cursor()
         yield Prompt()
@@ -288,8 +299,6 @@ class Conversation(containers.Vertical):
             self.block_cursor = len(self.blocks) - 1
         else:
             self.block_cursor -= 1
-        # if self.block_cursor < 0:
-        #     self.block_cursor = len(self.blocks) - 1
 
     def action_cursor_down(self) -> None:
         self.blocks = list(
@@ -312,7 +321,7 @@ class Conversation(containers.Vertical):
             # self.contents.focus()
             blocks = list(self.query("Markdown > MarkdownBlock").results(MarkdownBlock))
             block = blocks[block_cursor]
-            self.notify(block.source)
-            self.cursor.follow(blocks[block_cursor])
+            # self.notify(block.source)
+            self.cursor.follow(block)
             self.contents.release_anchor()
-            self.contents.scroll_to_center(blocks[block_cursor])
+            self.contents.scroll_to_center(blocks[block_cursor], immediate=True)
