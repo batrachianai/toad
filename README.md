@@ -30,6 +30,15 @@ Feel free to ask if there is any doubt.
 
 I intend to release a first public version when there is enough core functionality, under an Open Source license (probably MIT).
 
+## Requirements
+
+I'm developing this on macOS. I would expect it to work on Linux. Windows support may lag behind, but will catch up.
+
+Any terminal will work, although if you are using the default terminal on macOS you will get a much reduced experience.
+If you are on macOS I would recommend upgrading to [iTerm2](https://iterm2.com/), which is what I use.
+
+Related: I have heard the next version of macOS will ship with a much improved terminal.
+
 ## Getting started
 
 I'm using the awesome UV project.
