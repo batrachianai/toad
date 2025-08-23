@@ -111,9 +111,10 @@ class Shell:
 
         current_directory = ""
         unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        await asyncio.sleep(1 / 60)
         try:
             while True:
-                data = await reader.read(1024 * 64)
+                data = await reader.read(1024 * 128)
                 if line := unicode_decoder.decode(data, final=not data):
                     if self.ansi_log is None:
                         self.ansi_log = await self.conversation.get_ansi_log(self.width)
