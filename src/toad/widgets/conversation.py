@@ -473,7 +473,7 @@ class Conversation(containers.Vertical):
             block_type: The expected type.
 
         Returns:
-            _type_: The instance or `None` if not selected, or wrong type.
+            The widget next to the cursor, or `None` if the types don't match.
         """
         cursor_block = self.cursor_block_child
         if isinstance(cursor_block, block_type):
