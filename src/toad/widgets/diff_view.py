@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+from itertools import starmap
+from typing import Iterable, Literal
 
 from rich.segment import Segment
 from rich.style import Style as RichStyle
@@ -13,7 +15,6 @@ from textual.geometry import Size
 from textual import highlight
 from textual import events
 from textual.css.styles import RulesMap
-from textual._segment_tools import line_pad
 from textual.strip import Strip
 from textual.style import Style
 from textual.reactive import reactive, var
@@ -21,6 +22,8 @@ from textual.visual import Visual, RenderOptions
 from textual.widget import Widget
 from textual.widgets import Static
 from textual import containers
+
+type Annotation = Literal["+", "-", "/", " "]
 
 
 def _format_range_unified(start, stop):
@@ -137,7 +140,7 @@ class LineAnnotations(Widget):
 
     def __init__(
         self,
-        numbers: list[Content],
+        numbers: Iterable[Content],
         *,
         name: str | None = None,
         id: str | None = None,
@@ -145,7 +148,7 @@ class LineAnnotations(Widget):
         disabled: bool = False,
     ):
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
-        self.numbers = numbers
+        self.numbers = list(numbers)
 
     @property
     def total_width(self) -> int:
@@ -449,6 +452,31 @@ class DiffView(containers.VerticalGroup):
     def compose_split(self) -> ComposeResult:
         lines_a, lines_b = self.highlighted_code_lines
 
+        annotation_hatch = Content.styled("╱" * 3, "$foreground 20%")
+        annotation_blank = Content(" " * 3)
+
+        def make_annotation(
+            annotation: Annotation, highlight_annotation: Literal["+", "-"]
+        ) -> Content:
+            """Format an annotation.
+
+            Args:
+                annotation: Annotation to format.
+                highlight_annotation: Annotation to highlight ('+' or '-')
+
+            Returns:
+                Content with annotation.
+            """
+            if annotation == highlight_annotation:
+                return (
+                    Content(f" {annotation} ")
+                    .stylize(self.LINE_STYLES[annotation])
+                    .stylize("bold")
+                )
+            if annotation == "/":
+                return annotation_hatch
+            return annotation_blank
+
         for group in self.grouped_opcodes:
             first, last = group[0], group[-1]
             file1_range = _format_range_unified(first[1], last[2])
@@ -460,8 +488,8 @@ class DiffView(containers.VerticalGroup):
             )
             line_numbers_a: list[int | None] = []
             line_numbers_b: list[int | None] = []
-            annotations_a: list[str] = []
-            annotations_b: list[str] = []
+            annotations_a: list[Annotation] = []
+            annotations_b: list[Annotation] = []
             code_lines_a: list[Content | None] = []
             code_lines_b: list[Content | None] = []
             for tag, i1, i2, j1, j2 in group:
@@ -497,37 +525,33 @@ class DiffView(containers.VerticalGroup):
                 line_number_width = 1
 
             hatch = Content.styled("╱" * (2 + line_number_width), "$foreground 20%")
-            annotation_hatch = Content.styled("╱" * 3, "$foreground 20%")
-            annotation_blank = Content(" " * 3)
+
+            def format_number(line_no: int | None, annotation: str) -> Content:
+                """Format a line number with an annotation.
+
+                Args:
+                    line_no: Line number or `None` if there is no line here.
+                    annotation: An annotation string ('+', '-', or ' ')
+
+                Returns:
+                    Content for use in the `LineAnnotations` widget.
+                """
+                return (
+                    hatch
+                    if line_no is None
+                    else Content(f" {line_no:>{line_number_width}} ").stylize(
+                        self.NUMBER_STYLES[annotation]
+                    )
+                )
 
             with containers.HorizontalGroup(classes="diff-group"):
+                # Before line numbers
                 yield LineAnnotations(
-                    [
-                        (
-                            hatch
-                            if line_no is None
-                            else Content(f" {line_no:>{line_number_width}} ").stylize(
-                                self.NUMBER_STYLES[annotation]
-                            )
-                        )
-                        for line_no, annotation in zip(line_numbers_a, annotations_a)
-                    ]
+                    starmap(format_number, zip(line_numbers_b, annotations_b))
                 )
+                # Before annotations
                 yield LineAnnotations(
-                    [
-                        (
-                            Content(f" {annotation} ")
-                            .stylize(self.LINE_STYLES[annotation])
-                            .stylize("bold")
-                            if annotation == "-"
-                            else (
-                                annotation_hatch
-                                if annotation == "/"
-                                else annotation_blank
-                            )
-                        )
-                        for annotation in annotations_a
-                    ],
+                    [make_annotation(annotation, "-") for annotation in annotations_a],
                     classes="annotations",
                 )
 
@@ -539,50 +563,32 @@ class DiffView(containers.VerticalGroup):
                     for line in code_lines_a + code_lines_b
                     if line is not None
                 )
+                # Before code
                 with DiffScrollContainer() as scroll_container_a:
                     yield DiffCode(
                         LineContent(code_lines_a, code_line_styles, width=line_width)
                     )
 
+                # After line numbers
                 yield LineAnnotations(
-                    [
-                        (
-                            hatch
-                            if line_no is None
-                            else Content(f" {line_no:>{line_number_width}} ").stylize(
-                                self.NUMBER_STYLES[annotation]
-                            )
-                        )
-                        for line_no, annotation in zip(line_numbers_b, annotations_b)
-                    ]
+                    starmap(format_number, zip(line_numbers_b, annotations_b))
                 )
-
+                # After annotations
                 yield LineAnnotations(
-                    [
-                        (
-                            Content(f" {annotation} ")
-                            .stylize(self.LINE_STYLES[annotation])
-                            .stylize("bold")
-                            if annotation == "+"
-                            else (
-                                annotation_hatch
-                                if annotation == "/"
-                                else annotation_blank
-                            )
-                        )
-                        for annotation in annotations_b
-                    ],
+                    [make_annotation(annotation, "+") for annotation in annotations_b],
                     classes="annotations",
                 )
 
                 code_line_styles = [
                     self.LINE_STYLES[annotation] for annotation in annotations_b
                 ]
+                # After code
                 with DiffScrollContainer() as scroll_container_b:
                     yield DiffCode(
                         LineContent(code_lines_b, code_line_styles, width=line_width)
                     )
 
+                # Link scroll containers, so they scroll together
                 scroll_container_a.scroll_link = scroll_container_b
                 scroll_container_b.scroll_link = scroll_container_a
 
