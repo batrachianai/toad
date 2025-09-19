@@ -217,6 +217,7 @@ class Question(Widget, can_focus=True):
     @on(Option.Selected)
     def on_option_selected(self, event: Option.Selected) -> None:
         event.stop()
+        self._reset_blink()
         if not self.selected:
             self.selection = event.index
 
