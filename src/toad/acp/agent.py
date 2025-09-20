@@ -150,7 +150,7 @@ class Agent(AgentBase):
         # https://agentclientprotocol.com/protocol/file-system#reading-files
         read_path = self.project_root_path / path
         try:
-            text = read_path.read_text(encoding="utf-8", errors="replace")
+            text = read_path.read_text(encoding="utf-8", errors="ignore")
         except IOError:
             text = ""
         if line is not None:
@@ -165,8 +165,9 @@ class Agent(AgentBase):
     def rpc_write_text_file(self, sessionId: str, path: str, content: str) -> None:
         # TODO: What if the agent wants to write outside of the project path?
         # https://agentclientprotocol.com/protocol/file-system#writing-files
+        print("WRITE TEXT FILE", path)
         write_path = self.project_root_path / path
-        write_path.write_text(content)
+        write_path.write_text(content, encoding="utf-8", errors="ignore")
 
     async def _run_agent(self) -> None:
         """Task to communicate with the agent subprocess."""
@@ -187,26 +188,19 @@ class Agent(AgentBase):
         assert process.stdout is not None
         assert process.stdin is not None
 
-        results = []
-
-        async def handle_response_object(response: jsonrpc.JSONObject) -> None:
-            if "result" in response or "error" in response:
-                API.process_response(response)
-            elif "method" in response:
-                result = await self.server.call(response)
-                results.append(result)
-
         tasks: set[asyncio.Task] = set()
 
         async def call_jsonrpc(request: jsonrpc.JSONObject | jsonrpc.JSONList) -> None:
             print("calling", request)
-            result = await self.server.call(request)
-            print("result", result)
-            result_json = json.dumps(result).encode("utf-8")
-            if process.stdin is not None:
-                process.stdin.write(b"%s\n" % result_json)
-            if (task := asyncio.current_task()) is not None:
-                tasks.discard(task)
+            try:
+                result = await self.server.call(request)
+                print("result", result)
+                result_json = json.dumps(result).encode("utf-8")
+                if process.stdin is not None:
+                    process.stdin.write(b"%s\n" % result_json)
+            finally:
+                if (task := asyncio.current_task()) is not None:
+                    tasks.discard(task)
 
         while line := await process.stdout.readline():
             # This line should contain JSON, which may be:
@@ -227,32 +221,16 @@ class Agent(AgentBase):
 
             elif isinstance(agent_data, list):
                 if not all(isinstance(datum, dict) for datum in agent_data):
-                    log.warning(f"Data sent invalid data: {agent_data!r}")
+                    log.warning(f"Agent sent invalid data: {agent_data!r}")
                     continue
                 if all(("result" in datum or "error" in datum) for datum in agent_data):
                     API.process_response(agent_data)
                     continue
 
-            # By this point we know it
+            # By this point we know it is a JSON RPC call
             print("JSONRPC CALL")
             print(agent_data)
             tasks.add(asyncio.create_task(call_jsonrpc(agent_data)))
-
-            # if isinstance(agent_data, dict):
-            #     await handle_response_object(agent_data)
-            # elif isinstance(agent_data, list):
-            #     for response_object in agent_data:
-            #         if isinstance(response_object, dict):
-            #             await handle_response_object(response_object)
-
-            # if results:
-            #     try:
-            #         json_result = json.dumps(
-            #             results[0] if len(results) == 1 else results
-            #         )
-            #         stdin.write(b"%s\n" % json_result.encode("utf-8"))
-            #     finally:
-            #         results.clear()
 
         print("exit")
 
@@ -290,8 +268,9 @@ class Agent(AgentBase):
                     "terminal": True,
                 },
             )
-            print(initialize_response)
+
         response = await initialize_response.wait()
+        print(response)
         # Store agents capabilities
         if agent_capabilities := response.get("agentCapabilities"):
             self.agent_capabilities = agent_capabilities

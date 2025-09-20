@@ -1,3 +1,6 @@
+import os
+
+
 def mandelbrot(c: complex, max_iter: int) -> int:
     """Determine the number of iterations for a point in the Mandelbrot set.
 
@@ -46,10 +49,10 @@ def draw_mandelbrot(width: int, height: int, max_iter: int) -> None:
             real = (x / width) * 3.5 - 2.5
             imag = (y / height) * 2.0 - 1.0
             c = complex(real, imag)
-            
+
             # Calculate the number of iterations
             iter_count = mandelbrot(c, max_iter)
-            
+
             # Get the color for this point and print a space (box)
             color = colorize(iter_count, max_iter)
             print(f"{color}  ", end="")

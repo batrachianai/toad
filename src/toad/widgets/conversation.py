@@ -659,7 +659,6 @@ class Conversation(containers.Vertical):
             before: Content of file before edit.
             after: Content of file after edit.
         """
-        self.notify(f"post_diff {path}")
         from toad.widgets.diff_view import DiffView
 
         diff_view = DiffView(path, path, before, after, classes="block")

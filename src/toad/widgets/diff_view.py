@@ -239,12 +239,12 @@ class DiffView(containers.VerticalGroup):
     DiffView {
         width: 1fr;
         height: auto;
-        &:dark {
-            background: black 20%;
-        }   
-        &:dark {
-            background: $boost;
-        }       
+        # &:dark {
+        #     background: black 20%;
+        # }   
+        # &:dark {
+        #     # background: $foreground 10%;
+        # }       
         .diff-group {
             height: auto;
             background: $foreground 4%;
@@ -258,9 +258,9 @@ class DiffView(containers.VerticalGroup):
     """
 
     NUMBER_STYLES = {
-        "+": "$foreground 80% on $success 30%",
-        "-": "$foreground 80% on $error 30%",
-        " ": "$foreground 40%",
+        "+": "$text-success 80% on $success 20%",
+        "-": "$text-error 80% on $error 20%",
+        " ": "$foreground 30% on $foreground 3%",
     }
     LINE_STYLES = {
         "+": "on $success 10%",
@@ -311,7 +311,10 @@ class DiffView(containers.VerticalGroup):
             text_lines_a = self.code_before.splitlines()
             text_lines_b = self.code_after.splitlines()
             sequence_matcher = difflib.SequenceMatcher(
-                None, text_lines_a, text_lines_b, autojunk=False
+                lambda character: character in " \t",
+                text_lines_a,
+                text_lines_b,
+                autojunk=True,
             )
             self._grouped_opcodes = list(sequence_matcher.get_grouped_opcodes())
 
@@ -333,15 +336,15 @@ class DiffView(containers.VerticalGroup):
             )
 
             sequence_matcher = difflib.SequenceMatcher(
-                None, self.code_before, self.code_after, autojunk=False
+                lambda character: character in " \t",
+                self.code_before,
+                self.code_after,
+                autojunk=True,
             )
             code_a_spans: list[Span] = []
             code_b_spans: list[Span] = []
             for tag, i1, i2, j1, j2 in sequence_matcher.get_opcodes():
-                if (
-                    tag in {"delete", "replace"}
-                    and "\n" not in code_a.plain[i1 : i2 + 1]
-                ):
+                if tag == "delete" and "\n" not in code_a.plain[i1 : i2 + 1]:
                     code_a_spans.append(Span(i1, i2, "on $error 40%"))
 
                 if tag == "insert" and "\n" not in code_b.plain[j1 : j2 + 1]:

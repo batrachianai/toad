@@ -155,7 +155,10 @@ class Question(Widget, can_focus=True):
 
     def on_mount(self) -> None:
         def toggle_blink() -> None:
-            self.blink = not self.blink
+            if self.has_focus:
+                self.blink = not self.blink
+            else:
+                self.blink = False
 
         self._blink_timer = self.set_interval(0.5, toggle_blink)
 
