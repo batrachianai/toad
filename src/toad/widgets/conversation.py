@@ -29,6 +29,7 @@ from toad import messages
 from toad.acp import messages as acp_messages
 from toad.app import ToadApp
 from toad.acp import protocol as acp_protocol
+from toad.answer import Answer
 from toad.agent import AgentBase
 from toad.widgets.menu import Menu
 from toad.widgets.note import Note
@@ -45,7 +46,6 @@ if TYPE_CHECKING:
     from toad.widgets.ansi_log import ANSILog
     from toad.widgets.agent_response import AgentResponse
     from toad.widgets.agent_thought import AgentThought
-    from toad.widgets.question import Answer
 
 MD = """\
 # Textual Markdown Browser - Demo
@@ -618,8 +618,6 @@ class Conversation(containers.Vertical):
     async def on_acp_request_permission(
         self, message: acp_messages.ACPRequestPermission
     ):
-        from toad.widgets.question import Answer
-
         message.stop()
         await self.post_tool_call(message.tool_call)
         self.ask(

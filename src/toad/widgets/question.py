@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, NamedTuple
+from typing import Any, Callable
 
 from textual.app import ComposeResult
 from textual import events, on
@@ -13,11 +13,7 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Label
 
-
-class Answer(NamedTuple):
-    text: str
-    id: str
-
+from toad.answer import Answer
 
 type Options = list[Answer]
 

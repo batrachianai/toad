@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from asyncio import Future
 from textual.message import Message
 
-from toad.widgets.question import Answer
+from toad.answer import Answer
 from toad.acp import protocol
 
 

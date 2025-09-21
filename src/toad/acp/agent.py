@@ -16,7 +16,7 @@ from toad.acp import api
 from toad.acp.api import API
 from toad.acp import messages
 from toad.acp.prompt import build as build_prompt
-
+from toad.answer import Answer
 
 PROTOCOL_VERSION = 1
 
@@ -117,19 +117,21 @@ class Agent(AgentBase):
         toolCall: protocol.ToolCallUpdate,
         _meta: dict | None = None,
     ) -> protocol.RequestPermissionResponse:
-        print("REQUEST PERMISSION")
-        # if (message_target := self._message_target) is None:
-        #     return
-        from toad.widgets.question import Answer
+        """_summary_
 
+        Args:
+            sessionId: The session ID.
+            options: A list of permission options (potential replies).
+            toolCall: The tool or tools the agent is requesting permission to call.
+            _meta: Optional meta information.
+
+        Returns:
+            The response to the permission request.
+        """
         assert self._message_target is not None
         result_future: asyncio.Future[Answer] = asyncio.Future()
         self._message_target.post_message(
-            messages.ACPRequestPermission(
-                options,
-                toolCall,
-                result_future,
-            )
+            messages.ACPRequestPermission(options, toolCall, result_future)
         )
         await result_future
         ask_result = result_future.result()
