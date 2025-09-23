@@ -108,6 +108,7 @@ class Option(containers.HorizontalGroup):
 class Question(Widget, can_focus=True):
     """A text question with a menu of responses."""
 
+    BINDING_GROUP_TITLE = "Question"
     ALLOW_SELECT = False
     CURSOR_GROUP = Binding.Group("Cursor", compact=True)
     ALLOW_GROUP = Binding.Group("Allow once/always", compact=True)

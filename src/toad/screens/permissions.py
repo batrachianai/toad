@@ -91,7 +91,24 @@ def loop_first_last(values: Iterable[ValueType]) -> Iterable[tuple[bool, bool, V
 '''
 
 
+class PermissionsQuestion(Question):
+    BINDING_GROUP_TITLE = "Permissions Options"
+
+
+class ChangesOptionList(OptionList):
+    BINDING_GROUP_TITLE = "Changes list"
+
+
+class DiffViewSelect(Select):
+    BINDING_GROUP_TITLE = "Diff view select"
+
+
+class ToolScroll(containers.VerticalScroll):
+    BINDING_GROUP_TITLE = "Changes window"
+
+
 class PermissionsScreen(Screen[str]):
+    BINDING_GROUP_TITLE = "Permissions"
     AUTO_FOCUS = "Question"
     CSS_PATH = "permissions.tcss"
 
@@ -132,34 +149,34 @@ class PermissionsScreen(Screen[str]):
     diff_type: var[str] = var(Initialize(get_diff_type))
 
     def compose(self) -> ComposeResult:
-        with containers.Vertical(classes="top"):
+        with containers.Grid(classes="top"):
+            yield DiffViewSelect(
+                [
+                    ("Unified diff", "unified"),
+                    ("Split diff", "split"),
+                    ("Auto diff", "auto"),
+                ],
+                value=self.diff_type,
+                allow_blank=False,
+                id="diff-select",
+            )
             yield Static(
                 "[b]Approval request[/b] [dim]The Agent wishes to make the following changes",
                 id="instructions",
             )
-            with containers.HorizontalGroup(id="changes"):
-                with containers.Vertical(id="nav-container"):
-                    yield Select(
-                        [
-                            ("Unified view", "unified"),
-                            ("Split view", "split"),
-                            ("Auto fit", "auto"),
-                        ],
-                        value=self.diff_type,
-                        allow_blank=False,
-                        id="diff-select",
-                    )
-                    yield OptionList(id="navigator")
-                yield containers.VerticalScroll(id="tool-container")
-            yield Question(
-                "",
-                options=[
-                    Answer("Allow once", "allow_once", kind="allow_once"),
-                    Answer("Allow always", "allow_always", kind="allow_always"),
-                    Answer("Reject once", "reject_once", kind="reject_once"),
-                    Answer("Reject always", "reject_always", kind="reject_always"),
-                ],
-            )
+            with containers.Vertical(id="nav-container"):
+                yield PermissionsQuestion(
+                    "",
+                    options=[
+                        Answer("Allow once", "allow_once", kind="allow_once"),
+                        Answer("Allow always", "allow_always", kind="allow_always"),
+                        Answer("Reject once", "reject_once", kind="reject_once"),
+                        Answer("Reject always", "reject_always", kind="reject_always"),
+                    ],
+                )
+                yield ChangesOptionList(id="navigator")
+            yield ToolScroll(id="tool-container")
+
         yield Footer()
 
     async def on_mount(self):
@@ -177,6 +194,7 @@ class PermissionsScreen(Screen[str]):
         self.index += 1
         option_id = f"item-{self.index}"
         diff_view = DiffView(path1, path2, before or "", after, id=option_id)
+        await diff_view.prepare()
         app = self.app
         if isinstance(app, ToadApp):
             diff_view_setting = app.settings.get("diff.view", str)
@@ -291,8 +309,8 @@ def loop_first_last(values: Iterable[ValueType]) -> Iterable[tuple[bool, bool, V
         async def on_mount(self) -> None:
             screen = PermissionsScreen()
             await self.push_screen(screen)
-            for repeat in range(5):
-                await screen.add_diff("foo.py", "foo.py", SOURCE1, SOURCE2)
+            # for repeat in range(5):
+            #     await screen.add_diff("foo.py", "foo.py", SOURCE1, SOURCE2)
 
     app = PermissionTestApp()
     app.run()

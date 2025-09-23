@@ -10,17 +10,19 @@ PermissionsScreen {
         background: black 10%;
         border: tall black 10%;
         padding: 0 2;
-        margin: 0 0 1 0;        
+        # margin: 0 0 1 0;        
+        
     }
 
-    Vertical.top {
+    .top {
         height: 1fr;        
         background: $background;        
-        # border: thick black 30%;
-        margin: 1 ;    
+        margin: 1;    
         padding: 0 0;           
+        grid-size: 2 2;
+        grid-columns: auto 1fr;
+        grid-rows: auto 1fr;
     }
-
 
     #changes {        
         width: 1fr;
@@ -30,35 +32,37 @@ PermissionsScreen {
     OptionList#navigator {
         width: auto;
         height: 1fr;
-        min-width: 20;
-        # margin-bottom: 1;
+        min-width: 20;        
+        width: 1fr;
+        expand: optimal;
     }
     Question {        
-        width: 1fr;
+        width: auto;
+        expand: optimal;
         border: tall black 10%;
         background: black 10%;
-        dock: bottom;
+        # dock: bottom;
         height: auto;
-        margin-top: 1;
-        
+        margin: 1 0;  
+        padding: 0 2 0 1;      
         &:focus {
             border: tall $primary;    
         }
     }
     
-    #tool-container {
-        
+    #tool-container {        
         background: $background;    
         height: 1fr;
         border: tall black 10%;
+        margin-top: 1;      
         &:focus {
             border: tall $primary;
         }
     }
+    
     #nav-container {
         width: auto;
-        height: 1fr;
-        
+        height: 1fr;       
         Select {
             width: auto;
             height: auto;
