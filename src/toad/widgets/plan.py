@@ -28,10 +28,8 @@ class Plan(containers.Grid):
         grid-columns: auto auto 1fr;
         grid-rows: auto;
         height: auto;        
-        
-
+    
         .plan {
-            # padding: 0 1;
             color: $text-secondary;
         }
         .status {
@@ -41,28 +39,20 @@ class Plan(containers.Grid):
         .priority {
             padding: 0 0 0 0;
         }
-
-        .plan {
-            # color: $text-primary;
-        }
         .status.status-completed {
-            # text-style: strike;
             color: $text-success;
-        }
-
-        .status-in_progress {
-            # color: $text-primary;
         }
         .status-pending {
             opacity: 0.8;
         }
-  
     }
 
     """
 
     @dataclass(frozen=True)
     class Entry:
+        """Information about an entry in the Plan."""
+
         content: Content
         priority: str
         status: str
@@ -104,21 +94,18 @@ class Plan(containers.Grid):
     def compose(self) -> ComposeResult:
         if not self.entries:
             return
-        for index, entry in enumerate(self.entries, 1):
+        for entry in self.entries:
             classes = f"priority-{entry.priority} status-{entry.status}"
-            # yield Static(
-            #     Content(f"{index}"),
-            #     classes=f"numeral {classes}",
-            # )
-
             yield NonSelectableStatic(
                 self.PRIORITIES[entry.priority],
                 classes=f"priority {classes}",
             ).with_tooltip(f"priority: {entry.priority}")
+
             yield NonSelectableStatic(
                 self.render_status(entry.status),
                 classes=f"status {classes}",
             )
+
             yield (
                 strike_text := StrikeText(
                     entry.content,
