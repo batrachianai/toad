@@ -119,6 +119,8 @@ class ToadApp(App):
                 self.scrollbar = value
         elif key == "ui.footer":
             self.set_class(not bool(value), "-hide-footer")
+        elif key == "agent.thoughts":
+            self.set_class(not bool(value), "-hide-thoughts")
 
         self.settings_changed_signal.publish((key, value))
 

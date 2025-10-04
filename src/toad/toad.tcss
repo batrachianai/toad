@@ -24,6 +24,10 @@ App.-hide-footer Footer {
     display: none;
 }
 
+App.-hide-thoughts AgentThought {
+    display: none;
+}
+
 Note,MarkdownNote {
     padding: 0 1 0 0;
     &.about MarkdownTable {
@@ -186,7 +190,7 @@ Conversation {
     }
 
     ToolCall {
-        background: $foreground 8%;
+        background: black 10%;
         margin: 1 1 1 0;              
         padding: 1 1 1 1;
     }

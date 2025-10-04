@@ -91,6 +91,20 @@ SCHEMA: list[SchemaDict] = [
         ],
     },
     {
+        "key": "agent",
+        "title": "Agent settings",
+        "help": "Customize how you interact with agents",
+        "type": "object",
+        "fields": [
+            {
+                "key": "thoughts",
+                "title": "Agent thoughts",
+                "help": "Show agent's 'thoughts' in the conversation?",
+                "type": "boolean",
+            }
+        ],
+    },
+    {
         "key": "diff",
         "title": "Diff view settings",
         "help": "Customize how diffs are displayed.",
