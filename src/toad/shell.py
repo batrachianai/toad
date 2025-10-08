@@ -5,7 +5,6 @@ import os
 import asyncio
 import codecs
 import fcntl
-from pathlib import Path
 import platform
 import pty
 import struct

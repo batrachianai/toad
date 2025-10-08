@@ -41,47 +41,7 @@ Menu {
     background: transparent;
 }
 
-# Plan {
-#         background: black 20%;
-#         height: auto;
-#         padding: 0 1;
-#         margin: 0 1 1 0;
-#         border: tall transparent;
-        
-#         grid-size: 3;
-#         grid-columns: auto auto 1fr;
-#         grid-rows: auto;
-#         height: auto;        
-        
 
-#         .plan {
-#             # padding: 0 1;
-#             color: $text-secondary;
-#         }
-#         .status {
-#             padding: 0 0 0 0;
-#             color: $text-secondary;
-#         }
-#         .priority {
-#             padding: 0 0 0 0;
-#         }
-
-#         .plan {
-#             # color: $text-primary;
-#         }
-#         .status-completed {
-#             # text-style: strike;
-#             color: $text-success;
-#         }
-
-#         .status-in_progress {
-#             # color: $text-primary;
-#         }
-#         .status-pending {
-#             opacity: 0.8;
-#         }
-  
-#     }
 
 Conversation {
     
@@ -189,6 +149,40 @@ Conversation {
                 padding-right: 1;
             }
         }
+    }
+
+    Plan {
+        # border: tall black 20%;
+        border: panel $secondary;
+        # background: black 12%;            
+        background: transparent;
+        # margin: 0 !important;
+        margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
+        padding: 1 0 0 1;        
+        height: auto;                        
+        grid-size: 2;
+        grid-columns: auto auto 1fr;
+        grid-rows: auto;        
+    
+        .plan {
+            color: $text-secondary;
+        }
+        .status {
+            padding: 0 0 0 0;
+            color: $text-secondary;
+        }
+        .priority {
+            padding: 0 0 0 0;
+        }
+        .status.status-completed {
+            color: $text-success;            
+        }
+        .status-pending {
+            opacity: 0.7;
+        }
+        .plan.status-completed {
+            
+        }        
     }
 
     ToolCall {                

@@ -15,7 +15,8 @@ class NonSelectableStatic(Static):
 
 
 class Plan(containers.Grid):
-    # BORDER_TITLE = "Plan"
+    BORDER_TITLE = "Plan"
+    DEFAULT_CLASSES = "block"
     DEFAULT_CSS = """
     Plan {
         background: black 20%;
@@ -24,7 +25,7 @@ class Plan(containers.Grid):
         margin: 0 1 1 1;
         border: tall transparent;
         
-        grid-size: 3;
+        grid-size: 2;
         grid-columns: auto auto 1fr;
         grid-rows: auto;
         height: auto;        
@@ -41,6 +42,7 @@ class Plan(containers.Grid):
         }
         .status.status-completed {
             color: $text-success;
+            text-style: bold;
         }
         .status-pending {
             opacity: 0.8;
@@ -96,10 +98,10 @@ class Plan(containers.Grid):
             return
         for entry in self.entries:
             classes = f"priority-{entry.priority} status-{entry.status}"
-            yield NonSelectableStatic(
-                self.PRIORITIES[entry.priority],
-                classes=f"priority {classes}",
-            ).with_tooltip(f"priority: {entry.priority}")
+            # yield NonSelectableStatic(
+            #     self.PRIORITIES[entry.priority],
+            #     classes=f"priority {classes}",
+            # ).with_tooltip(f"priority: {entry.priority}")
 
             yield NonSelectableStatic(
                 self.render_status(entry.status),
@@ -112,7 +114,9 @@ class Plan(containers.Grid):
                     classes=f"plan {classes}",
                 )
             )
-            if entry in self.newly_completed:
+            if entry in self.newly_completed or (
+                not self.is_mounted and entry.status == "completed"
+            ):
                 self.call_after_refresh(strike_text.strike)
 
     def render_status(self, status: str) -> Content:

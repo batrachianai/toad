@@ -20,7 +20,7 @@ class MainScreen(Screen, can_focus=False):
     AUTO_FOCUS = "Conversation Prompt TextArea"
 
     BINDINGS = [
-        Binding("f3", "show_files", "Show files"),
+        Binding("f3", "show_files", "Files"),
         Binding("f3", "hide_files", "Hide files"),
     ]
 
@@ -33,7 +33,7 @@ class MainScreen(Screen, can_focus=False):
     column = reactive(False)
     column_width = reactive(100)
     scrollbar = reactive("")
-    show_tree = reactive(False, toggle_class="-show-tree")
+    show_tree = reactive(False, toggle_class="-show-tree", bindings=True)
     project_path: var[Path] = var(Path("./").expanduser().absolute())
 
     def compose(self) -> ComposeResult:

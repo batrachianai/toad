@@ -1,3 +1,5 @@
+from rich.text import Text
+
 from textual import log
 from textual.app import ComposeResult
 from textual.content import Content
@@ -119,7 +121,11 @@ class ToolCall(containers.VerticalGroup):
         ) -> ComposeResult:
             match content_block:
                 case {"type": "text", "text": text}:
-                    yield TextContent(text)
+                    if "\x1b" in text:
+                        text = Text.from_ansi(text)
+                        yield TextContent(Content.from_rich_text(text))
+                    else:
+                        yield TextContent(text)
 
         for content in tool_call_content:
             log(content)

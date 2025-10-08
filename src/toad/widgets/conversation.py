@@ -389,24 +389,24 @@ class ContentsGrid(containers.Grid):
 
 class Window(containers.VerticalScroll):
     BINDING_GROUP_TITLE = "View"
-    BINDINGS = [Binding("end", "screen.focus_prompt", "Focus prompt")]
+    BINDINGS = [Binding("end", "screen.focus_prompt", "Prompt")]
 
 
 class Conversation(containers.Vertical):
     BINDING_GROUP_TITLE = "Conversation"
-    CURSOR_BINDING_GROUP = Binding.Group(description="Block cursor")
+    CURSOR_BINDING_GROUP = Binding.Group(description="Cursor")
     BINDINGS = [
         Binding(
             "alt+up",
             "cursor_up",
-            "Block up",
+            "Block cursor up",
             priority=True,
             group=CURSOR_BINDING_GROUP,
         ),
         Binding(
             "alt+down",
             "cursor_down",
-            "Block down",
+            "Block cursor down",
             group=CURSOR_BINDING_GROUP,
         ),
         Binding("enter", "select_block", "Select"),
@@ -475,6 +475,8 @@ class Conversation(containers.Vertical):
         if self.contents.children and not isinstance(
             self.contents.children[-1], AgentThought
         ):
+            if self._agent_thought is not None:
+                self._agent_thought.loading = False
             self._agent_thought = None
 
         if self._agent_thought is None:
@@ -617,6 +619,27 @@ class Conversation(containers.Vertical):
             options,
             message.tool_call,
         )
+
+    @on(acp_messages.Plan)
+    async def on_acp_plan(self, message: acp_messages.Plan):
+        message.stop()
+        from toad.widgets.plan import Plan
+
+        entries = [
+            Plan.Entry(
+                Content(entry["content"]),
+                entry.get("priority", "medium"),
+                entry.get("status", "pending"),
+            )
+            for entry in message.entries
+        ]
+
+        if self.contents.children and isinstance(
+            (current_plan := self.contents.children[-1]), Plan
+        ):
+            current_plan.entries = entries
+        else:
+            await self.post(Plan(entries))
 
     @on(acp_messages.ToolCallUpdate)
     @on(acp_messages.ToolCall)

@@ -33,7 +33,7 @@ class MenuOption(ListItem):
 
 
 class Menu(ListView, can_focus=True):
-    BINDINGS = [Binding("escape", "dismiss", "Dismiss menu")]
+    BINDINGS = [Binding("escape", "dismiss", "Dismiss")]
 
     DEFAULT_CSS = """
     Menu {

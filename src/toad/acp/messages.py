@@ -35,6 +35,11 @@ class RequestPermission(AgentMessage):
 
 
 @dataclass
+class Plan(AgentMessage):
+    entries: list[protocol.PlanEntry]
+
+
+@dataclass
 class ToolCall(AgentMessage):
     tool_call: protocol.ToolCall
 
