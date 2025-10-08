@@ -8,7 +8,7 @@ SettingsScreen {
         padding: 0 1;    
         background: black 10%;                    
         & > VerticalScroll {
-            overflow: auto scroll;
+            overflow: hidden scroll;
         }
     }
 
