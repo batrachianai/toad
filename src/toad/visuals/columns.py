@@ -60,6 +60,14 @@ class Columns:
         gutter: int = 1,
         style: Style | str = "",
     ) -> None:
+        """
+
+        Args:
+            *columns: "auto" to use the maximum width of the cells in a column,
+                or "flex" to use the remaining space.
+            gutter: Space between columns in cells.
+            style: Base style for the columns.
+        """
         self.columns = columns
         self.gutter = gutter
         self.style = style
@@ -82,6 +90,11 @@ class Columns:
         return Row(self, row_index)
 
     def get_optimal_width(self) -> int:
+        """Get optional width (Visual protocol).
+
+        Returns:
+            Width in cells.
+        """
         if self._optimal_width_cache is not None:
             return self._optimal_width_cache
         gutter_width = (len(self.columns) - 1) * self.gutter
@@ -93,6 +106,15 @@ class Columns:
         return optimal_width
 
     def get_row_height(self, width: int, row_index: int) -> int:
+        """Get the height of a row when rendered with the given width.
+
+        Args:
+            width: Available width.
+            row_index: Index of the row.
+
+        Returns:
+            Height in lines of the row.
+        """
         if self._last_render is None:
             row_strips = self._render(width, Style.null())
         else:
