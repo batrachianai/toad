@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 import io
 
-from typing import Generator, Iterable, Mapping, NamedTuple, Sequence
+from typing import Iterable, Mapping, NamedTuple, Sequence
 from textual.color import Color
 from textual.style import Style, NULL_STYLE
 from textual.content import Content, EMPTY_CONTENT
@@ -16,11 +16,10 @@ from toad._stream_parser import (
     MatchToken,
     StreamParser,
     SeparatorToken,
-    StreamRead,
-    Token,
     PatternToken,
     Pattern,
     PatternCheck,
+    ParseResult,
 )
 
 
@@ -174,8 +173,8 @@ class OSC(ANSIToken):
     pass
 
 
-class ANSIParser(StreamParser):
-    def parse(self) -> Generator[StreamRead | Token | ANSIToken, Token, None]:
+class ANSIParser(StreamParser[ANSIToken]):
+    def parse(self) -> ParseResult[ANSIToken]:
         NEW_LINE = "\n"
         CARRIAGE_RETURN = "\r"
         ESCAPE = "\x1b"

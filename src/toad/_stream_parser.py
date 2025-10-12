@@ -6,7 +6,7 @@ import rich.repr
 from typing import Generator, Iterable
 
 
-type ParseResult = Generator[StreamRead | Token, Token, None]
+type ParseResult[ParseType] = Generator[StreamRead | ParseType, Token, None]
 type PatternCheck = Generator[None, str, object | None]
 
 
@@ -140,10 +140,10 @@ class PatternToken(Token):
         yield None, self.value
 
 
-class StreamParser:
+class StreamParser[ParseType]:
     def __init__(self):
         self._gen = self.parse()
-        self._reading: StreamRead | str = next(self._gen)
+        self._reading: StreamRead | ParseType = next(self._gen)
 
     def read(self, count: int) -> Read:
         return Read(count)
@@ -244,7 +244,7 @@ class StreamParser:
                     else:
                         text = ""
 
-    def parse(self) -> Generator[StreamRead | str, Token | None, None]:
+    def parse(self) -> ParseResult[ParseType]:
         yield from ()
 
 
