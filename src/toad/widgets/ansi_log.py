@@ -11,7 +11,6 @@ from textual.cache import LRUCache
 from textual.content import Content
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
-from textual.style import Style
 from textual.selection import Selection
 from textual.filter import LineFilter
 
