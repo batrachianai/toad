@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from toad.widgets.ansi_log import ANSILog
     from toad.widgets.agent_response import AgentResponse
     from toad.widgets.agent_thought import AgentThought
+    from toad.widgets.terminal import Terminal
 
 
 class Cursor(Static):
@@ -403,6 +404,80 @@ class Conversation(containers.Vertical):
             slash_commands.append(slash_command)
         self.agent_slash_commands = slash_commands
         self.update_slash_commands()
+
+    def get_terminal(self, terminal_id: str) -> Terminal | None:
+        """Get a terminal from its id.
+
+        Args:
+            terminal_id: ID of the terminal.
+
+        Returns:
+            Terminal instance, or `None` if no terminal was found.
+        """
+        from toad.widgets.terminal import Terminal
+
+        try:
+            terminal = self.contents.query_one(f"#{terminal_id}", Terminal)
+        except NoMatches:
+            return None
+        if terminal.released:
+            return None
+        return terminal
+
+    @on(acp_messages.CreateTerminal)
+    async def on_acp_create_terminal(self, message: acp_messages.CreateTerminal):
+        from toad.widgets.terminal import Terminal, Command
+
+        command = Command(
+            message.command,
+            message.args or [],
+            message.env or {},
+            message.cwd or str(self.project_path),
+        )
+        terminal = Terminal(
+            command,
+            output_byte_limit=message.output_byte_limit,
+            id=message.terminal_id,
+        )
+        # terminal.display = False
+        width, height = self.contents.scrollable_content_region.size
+        width -= 4
+        terminal.start(width, height)
+        await self.post(terminal)
+
+    @on(acp_messages.KillTerminal)
+    async def on_acp_kill_terminal(self, message: acp_messages.KillTerminal):
+        if (terminal := self.get_terminal(message.terminal_id)) is not None:
+            terminal.kill()
+
+    @on(acp_messages.GetTerminalState)
+    def on_acp_get_terminal_state(self, message: acp_messages.GetTerminalState):
+        if (terminal := self.get_terminal(message.terminal_id)) is None:
+            message.result_future.set_exception(
+                KeyError(f"No terminal with id {message.terminal_id!r}")
+            )
+        else:
+            message.result_future.set_result(terminal.state)
+
+    @on(acp_messages.ReleaseTerminal)
+    def on_acp_terminal_release(self, message: acp_messages.ReleaseTerminal):
+        if (terminal := self.get_terminal(message.terminal_id)) is not None:
+            terminal.kill()
+            terminal.release()
+
+    @work
+    @on(acp_messages.WaitForTerminalExit)
+    async def on_acp_wait_for_terminal_exit(
+        self, message: acp_messages.WaitForTerminalExit
+    ):
+        if (terminal := self.get_terminal(message.terminal_id)) is None:
+            message.result_future.set_exception(
+                KeyError(f"No terminal with id {message.terminal_id!r}")
+            )
+        else:
+            print("WAITING for exit")
+            return_code, signal = await terminal.wait_for_exit()
+            message.result_future.set_result((return_code or 0, signal))
 
     @work
     async def request_permissions(

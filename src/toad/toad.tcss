@@ -210,8 +210,19 @@ Conversation {
         padding: 0 1 0 0;
         margin: 1 0;
         overflow: scroll;
-        scrollbar-size: 0 0;             
+        scrollbar-size: 0 0;
+    }
 
+    Terminal {
+        height: auto;
+        border: panel $text-secondary;  
+        padding: 1 1 0 1;        
+        &.-error {
+            border: panel $text-error;  
+        }
+        &.-released {
+                
+        }
     }
     
     UserInput {
@@ -249,6 +260,8 @@ Welcome {
         height: auto;
     }
 }
+
+
 
 Prompt {
             

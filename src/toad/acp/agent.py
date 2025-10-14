@@ -9,6 +9,7 @@ from copy import deepcopy
 import rich.repr
 
 from textual.content import Content
+from textual.message import Message
 from textual.message_pump import MessagePump
 from textual import log
 
@@ -63,6 +64,8 @@ class Agent(AgentBase):
 
         self._message_target: MessagePump | None = None
 
+        self._terminal_count: int = 0
+
     def __rich_repr__(self) -> rich.repr.Result:
         yield self.project_root_path
         yield self.command
@@ -93,6 +96,19 @@ class Agent(AgentBase):
         """Create a request object."""
         return API.request(self.send)
 
+    def post_message(self, message: Message) -> bool:
+        """Post a message to the message target (the Conversation).
+
+        Args:
+            message (_type_): _description_
+
+        Returns:
+            `True` if the message was posted successfully, or `False` if it wasn't.
+        """
+        if (message_target := self._message_target) is None:
+            return False
+        return message_target.post_message(message)
+
     @jsonrpc.expose("session/update")
     def rpc_session_update(self, sessionId: str, update: protocol.SessionUpdate):
         """Agent requests an update.
@@ -100,28 +116,25 @@ class Agent(AgentBase):
         https://agentclientprotocol.com/protocol/schema
         """
 
-        if (message_target := self._message_target) is None:
-            return
-
         match update:
             case {
                 "sessionUpdate": "agent_message_chunk",
                 "content": {"type": type, "text": text},
             }:
-                message_target.post_message(messages.Update(type, text))
+                self.post_message(messages.Update(type, text))
 
             case {
                 "sessionUpdate": "agent_thought_chunk",
                 "content": {"type": type, "text": text},
             }:
-                message_target.post_message(messages.Thinking(type, text))
+                self.post_message(messages.Thinking(type, text))
 
             case {
                 "sessionUpdate": "tool_call",
                 "toolCallId": tool_call_id,
             }:
                 self.tool_calls[tool_call_id] = update
-                message_target.post_message(messages.ToolCall(update))
+                self.post_message(messages.ToolCall(update))
 
             case {
                 "sessionUpdate": "tool_call_update",
@@ -133,7 +146,7 @@ class Agent(AgentBase):
                         if value is not None:
                             current_tool_call[key] = value
 
-                    message_target.post_message(
+                    self.post_message(
                         messages.ToolCallUpdate(deepcopy(current_tool_call), update)
                     )
                 else:
@@ -148,15 +161,13 @@ class Agent(AgentBase):
                             current_tool_call[key] = value
 
                     self.tool_calls[tool_call_id] = current_tool_call
-                    message_target.post_message(messages.ToolCall(current_tool_call))
+                    self.post_message(messages.ToolCall(current_tool_call))
 
             case {
                 "sessionUpdate": "available_commands_update",
                 "availableCommands": available_commands,
             }:
-                message_target.post_message(
-                    messages.AvailableCommandsUpdate(available_commands)
-                )
+                self.post_message(messages.AvailableCommandsUpdate(available_commands))
 
     @jsonrpc.expose("session/request_permission")
     async def rpc_request_permission(
@@ -177,7 +188,6 @@ class Agent(AgentBase):
         Returns:
             The response to the permission request.
         """
-        assert self._message_target is not None
         result_future: asyncio.Future[Answer] = asyncio.Future()
         # kind = toolCall.get("kind", None)
         tool_call_id = toolCall["toolCallId"]
@@ -190,7 +200,7 @@ class Agent(AgentBase):
             tool_call = deepcopy(self.tool_calls[tool_call_id])
 
         message = messages.RequestPermission(options, tool_call, result_future)
-        self._message_target.post_message(message)
+        self.post_message(message)
         await result_future
         ask_result = result_future.result()
 
@@ -244,40 +254,83 @@ class Agent(AgentBase):
         args: list[str] | None = None,
         cwd: str | None = None,
         env: list[protocol.EnvVariable] | None = None,
-        outputByteLimit: str | None = None,
+        outputByteLimit: int | None = None,
         sessionId: str | None = None,
     ) -> protocol.CreateTerminalResponse:
-        return {"terminalId": ""}
+        # Assign a terminal id
+        self._terminal_count = self._terminal_count + 1
+        terminal_id = f"terminal-{self._terminal_count}"
+
+        terminal_env = (
+            {variable["name"]: variable["value"] for variable in env} if env else {}
+        )
+
+        self.post_message(
+            messages.CreateTerminal(
+                terminal_id,
+                command=command,
+                args=args,
+                cwd=cwd,
+                env=terminal_env,
+                output_byte_limit=outputByteLimit,
+            )
+        )
+        return {"terminalId": terminal_id}
 
     # https://agentclientprotocol.com/protocol/schema#killterminalcommandrequest
     @jsonrpc.expose("terminal/kill")
     def rpc_terminal_kill(
         self, sessionID: str, terminalId: str, _meta: dict | None = None
     ) -> protocol.KillTerminalCommandResponse:
+        self.post_message(messages.KillTerminal(terminalId))
         return {}
 
     # https://agentclientprotocol.com/protocol/schema#terminal%2Foutput
     @jsonrpc.expose("terminal/output")
-    def rpc_terminal_output(
+    async def rpc_terminal_output(
         self, sessionId: str, terminalId: str, _meta: dict | None = None
     ) -> protocol.TerminalOutputResponse:
-        output = ""
-        truncated = False
-        return {"output": output, "truncated": truncated}
+        from toad.widgets.terminal import TerminalState
+
+        result_future: asyncio.Future[TerminalState] = asyncio.Future()
+
+        if not self.post_message(messages.GetTerminalState(terminalId, result_future)):
+            raise RuntimeError("Unable to get terminal output")
+
+        await result_future
+        terminal_state = result_future.result()
+
+        result: protocol.TerminalOutputResponse = {
+            "output": terminal_state.output,
+            "truncated": terminal_state.truncated,
+        }
+        if (return_code := terminal_state.return_code) is not None:
+            result["exitStatus"] = {"exitCode": return_code}
+        return result
 
     # https://agentclientprotocol.com/protocol/schema#terminal%2Frelease
     @jsonrpc.expose("terminal/release")
     def rpc_terminal_release(
         self, sessionId: str, terminalId: str, _meta: dict | None = None
     ) -> protocol.ReleaseTerminalResponse:
+        self.post_message(messages.ReleaseTerminal(terminalId))
         return {}
 
     # https://agentclientprotocol.com/protocol/schema#terminal%2Fwait-for-exit
     @jsonrpc.expose("terminal/wait_for_exit")
-    def rpc_terminal_wait_for_exit(
+    async def rpc_terminal_wait_for_exit(
         self, sessionId: str, terminalId: str, _meta: dict | None = None
     ) -> protocol.WaitForTerminalExitResponse:
-        return {}
+        result_future: asyncio.Future[tuple[int, str | None]] = asyncio.Future()
+        if not self.post_message(
+            messages.WaitForTerminalExit(terminalId, result_future)
+        ):
+            print("!!!")
+            raise RuntimeError("Unable to wait for terminal exit; no terminal found")
+
+        await result_future
+        return_code, signal = result_future.result()
+        return {"exitCode": return_code, "signal": signal}
 
     async def _run_agent(self) -> None:
         """Task to communicate with the agent subprocess."""
@@ -325,7 +378,6 @@ class Agent(AgentBase):
 
             try:
                 agent_data: jsonrpc.JSONType = json.loads(line.decode("utf-8"))
-                log(agent_data)
             except Exception:
                 # TODO: handle this
                 raise

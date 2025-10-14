@@ -269,6 +269,7 @@ class Prompt(containers.VerticalGroup):
             "mkdir",
             "touch",
             "open",
+            "pwd",
         ):
             return True
         return False

@@ -30,7 +30,7 @@ def replay(path: str) -> None:
     stdout = sys.stdout.buffer
     with open(path, "rb") as replay_file:
         for line in replay_file.readlines():
-            time.sleep(0.1)
+            time.sleep(1)
             stdout.write(line)
             stdout.flush()
 

@@ -159,14 +159,14 @@ class Server:
                     "message": error.message,
                 },
             }
-        except Exception:
+        except Exception as error:
             log.exception("Error dispatching JSONRPC request")
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
                 "error": {
                     "code": int(ErrorCode.INTERNAL_ERROR),
-                    "message": "An error occurred handling your request, see server logs",
+                    "message": f"An error occurred handling your request: {error:!r}",
                 },
             }
 
@@ -261,6 +261,8 @@ class Server:
             error.id = request_id
             raise error
         except Exception as error:
+            raise
+            print("JSON error", repr(error))
             log.debug(f"Error in exposed JSONRPC method; {error}")
             raise InternalError(str(error), id=request_id)
 
@@ -269,8 +271,6 @@ class Server:
             return None
 
         response_object = {"jsonrpc": "2.0", "result": result, "id": request_id}
-        print("JSONRPC response")
-        print(response_object)
         return response_object
 
     async def _dispatch_batch(self, json: JSONList) -> list[JSONType]:
@@ -452,7 +452,6 @@ class API:
                                 APIError(code, message, data)
                             )
                 else:
-                    print("RESULT", result)
                     method_call.future.set_result(result)
 
     def process_response(self, response: JSONType) -> None:
