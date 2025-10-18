@@ -187,8 +187,8 @@ class Conversation(containers.Vertical):
         self._agent_thought: AgentThought | None = None
 
     def compose(self) -> ComposeResult:
+        yield Throbber(id="throbber")
         with Window():
-            yield Throbber(id="throbber")
             with ContentsGrid():
                 with containers.VerticalGroup(id="cursor-container"):
                     yield Cursor()
@@ -413,6 +413,8 @@ class Conversation(containers.Vertical):
             options,
             message.tool_call,
         )
+        self._agent_response = None
+        self._agent_thought = None
 
     @on(acp_messages.Plan)
     async def on_acp_plan(self, message: acp_messages.Plan):

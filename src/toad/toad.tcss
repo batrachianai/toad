@@ -13,8 +13,7 @@ Throbber {
     visibility: hidden;
     &.-busy {
         visibility: visible;
-    }
-    dock: top;
+    }    
 } 
 
 .-hidden {

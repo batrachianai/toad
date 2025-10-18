@@ -56,13 +56,16 @@ class ThrobberVisual(Visual):
 
         time = monotonic()
         gradient = self.gradient
+        background = style.rich_style.bgcolor
+
         strips = [
             Strip(
                 [
                     Segment(
                         "━",
                         RichStyle.from_color(
-                            gradient.get_rich_color((offset / width - time) % 1.0)
+                            gradient.get_rich_color((offset / width - time) % 1.0),
+                            background,
                         ),
                     )
                     for offset in range(width)
