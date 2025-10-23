@@ -49,7 +49,8 @@ Generating a buzz ahead of the first open release will be very beneficial.
 
 You may share your thoughts on social media in addition to screenshots and videos (but obviously no code from this repository).
 
-I intend to release a first public version when there is enough core functionality, under an Open Source license (probably MIT).
+I intend to release a first public version when there is enough core functionality.
+Progress has been good. So I would expect a release in December.
 
 ## Requirements
 
@@ -118,4 +119,5 @@ Thanks for being a part of this!
 See you in discussions.
 
 I'm also in the #toad channel on the [Textualize discord server](https://discord.gg/Enf6Z3qhVr).
+
 
