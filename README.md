@@ -6,9 +6,15 @@ This repository is currently private.
 If you are here, it is because you had a personal invite from me, and I value your opinion.
 I'm looking for early feedback, and potential collaboration in the future (if you're interested).
 
+I am particularly interested in your feedback on usability right now.
+This class of apps is so new, I think there is plenty of room for innovation.
+
 Please use the Discussions tab for your feedback.
 Avoid issues and PRs for now, unless we've agreed on them in the Discussions tab.
 I am working quite fast, and chances are I am aware of most of the issues.
+
+Toad is very much a work in progress.
+See [notes.md](https://github.com/Textualize/toad/blob/main/notes.md) for details about what to expect.
 
 <table>
 
@@ -112,3 +118,4 @@ Thanks for being a part of this!
 See you in discussions.
 
 I'm also in the #toad channel on the [Textualize discord server](https://discord.gg/Enf6Z3qhVr).
+
