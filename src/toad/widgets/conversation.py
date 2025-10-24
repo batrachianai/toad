@@ -44,7 +44,7 @@ from toad.widgets.user_input import UserInput
 from toad.widgets.explain import Explain
 from toad.shell import Shell, CurrentWorkingDirectoryChanged, ShellFinished
 from toad.slash_command import SlashCommand
-from toad.protocol import BlockProtocol, MenuProtocol
+from toad.protocol import BlockProtocol, MenuProtocol, ExpandProtocol
 from toad.menus import MenuItem
 
 if TYPE_CHECKING:
@@ -148,10 +148,44 @@ class Conversation(containers.Vertical):
             group=CURSOR_BINDING_GROUP,
         ),
         Binding("enter", "select_block", "Select", tooltip="Select this block"),
-        Binding("escape", "cancel", "Cancel", tooltip="Cancel agent's turn"),
-        Binding("ctrl+m", "mode_switcher", "Modes", tooltip="Open the mode switcher"),
-        Binding("ctrl+comma,f2", "settings", "Settings", tooltip="Settings screen"),
-        Binding("ctrl+c", "interrupt", "Interrupt", tooltip="interrupt"),
+        Binding(
+            "space",
+            "expand_block",
+            "Expand",
+            key_display="␣",
+            tooltip="Expand cursor block",
+        ),
+        Binding(
+            "space",
+            "collapse_block",
+            "Collapse",
+            key_display="␣",
+            tooltip="Collapse cursor block",
+        ),
+        Binding(
+            "escape",
+            "cancel",
+            "Cancel",
+            tooltip="Cancel agent's turn",
+        ),
+        Binding(
+            "ctrl+m",
+            "mode_switcher",
+            "Modes",
+            tooltip="Open the mode switcher",
+        ),
+        Binding(
+            "ctrl+comma,f2",
+            "settings",
+            "Settings",
+            tooltip="Settings screen",
+        ),
+        Binding(
+            "ctrl+c",
+            "interrupt",
+            "Interrupt",
+            tooltip="interrupt",
+        ),
     ]
 
     busy_count = var(0)
@@ -235,7 +269,31 @@ class Conversation(containers.Vertical):
             return bool(self.modes)
         if action == "cancel":
             return True if (self.agent and self.turn == "agent") else None
+        if action in {"expand_block", "collapse_block"}:
+            if (cursor_block := self.cursor_block) is None:
+                return False
+            elif isinstance(cursor_block, ExpandProtocol):
+                if action == "expand_block":
+                    return False if cursor_block.is_block_expanded() else True
+                else:
+                    return True if cursor_block.is_block_expanded() else False
+            return None if action == "expand_block" else False
+
         return True
+
+    async def action_expand_block(self) -> None:
+        if (cursor_block := self.cursor_block) is not None:
+            if isinstance(cursor_block, ExpandProtocol):
+                cursor_block.expand_block()
+                self.refresh_bindings()
+                self.call_after_refresh(self.cursor.follow, cursor_block)
+
+    async def action_collapse_block(self) -> None:
+        if (cursor_block := self.cursor_block) is not None:
+            if isinstance(cursor_block, ExpandProtocol):
+                cursor_block.collapse_block()
+                self.refresh_bindings()
+                self.call_after_refresh(self.cursor.follow, cursor_block)
 
     async def post_agent_response(self, fragment: str = "") -> AgentResponse:
         """Get or create an agent response widget."""
@@ -383,12 +441,13 @@ class Conversation(containers.Vertical):
 
     @on(Menu.OptionSelected)
     async def on_menu_option_selected(self, event: Menu.OptionSelected) -> None:
-        await event.menu.remove()
-        self.window.focus(scroll_visible=False)
+        event.stop()
+        event.menu.display = False
         if event.action is not None:
-            self.call_after_refresh(
-                self.run_action, event.action, {"block": event.owner}
-            )
+            await self.run_action(event.action, {"block": event.owner})
+        if (cursor_block := self.get_cursor_block()) is not None:
+            self.call_after_refresh(self.cursor.follow, cursor_block)
+        self.call_after_refresh(event.menu.remove)
 
     @on(Menu.Dismissed)
     async def on_menu_dismissed(self, event: Menu.Dismissed) -> None:
@@ -1133,6 +1192,7 @@ class Conversation(containers.Vertical):
             self.window.scroll_end(duration=2 / 10)
             self.cursor.follow(None)
             self.prompt.focus()
+        self.refresh_bindings()
 
     async def slash_command(self, text: str) -> None:
         command, _, parameters = text[1:].partition(" ")

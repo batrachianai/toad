@@ -174,12 +174,9 @@ Conversation {
         }
     }
 
-    Plan {
-        # border: tall black 20%;
-        border: panel $secondary;
-        # background: black 12%;            
-        background: transparent;
-        # margin: 0 !important;
+    Plan {        
+        border: panel $secondary;        
+        background: transparent;        
         margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
         padding: 1 0 0 1;        
         height: auto;                        
@@ -208,11 +205,14 @@ Conversation {
         }        
     }
 
-    ToolCall {                
-        border: tall black 20%;
-        background: black 12%;            
+    ToolCall {                        
         margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
         padding: 0 0 0 1;
+        layout: vertical;
+
+        ToolCallHeader {
+            width: auto !important;            
+        }
     }
 
     ShellResult {        
@@ -277,7 +277,7 @@ Conversation {
 
 
 Welcome {
-    # height: 100%;
+    
     height: auto;       
     #logo {
         color: $text-success;        

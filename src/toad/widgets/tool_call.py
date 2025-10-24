@@ -1,13 +1,20 @@
 import re
+from typing import Iterable
 from rich.text import Text
 
-from textual import log
+from textual import on
+from textual import events
 from textual.app import ComposeResult
+
 from textual.content import Content
+from textual.reactive import var
+from textual.css.query import NoMatches
 from textual import containers
 from textual.widgets import Static, Markdown
 
+from toad.app import ToadApp
 from toad.acp import protocol
+from toad.menus import MenuItem
 from toad.pill import pill
 
 
@@ -38,9 +45,13 @@ class ToolCallDiff(Static):
 
 
 class ToolCallHeader(Static):
+    ALLOW_SELECT = False
     DEFAULT_CSS = """
     ToolCallHeader {
-        width: 1fr;        
+        width: auto;        
+        &:hover {
+            background: $panel;
+        }
     }
     """
 
@@ -62,13 +73,22 @@ class ToolCall(containers.VerticalGroup):
         }
         #tool-content {
             margin-top: 1;
-            &:empty {
-                display: none;
+            # &:empty {
+            #     display: none;
+            # }
+            display: none;
+        }
+        &.-expanded {
+            #tool-content {
+                display: block;
             }
         }
     }
 
     """
+
+    has_content: var[bool] = var(False)
+    expanded: var[bool] = var(False, toggle_class="-expanded")
 
     def __init__(
         self,
@@ -89,13 +109,61 @@ class ToolCall(containers.VerticalGroup):
         self._tool_call = tool_call
         self.refresh(recompose=True)
 
+    def get_block_menu(self) -> Iterable[MenuItem]:
+        if self.expanded:
+            yield MenuItem("Collapse", "block.collapse", "x")
+        else:
+            yield MenuItem("Expand", "block.expand", "x")
+
+    def action_collapse(self) -> None:
+        self.expanded = False
+
+    def action_expand(self) -> None:
+        self.expanded = True
+
+    def get_block_content(self, destination: str) -> str | None:
+        return None
+
+    def can_expand(self) -> bool:
+        return self.has_content
+
+    def expand_block(self) -> None:
+        self.expanded = True
+
+    def collapse_block(self) -> None:
+        self.expanded = False
+
+    def is_block_expanded(self) -> bool:
+        return self.expanded
+
     def compose(self) -> ComposeResult:
         tool_call = self._tool_call
         content: list[protocol.ToolCallContent] = tool_call.get("content", None) or []
+        self.has_content = bool(content)
+        title = tool_call.get("title", "title")
+
+        yield ToolCallHeader(self.tool_call_header_content, markup=False).with_tooltip(
+            title
+        )
+        with containers.VerticalGroup(id="tool-content"):
+            yield from self._compose_content(content)
+
+    @property
+    def tool_call_header_content(self) -> Content:
+        tool_call = self._tool_call
         kind = tool_call.get("kind", "tool")
         title = tool_call.get("title", "title")
         status = tool_call.get("status", "pending")
+
+        expand_icon: Content = Content.styled("▶ ", "$text 40%")
+        if self.has_content:
+            if self.expanded:
+                expand_icon = Content("▼ ")
+            else:
+                expand_icon = Content("▶ ")
+
         header = Content.assemble(
+            expand_icon,
             "🔧 ",
             pill(kind, "$primary-muted", "$text-primary"),
             " ",
@@ -109,10 +177,27 @@ class ToolCall(containers.VerticalGroup):
             header += Content.assemble(" ", pill("failed", "$error-muted", "$error"))
         elif status == "completed":
             header += Content.from_markup(" [$success]✔")
+        return header
 
-        yield ToolCallHeader(header, markup=False).with_tooltip(title)
-        with containers.VerticalGroup(id="tool-content"):
-            yield from self._compose_content(content)
+    def watch_expanded(self) -> None:
+        try:
+            self.query_one(ToolCallHeader).update(self.tool_call_header_content)
+        except NoMatches:
+            pass
+
+    def watch_has_content(self) -> None:
+        try:
+            self.query_one(ToolCallHeader).update(self.tool_call_header_content)
+        except NoMatches:
+            pass
+
+    @on(events.Click, "ToolCallHeader")
+    def on_click_tool_call_header(self, event: events.Click) -> None:
+        event.stop()
+        if self.has_content:
+            self.expanded = not self.expanded
+        else:
+            self.app.bell()
 
     def _compose_content(
         self, tool_call_content: list[protocol.ToolCallContent]
@@ -139,13 +224,24 @@ class ToolCall(containers.VerticalGroup):
                         yield TextContent(text, markup=False)
 
         for content in tool_call_content:
-            log(content)
             match content:
                 case {"type": "content", "content": sub_content}:
                     yield from compose_content_block(sub_content)
-                case {"type": "diff", "path": path}:
-                    pass
-                    # yield ToolCallDiff(path, markup=False)
+                case {
+                    "type": "diff",
+                    "path": path,
+                    "oldText": old_text,
+                    "newText": new_text,
+                }:
+                    from toad.widgets.diff_view import DiffView
+
+                    yield (diff_view := DiffView(path, path, old_text or "", new_text))
+
+                    if isinstance(self.app, ToadApp):
+                        diff_view_setting = self.app.settings.get("diff.view", str)
+                        diff_view.split = diff_view_setting == "split"
+                        diff_view.auto_split = diff_view_setting == "auto"
+
                 case {"type": "terminal", "terminalId": terminal_id}:
                     pass
 
@@ -184,6 +280,14 @@ if __name__ == "__main__":
         ],
     }
 
+    TOOL_CALL_EMPTY: protocol.ToolCall = {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "run_shell_command-1759480356886",
+        "status": "completed",
+        "title": "Bar",
+        "content": [],
+    }
+
     class ToolApp(App):
         def on_mount(self) -> None:
             self.theme = "dracula"
@@ -191,5 +295,6 @@ if __name__ == "__main__":
         def compose(self) -> ComposeResult:
             yield ToolCall(TOOL_CALL_READ)
             yield ToolCall(TOOL_CALL_CONTENT)
+            yield ToolCall(TOOL_CALL_EMPTY)
 
     ToolApp().run()
