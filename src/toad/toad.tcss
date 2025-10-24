@@ -209,10 +209,15 @@ Conversation {
     }
 
     ToolCall {                
-        border: tall black 20%;
-        background: black 12%;            
+        # border: tall black 20%;
+        # background: black 12%;            
         margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
         padding: 0 0 0 1;
+        layout: vertical;
+
+        ToolCallHeader {
+            width: auto !important;            
+        }
     }
 
     ShellResult {        

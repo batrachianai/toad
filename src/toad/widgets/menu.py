@@ -125,17 +125,12 @@ class Menu(ListView, can_focus=True):
     async def activate_index(self, index: int) -> None:
         action = self._options[index].action
         self.post_message(self.OptionSelected(self, self._owner, action))
-        # self.display = False
-        # await self.remove()
-        # self.post_message(self.Dismissed(self))
 
     async def action_dismiss(self) -> None:
         self.post_message(self.Dismissed(self))
-        # await self.remove()
 
     async def on_blur(self) -> None:
         self.post_message(self.Dismissed(self))
-        # await self.remove()
 
     @on(events.Key)
     async def on_key(self, event: events.Key) -> None:
