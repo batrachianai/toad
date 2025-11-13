@@ -35,7 +35,27 @@ def acp(
     command: str, host: str, port: int, project_dir: str | None, serve: bool = False
 ) -> None:
     """Run an ACP client."""
-    app = ToadApp(acp_command=command, project_dir=project_dir)
+
+    from toad.agent_schema import Agent as AgentData
+
+    agent_data: AgentData = {
+        "identity": "toad.custom",
+        "name": command,
+        "short_name": "agent",
+        "url": "https://github.com/textualize/toad",
+        "protocol": "acp",
+        "type": "coding",
+        "author_name": "Will McGugan",
+        "author_url": "https://willmcgugan.github.io/",
+        "publisher_name": "Will McGugan",
+        "publisher_url": "https://willmcgugan.github.io/",
+        "description": "Agent launched from CLI",
+        "tags": [],
+        "help": "",
+        "run_command": {"*": command},
+        "actions": {},
+    }
+    app = ToadApp(agent_data=agent_data, project_dir=project_dir)
     if serve:
         import shlex
         from textual_serve.server import Server

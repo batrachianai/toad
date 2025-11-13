@@ -248,11 +248,7 @@ class StoreScreen(Screen):
 
         project_path = Path(self.app.project_dir or "./")
 
-        run_command = toad.get_os_matrix(agent["run_command"])
-        # TODO: implement fallback
-        assert run_command is not None
-
-        screen = MainScreen(project_path, run_command)
+        screen = MainScreen(project_path, agent)
         await self.app.push_screen_wait(screen)
 
     @work

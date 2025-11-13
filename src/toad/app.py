@@ -13,6 +13,7 @@ from textual.signal import Signal
 
 
 from toad.settings import Schema, Settings
+from toad.agent_schema import Agent as AgentData
 from toad.settings_schema import SCHEMA
 from toad import paths
 from toad import atomic
@@ -230,17 +231,12 @@ class ToadApp(App, inherit_bindings=False):
 
     def __init__(
         self,
-        acp_command: str | None = None,
+        agent_data: AgentData | None = None,
         project_dir: str | None = None,
         mode: str | None = None,
     ) -> None:
-        """
-
-        Args:
-            acp_command: Command to launch an ACP agent.
-        """
         self.settings_changed_signal = Signal(self, "settings_changed")
-        self.acp_command = acp_command
+        self.agent_data = agent_data
         self.project_dir = project_dir
         self._initial_mode = mode
         super().__init__()
@@ -328,7 +324,7 @@ class ToadApp(App, inherit_bindings=False):
         from toad.screens.main import MainScreen
 
         project_path = Path(self.project_dir or "./").resolve().absolute()
-        return MainScreen(project_path).data_bind(
+        return MainScreen(project_path, self.agent_data).data_bind(
             column=ToadApp.column,
             column_width=ToadApp.column_width,
             scrollbar=ToadApp.scrollbar,

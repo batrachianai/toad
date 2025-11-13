@@ -50,7 +50,6 @@ class Agent(AgentBase):
         super().__init__(project_root)
 
         self._agent_data = agent
-        self.command = command
 
         self.server = jsonrpc.Server()
         self.server.expose_instance(self)
@@ -77,8 +76,9 @@ class Agent(AgentBase):
 
     @property
     def command(self) -> str | None:
-        acp_command = toad.get_os_matrix(self._agent_data["run_command"]))
-        return acp_command            
+        """The command used to launch the agent, or `None` if there isn't one."""
+        acp_command = toad.get_os_matrix(self._agent_data["run_command"])
+        return acp_command
 
     def __rich_repr__(self) -> rich.repr.Result:
         yield self.project_root_path
@@ -365,11 +365,9 @@ class Agent(AgentBase):
         env = os.environ.copy()
         env["TOAD_CWD"] = str(Path("./").absolute())
 
-        if (command:=self.command) is None:
+        if (command := self.command) is None:
             self.post_message(
-                AgentFail(
-                    "Failed to start agent; no run command for this OS"                    
-                )
+                AgentFail("Failed to start agent; no run command for this OS")
             )
             return
 
@@ -488,13 +486,9 @@ class Agent(AgentBase):
                         "readTextFile": True,
                         "writeTextFile": True,
                     },
-                    "terminal": True,                    
+                    "terminal": True,
                 },
-                {
-                    "name": toad.NAME,
-                    "title": toad.TITLE,
-                    "version": toad.get_version()
-                }
+                {"name": toad.NAME, "title": toad.TITLE, "version": toad.get_version()},
             )
 
         response = await initialize_response.wait()
@@ -572,15 +566,3 @@ class Agent(AgentBase):
 
     async def cancel(self) -> bool:
         return await self.acp_session_cancel()
-
-
-if __name__ == "__main__":
-    from rich import print
-
-    async def run_agent():
-        agent = Agent(Path("./"), "gemini --experimental-acp")
-        print(agent)
-        agent.start()
-        await agent.done_event.wait()
-
-    asyncio.run(run_agent())
