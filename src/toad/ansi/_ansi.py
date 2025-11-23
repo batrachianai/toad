@@ -6,15 +6,17 @@ import rich.repr
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from typing import Iterable, Literal, Mapping, NamedTuple, Sequence
+from typing import Iterable, Literal, Mapping, NamedTuple
 from textual import events
-from textual._ansi_sequences import ANSI_SEQUENCES_KEYS
 from textual.color import Color
 from textual.content import Content
-from textual.keys import Keys
 from textual.style import Style, NULL_STYLE
 
-from toad._stream_parser import (
+from toad.ansi._ansi_colors import ANSI_COLORS
+from toad.ansi._keys import TERMINAL_KEY_MAP, CURSOR_KEYS_APPLICATION
+from toad.ansi._control_codes import CONTROL_CODES
+from toad.ansi._sgr_styles import SGR_STYLES
+from toad.ansi._stream_parser import (
     MatchToken,
     StreamParser,
     SeparatorToken,
@@ -45,26 +47,6 @@ class ANSIToken:
     pass
 
 
-# @dataclass
-# class ANSIContent(ANSIToken):
-#     text: str
-
-
-# @dataclass
-# class Separator(ANSIToken):
-#     text: str
-
-
-# @dataclass
-# class CSI(ANSIToken):
-#     text: str
-
-
-# @dataclass
-# class OSC(ANSIToken):
-#     text: str
-
-
 class DEC(NamedTuple):
     slot: int
     character_set: str
@@ -76,132 +58,7 @@ class DECInvoke(NamedTuple):
     shift: int | None = None
 
 
-# class CSIPattern(Pattern):
-#     """Control Sequence Introducer."""
-
-#     PARAMETER_BYTES = character_range(0x30, 0x3F)
-#     INTERMEDIATE_BYTES = character_range(0x20, 0x2F)
-#     FINAL_BYTE = character_range(0x40, 0x7E)
-
-#     class Match(NamedTuple):
-#         parameter: str
-#         intermediate: str
-#         final: str
-
-#         @property
-#         def full(self) -> str:
-#             return f"\x1b[{self.parameter}{self.intermediate}{self.final}"
-
-#     def check(self) -> PatternCheck:
-#         """Check a CSI pattern."""
-#         if (yield) != "[":
-#             return False
-
-#         parameter = io.StringIO()
-#         intermediate = io.StringIO()
-#         parameter_bytes = self.PARAMETER_BYTES
-
-#         while (character := (yield)) in parameter_bytes:
-#             parameter.write(character)
-
-#         if character in self.FINAL_BYTE:
-#             return self.Match(parameter.getvalue(), "", character)
-
-#         intermediate_bytes = self.INTERMEDIATE_BYTES
-#         while True:
-#             intermediate.write(character)
-#             if (character := (yield)) not in intermediate_bytes:
-#                 break
-
-#         final_byte = character
-#         if final_byte not in self.FINAL_BYTE:
-#             return False
-
-#         return self.Match(
-#             parameter.getvalue(),
-#             intermediate.getvalue(),
-#             final_byte,
-#         )
-
-
 DEC_SLOTS = {"(": 0, ")": 1, "*": 2, "+": 3, "-": 1, ".": 2, "//": 3}
-
-
-class DECPattern(Pattern):
-    """Character set sequence."""
-
-    def check(self) -> PatternCheck:
-        if (initial_character := (yield)) not in "()*+":
-            return False
-        slot = "()*+".find(initial_character)
-        character_set = yield
-        return DEC(slot, character_set)
-
-
-class DECInvokePattern(Pattern):
-    """Invoke a character set."""
-
-    INVOKE_G2_INTO_GL = DECInvoke(gl=2)
-    INVOKE_G3_INTO_GL = DECInvoke(gl=3)
-    INVOKE_G1_INTO_GR = DECInvoke(gr=1)
-    INVOKE_G2_INTO_GR = DECInvoke(gr=2)
-    INVOKE_G3_INTO_GR = DECInvoke(gr=3)
-    SHIFT_G2 = DECInvoke(shift=2)
-    SHIFT_G3 = DECInvoke(shift=3)
-
-    INVOKE = {
-        "n": INVOKE_G2_INTO_GL,
-        "o": INVOKE_G3_INTO_GL,
-        "~": INVOKE_G1_INTO_GR,
-        "}": INVOKE_G2_INTO_GR,
-        "|": INVOKE_G3_INTO_GR,
-        "N": SHIFT_G2,
-        "O": SHIFT_G3,
-    }
-
-    def check(self) -> PatternCheck:
-        if (initial_character := (yield)) not in self.INVOKE:
-            return False
-        return self.INVOKE[initial_character]
-
-
-CONTROL_CODES = {
-    "D": "ind",
-    "E": "nel",
-    "H": "hts",
-    "I": "htj",
-    "J": "vts",
-    "K": "pld",
-    "L": "plu",
-    "M": "ri",
-    "N": "ss2",
-    "O": "ss3",
-    "P": "dcs",
-    "Q": "pu1",
-    "R": "pu2",
-    "S": "sts",
-    "T": "cch",
-    "U": "mw",
-    "V": "spa",
-    "W": "epa",
-    "X": "sos",
-    "Z": "decid",
-    "[": "csi",
-    "\\": "st",
-    "]": "osc",
-    "^": "pm",
-    "_": "apc",
-    "c": "ris",
-    "7": "decsc",
-    "8": "decrc",
-    "=": "deckpam",
-    ">": "deckpnm",
-    "#": "decaln",
-    "(": "scs_g0",
-    ")": "scs_g1",
-    "*": "scs_g2",
-    "+": "scs_g3",
-}
 
 
 class FEPattern(Pattern):
@@ -271,67 +128,6 @@ class FEPattern(Pattern):
                 return ("control", character)
 
 
-SGR_STYLE_MAP: Mapping[int, Style] = {
-    1: Style(bold=True),
-    2: Style(dim=True),
-    3: Style(italic=True),
-    4: Style(underline=True),
-    5: Style(blink=True),
-    6: Style(blink=True),
-    7: Style(reverse=True),
-    8: Style(reverse=True),
-    9: Style(strike=True),
-    21: Style(underline2=True),
-    22: Style(dim=False, bold=False),
-    23: Style(italic=False),
-    24: Style(underline=False),
-    25: Style(blink=False),
-    26: Style(blink=False),
-    27: Style(reverse=False),
-    28: NULL_STYLE,  # "not conceal",
-    29: Style(strike=False),
-    30: Style(foreground=Color(0, 0, 0, ansi=0)),
-    31: Style(foreground=Color(128, 0, 0, ansi=1)),
-    32: Style(foreground=Color(0, 128, 0, ansi=2)),
-    33: Style(foreground=Color(128, 128, 0, ansi=3)),
-    34: Style(foreground=Color(0, 0, 128, ansi=4)),
-    35: Style(foreground=Color(128, 0, 128, ansi=5)),
-    36: Style(foreground=Color(0, 128, 128, ansi=6)),
-    37: Style(foreground=Color(192, 192, 192, ansi=7)),
-    39: Style(foreground=Color(0, 0, 0, ansi=-1)),
-    40: Style(background=Color(0, 0, 0, ansi=0)),
-    41: Style(background=Color(128, 0, 0, ansi=1)),
-    42: Style(background=Color(0, 128, 0, ansi=2)),
-    43: Style(background=Color(128, 128, 0, ansi=3)),
-    44: Style(background=Color(0, 0, 128, ansi=4)),
-    45: Style(background=Color(128, 0, 128, ansi=5)),
-    46: Style(background=Color(0, 128, 128, ansi=6)),
-    47: Style(background=Color(192, 192, 192, ansi=7)),
-    49: Style(background=Color(0, 0, 0, ansi=-1)),
-    51: NULL_STYLE,  # "frame",
-    52: NULL_STYLE,  # "encircle",
-    53: NULL_STYLE,  # "overline",
-    54: NULL_STYLE,  # "not frame not encircle",
-    55: NULL_STYLE,  # "not overline",
-    90: Style(foreground=Color(128, 128, 128, ansi=8)),
-    91: Style(foreground=Color(255, 0, 0, ansi=9)),
-    92: Style(foreground=Color(0, 255, 0, ansi=10)),
-    93: Style(foreground=Color(255, 255, 0, ansi=11)),
-    94: Style(foreground=Color(0, 0, 255, ansi=12)),
-    95: Style(foreground=Color(255, 0, 255, ansi=13)),
-    96: Style(foreground=Color(0, 255, 255, ansi=14)),
-    97: Style(foreground=Color(255, 255, 255, ansi=15)),
-    100: Style(background=Color(128, 128, 128, ansi=8)),
-    101: Style(background=Color(255, 0, 0, ansi=9)),
-    102: Style(background=Color(0, 255, 0, ansi=10)),
-    103: Style(background=Color(255, 255, 0, ansi=11)),
-    104: Style(background=Color(0, 0, 255, ansi=12)),
-    105: Style(background=Color(255, 0, 255, ansi=13)),
-    106: Style(background=Color(0, 255, 255, ansi=14)),
-    107: Style(background=Color(255, 255, 255, ansi=15)),
-}
-
-
 class ANSIParser(StreamParser[tuple[str, str]]):
     """Parse a stream of text containing escape sequences in to logical tokens."""
 
@@ -362,295 +158,14 @@ class ANSIParser(StreamParser[tuple[str, str]]):
                         else:
                             yield token.value
 
-                        # match value:
-                        #     case CSIPattern.Match():
-                        #         yield CSI(value.full)
-                        #     case OSCPattern.Match():
-                        #         osc_data: list[str] = []
-
-                        #         while not isinstance(
-                        #             token := (yield self.read_regex(r"\x1b\\|\x07")),
-                        #             MatchToken,
-                        #         ):
-                        #             osc_data.append(token.text)
-                        #         yield OSC("".join(osc_data))
-                        #     case DEC():
-                        #         yield value
-                        #     case DECInvoke():
-                        #         yield value
-                        #     case FEPattern.Match():
-                        #         yield value
-
                 else:
                     yield "separator", token.text
                 continue
 
-            if "\t" in token.text:
-                print("TABS")
             yield "content", token.text
 
 
 EMPTY_LINE = Content()
-
-
-ANSI_COLORS: Sequence[str] = [
-    "ansi_black",
-    "ansi_red",
-    "ansi_green",
-    "ansi_yellow",
-    "ansi_blue",
-    "ansi_magenta",
-    "ansi_cyan",
-    "ansi_white",
-    "ansi_bright_black",
-    "ansi_bright_red",
-    "ansi_bright_green",
-    "ansi_bright_yellow",
-    "ansi_bright_blue",
-    "ansi_bright_magenta",
-    "ansi_bright_cyan",
-    "ansi_bright_white",
-    "rgb(0,0,0)",
-    "rgb(0,0,95)",
-    "rgb(0,0,135)",
-    "rgb(0,0,175)",
-    "rgb(0,0,215)",
-    "rgb(0,0,255)",
-    "rgb(0,95,0)",
-    "rgb(0,95,95)",
-    "rgb(0,95,135)",
-    "rgb(0,95,175)",
-    "rgb(0,95,215)",
-    "rgb(0,95,255)",
-    "rgb(0,135,0)",
-    "rgb(0,135,95)",
-    "rgb(0,135,135)",
-    "rgb(0,135,175)",
-    "rgb(0,135,215)",
-    "rgb(0,135,255)",
-    "rgb(0,175,0)",
-    "rgb(0,175,95)",
-    "rgb(0,175,135)",
-    "rgb(0,175,175)",
-    "rgb(0,175,215)",
-    "rgb(0,175,255)",
-    "rgb(0,215,0)",
-    "rgb(0,215,95)",
-    "rgb(0,215,135)",
-    "rgb(0,215,175)",
-    "rgb(0,215,215)",
-    "rgb(0,215,255)",
-    "rgb(0,255,0)",
-    "rgb(0,255,95)",
-    "rgb(0,255,135)",
-    "rgb(0,255,175)",
-    "rgb(0,255,215)",
-    "rgb(0,255,255)",
-    "rgb(95,0,0)",
-    "rgb(95,0,95)",
-    "rgb(95,0,135)",
-    "rgb(95,0,175)",
-    "rgb(95,0,215)",
-    "rgb(95,0,255)",
-    "rgb(95,95,0)",
-    "rgb(95,95,95)",
-    "rgb(95,95,135)",
-    "rgb(95,95,175)",
-    "rgb(95,95,215)",
-    "rgb(95,95,255)",
-    "rgb(95,135,0)",
-    "rgb(95,135,95)",
-    "rgb(95,135,135)",
-    "rgb(95,135,175)",
-    "rgb(95,135,215)",
-    "rgb(95,135,255)",
-    "rgb(95,175,0)",
-    "rgb(95,175,95)",
-    "rgb(95,175,135)",
-    "rgb(95,175,175)",
-    "rgb(95,175,215)",
-    "rgb(95,175,255)",
-    "rgb(95,215,0)",
-    "rgb(95,215,95)",
-    "rgb(95,215,135)",
-    "rgb(95,215,175)",
-    "rgb(95,215,215)",
-    "rgb(95,215,255)",
-    "rgb(95,255,0)",
-    "rgb(95,255,95)",
-    "rgb(95,255,135)",
-    "rgb(95,255,175)",
-    "rgb(95,255,215)",
-    "rgb(95,255,255)",
-    "rgb(135,0,0)",
-    "rgb(135,0,95)",
-    "rgb(135,0,135)",
-    "rgb(135,0,175)",
-    "rgb(135,0,215)",
-    "rgb(135,0,255)",
-    "rgb(135,95,0)",
-    "rgb(135,95,95)",
-    "rgb(135,95,135)",
-    "rgb(135,95,175)",
-    "rgb(135,95,215)",
-    "rgb(135,95,255)",
-    "rgb(135,135,0)",
-    "rgb(135,135,95)",
-    "rgb(135,135,135)",
-    "rgb(135,135,175)",
-    "rgb(135,135,215)",
-    "rgb(135,135,255)",
-    "rgb(135,175,0)",
-    "rgb(135,175,95)",
-    "rgb(135,175,135)",
-    "rgb(135,175,175)",
-    "rgb(135,175,215)",
-    "rgb(135,175,255)",
-    "rgb(135,215,0)",
-    "rgb(135,215,95)",
-    "rgb(135,215,135)",
-    "rgb(135,215,175)",
-    "rgb(135,215,215)",
-    "rgb(135,215,255)",
-    "rgb(135,255,0)",
-    "rgb(135,255,95)",
-    "rgb(135,255,135)",
-    "rgb(135,255,175)",
-    "rgb(135,255,215)",
-    "rgb(135,255,255)",
-    "rgb(175,0,0)",
-    "rgb(175,0,95)",
-    "rgb(175,0,135)",
-    "rgb(175,0,175)",
-    "rgb(175,0,215)",
-    "rgb(175,0,255)",
-    "rgb(175,95,0)",
-    "rgb(175,95,95)",
-    "rgb(175,95,135)",
-    "rgb(175,95,175)",
-    "rgb(175,95,215)",
-    "rgb(175,95,255)",
-    "rgb(175,135,0)",
-    "rgb(175,135,95)",
-    "rgb(175,135,135)",
-    "rgb(175,135,175)",
-    "rgb(175,135,215)",
-    "rgb(175,135,255)",
-    "rgb(175,175,0)",
-    "rgb(175,175,95)",
-    "rgb(175,175,135)",
-    "rgb(175,175,175)",
-    "rgb(175,175,215)",
-    "rgb(175,175,255)",
-    "rgb(175,215,0)",
-    "rgb(175,215,95)",
-    "rgb(175,215,135)",
-    "rgb(175,215,175)",
-    "rgb(175,215,215)",
-    "rgb(175,215,255)",
-    "rgb(175,255,0)",
-    "rgb(175,255,95)",
-    "rgb(175,255,135)",
-    "rgb(175,255,175)",
-    "rgb(175,255,215)",
-    "rgb(175,255,255)",
-    "rgb(215,0,0)",
-    "rgb(215,0,95)",
-    "rgb(215,0,135)",
-    "rgb(215,0,175)",
-    "rgb(215,0,215)",
-    "rgb(215,0,255)",
-    "rgb(215,95,0)",
-    "rgb(215,95,95)",
-    "rgb(215,95,135)",
-    "rgb(215,95,175)",
-    "rgb(215,95,215)",
-    "rgb(215,95,255)",
-    "rgb(215,135,0)",
-    "rgb(215,135,95)",
-    "rgb(215,135,135)",
-    "rgb(215,135,175)",
-    "rgb(215,135,215)",
-    "rgb(215,135,255)",
-    "rgb(215,175,0)",
-    "rgb(215,175,95)",
-    "rgb(215,175,135)",
-    "rgb(215,175,175)",
-    "rgb(215,175,215)",
-    "rgb(215,175,255)",
-    "rgb(215,215,0)",
-    "rgb(215,215,95)",
-    "rgb(215,215,135)",
-    "rgb(215,215,175)",
-    "rgb(215,215,215)",
-    "rgb(215,215,255)",
-    "rgb(215,255,0)",
-    "rgb(215,255,95)",
-    "rgb(215,255,135)",
-    "rgb(215,255,175)",
-    "rgb(215,255,215)",
-    "rgb(215,255,255)",
-    "rgb(255,0,0)",
-    "rgb(255,0,95)",
-    "rgb(255,0,135)",
-    "rgb(255,0,175)",
-    "rgb(255,0,215)",
-    "rgb(255,0,255)",
-    "rgb(255,95,0)",
-    "rgb(255,95,95)",
-    "rgb(255,95,135)",
-    "rgb(255,95,175)",
-    "rgb(255,95,215)",
-    "rgb(255,95,255)",
-    "rgb(255,135,0)",
-    "rgb(255,135,95)",
-    "rgb(255,135,135)",
-    "rgb(255,135,175)",
-    "rgb(255,135,215)",
-    "rgb(255,135,255)",
-    "rgb(255,175,0)",
-    "rgb(255,175,95)",
-    "rgb(255,175,135)",
-    "rgb(255,175,175)",
-    "rgb(255,175,215)",
-    "rgb(255,175,255)",
-    "rgb(255,215,0)",
-    "rgb(255,215,95)",
-    "rgb(255,215,135)",
-    "rgb(255,215,175)",
-    "rgb(255,215,215)",
-    "rgb(255,215,255)",
-    "rgb(255,255,0)",
-    "rgb(255,255,95)",
-    "rgb(255,255,135)",
-    "rgb(255,255,175)",
-    "rgb(255,255,215)",
-    "rgb(255,255,255)",
-    "rgb(8,8,8)",
-    "rgb(18,18,18)",
-    "rgb(28,28,28)",
-    "rgb(38,38,38)",
-    "rgb(48,48,48)",
-    "rgb(58,58,58)",
-    "rgb(68,68,68)",
-    "rgb(78,78,78)",
-    "rgb(88,88,88)",
-    "rgb(98,98,98)",
-    "rgb(108,108,108)",
-    "rgb(118,118,118)",
-    "rgb(128,128,128)",
-    "rgb(138,138,138)",
-    "rgb(148,148,148)",
-    "rgb(158,158,158)",
-    "rgb(168,168,168)",
-    "rgb(178,178,178)",
-    "rgb(188,188,188)",
-    "rgb(198,198,198)",
-    "rgb(208,208,208)",
-    "rgb(218,218,218)",
-    "rgb(228,228,228)",
-    "rgb(238,238,238)",
-]
 
 
 type ClearType = Literal["cursor_to_end", "cursor_to_beginning", "screen", "scrollback"]
@@ -852,15 +367,15 @@ class ANSIStream:
                     style += Style(background=Color(red, green, blue))
                 case [38, 5, ansi_color, *codes]:
                     # Foreground ANSI
-                    style += Style(foreground=Color.parse(ANSI_COLORS[ansi_color]))
+                    style += Style(foreground=ANSI_COLORS[ansi_color])
                 case [48, 5, ansi_color, *codes]:
                     # Background ANSI
-                    style += Style(background=Color.parse(ANSI_COLORS[ansi_color]))
+                    style += Style(background=ANSI_COLORS[ansi_color])
                 case [0, *codes]:
                     # reset
                     return None
                 case [code, *codes]:
-                    if sgr_style := SGR_STYLE_MAP.get(code):
+                    if sgr_style := SGR_STYLES.get(code):
                         style += sgr_style
 
         return style
@@ -1186,29 +701,24 @@ class Buffer:
 
     lines: list[LineRecord] = field(default_factory=list)
     """unfolded lines."""
-
     line_to_fold: list[int] = field(default_factory=list)
     """An index from folded lines on to unfolded lines."""
-
     folded_lines: list[LineFold] = field(default_factory=list)
     """Folded lines."""
-
     scroll_margin: ScrollMargin = ScrollMargin(0, 0)
     """Scroll margins"""
-
     cursor_line: int = 0
     """Folded line index."""
     cursor_offset: int = 0
     """Folded line offset."""
-
     max_line_width: int = 0
     """The longest line in the buffer."""
-
     updates: int = 0
     """Updates count (used in caching)."""
 
     @property
     def line_count(self) -> int:
+        """Total number of lines."""
         return len(self.lines)
 
     @property
@@ -1218,6 +728,7 @@ class Buffer:
 
     @property
     def unfolded_line(self) -> int:
+        """THh unfolded line index under the cursor."""
         cursor_folded_line = self.folded_lines[self.cursor_line]
         return cursor_folded_line.line_no
 
@@ -1241,6 +752,12 @@ class Buffer:
         return (line_no, position)
 
     def clear(self, updates: int) -> None:
+        """Clear the buffer to its initial state.
+
+        Args:
+            updates: the initial updates index.
+
+        """
         del self.lines[:]
         del self.line_to_fold[:]
         del self.folded_lines[:]
@@ -1305,264 +822,16 @@ class MouseTracking:
     alternate_scroll: bool = False
 
 
-TERMINAL_KEY_MAP = {
-    # ============================================================================
-    # FUNCTION KEYS (F1-F12)
-    # ============================================================================
-    # Unmodified function keys
-    "f1": "\x1bOP",  # ESC O P (SS3 P)
-    "f2": "\x1bOQ",  # ESC O Q (SS3 Q)
-    "f3": "\x1bOR",  # ESC O R (SS3 R)
-    "f4": "\x1bOS",  # ESC O S (SS3 S)
-    "f5": "\x1b[15~",  # CSI 15 ~
-    "f6": "\x1b[17~",  # CSI 17 ~
-    "f7": "\x1b[18~",  # CSI 18 ~
-    "f8": "\x1b[19~",  # CSI 19 ~
-    "f9": "\x1b[20~",  # CSI 20 ~
-    "f10": "\x1b[21~",  # CSI 21 ~
-    "f11": "\x1b[23~",  # CSI 23 ~
-    "f12": "\x1b[24~",  # CSI 24 ~
-    # Shift+Function keys
-    "shift+f1": "\x1b[1;2P",  # CSI 1 ; 2 P
-    "shift+f2": "\x1b[1;2Q",  # CSI 1 ; 2 Q
-    "shift+f3": "\x1b[1;2R",  # CSI 1 ; 2 R
-    "shift+f4": "\x1b[1;2S",  # CSI 1 ; 2 S
-    "shift+f5": "\x1b[15;2~",  # CSI 15 ; 2 ~
-    "shift+f6": "\x1b[17;2~",  # CSI 17 ; 2 ~
-    "shift+f7": "\x1b[18;2~",  # CSI 18 ; 2 ~
-    "shift+f8": "\x1b[19;2~",  # CSI 19 ; 2 ~
-    "shift+f9": "\x1b[20;2~",  # CSI 20 ; 2 ~
-    "shift+f10": "\x1b[21;2~",  # CSI 21 ; 2 ~
-    "shift+f11": "\x1b[23;2~",  # CSI 23 ; 2 ~
-    "shift+f12": "\x1b[24;2~",  # CSI 24 ; 2 ~
-    # Ctrl+Function keys
-    "ctrl+f1": "\x1b[1;5P",  # CSI 1 ; 5 P
-    "ctrl+f2": "\x1b[1;5Q",  # CSI 1 ; 5 Q
-    "ctrl+f3": "\x1b[1;5R",  # CSI 1 ; 5 R
-    "ctrl+f4": "\x1b[1;5S",  # CSI 1 ; 5 S
-    "ctrl+f5": "\x1b[15;5~",  # CSI 15 ; 5 ~
-    "ctrl+f6": "\x1b[17;5~",  # CSI 17 ; 5 ~
-    "ctrl+f7": "\x1b[18;5~",  # CSI 18 ; 5 ~
-    "ctrl+f8": "\x1b[19;5~",  # CSI 19 ; 5 ~
-    "ctrl+f9": "\x1b[20;5~",  # CSI 20 ; 5 ~
-    "ctrl+f10": "\x1b[21;5~",  # CSI 21 ; 5 ~
-    "ctrl+f11": "\x1b[23;5~",  # CSI 23 ; 5 ~
-    "ctrl+f12": "\x1b[24;5~",  # CSI 24 ; 5 ~
-    # Ctrl+Shift+Function keys
-    "ctrl+shift+f1": "\x1b[1;6P",  # CSI 1 ; 6 P
-    "ctrl+shift+f2": "\x1b[1;6Q",  # CSI 1 ; 6 Q
-    "ctrl+shift+f3": "\x1b[1;6R",  # CSI 1 ; 6 R
-    "ctrl+shift+f4": "\x1b[1;6S",  # CSI 1 ; 6 S
-    "ctrl+shift+f5": "\x1b[15;6~",  # CSI 15 ; 6 ~
-    "ctrl+shift+f6": "\x1b[17;6~",  # CSI 17 ; 6 ~
-    "ctrl+shift+f7": "\x1b[18;6~",  # CSI 18 ; 6 ~
-    "ctrl+shift+f8": "\x1b[19;6~",  # CSI 19 ; 6 ~
-    "ctrl+shift+f9": "\x1b[20;6~",  # CSI 20 ; 6 ~
-    "ctrl+shift+f10": "\x1b[21;6~",  # CSI 21 ; 6 ~
-    "ctrl+shift+f11": "\x1b[23;6~",  # CSI 23 ; 6 ~
-    "ctrl+shift+f12": "\x1b[24;6~",  # CSI 24 ; 6 ~
-    # ============================================================================
-    # ARROW KEYS
-    # ============================================================================
-    # Unmodified arrow keys (Normal mode - CSI format)
-    "up": "\x1b[A",  # CSI A
-    "down": "\x1b[B",  # CSI B
-    "right": "\x1b[C",  # CSI C
-    "left": "\x1b[D",  # CSI D
-    # Shift+Arrow keys
-    "shift+up": "\x1b[1;2A",  # CSI 1 ; 2 A
-    "shift+down": "\x1b[1;2B",  # CSI 1 ; 2 B
-    "shift+right": "\x1b[1;2C",  # CSI 1 ; 2 C
-    "shift+left": "\x1b[1;2D",  # CSI 1 ; 2 D
-    # Ctrl+Arrow keys
-    "ctrl+up": "\x1b[1;5A",  # CSI 1 ; 5 A
-    "ctrl+down": "\x1b[1;5B",  # CSI 1 ; 5 B
-    "ctrl+right": "\x1b[1;5C",  # CSI 1 ; 5 C
-    "ctrl+left": "\x1b[1;5D",  # CSI 1 ; 5 D
-    # Ctrl+Shift+Arrow keys
-    "ctrl+shift+up": "\x1b[1;6A",  # CSI 1 ; 6 A
-    "ctrl+shift+down": "\x1b[1;6B",  # CSI 1 ; 6 B
-    "ctrl+shift+right": "\x1b[1;6C",  # CSI 1 ; 6 C
-    "ctrl+shift+left": "\x1b[1;6D",  # CSI 1 ; 6 D
-    # ============================================================================
-    # NAVIGATION KEYS
-    # ============================================================================
-    # Home
-    "home": "\x1b[H",  # CSI H (or \x1b[1~)
-    "shift+home": "\x1b[1;2H",  # CSI 1 ; 2 H
-    "ctrl+home": "\x1b[1;5H",  # CSI 1 ; 5 H
-    "ctrl+shift+home": "\x1b[1;6H",  # CSI 1 ; 6 H
-    # End
-    "end": "\x1b[F",  # CSI F (or \x1b[4~)
-    "shift+end": "\x1b[1;2F",  # CSI 1 ; 2 F
-    "ctrl+end": "\x1b[1;5F",  # CSI 1 ; 5 F
-    "ctrl+shift+end": "\x1b[1;6F",  # CSI 1 ; 6 F
-    # Page Up
-    "pageup": "\x1b[5~",  # CSI 5 ~
-    "shift+pageup": "\x1b[5;2~",  # CSI 5 ; 2 ~
-    "ctrl+pageup": "\x1b[5;5~",  # CSI 5 ; 5 ~
-    "ctrl+shift+pageup": "\x1b[5;6~",  # CSI 5 ; 6 ~
-    # Page Down
-    "pagedown": "\x1b[6~",  # CSI 6 ~
-    "shift+pagedown": "\x1b[6;2~",  # CSI 6 ; 2 ~
-    "ctrl+pagedown": "\x1b[6;5~",  # CSI 6 ; 5 ~
-    "ctrl+shift+pagedown": "\x1b[6;6~",  # CSI 6 ; 6 ~
-    # Insert
-    "insert": "\x1b[2~",  # CSI 2 ~
-    "shift+insert": "\x1b[2;2~",  # CSI 2 ; 2 ~
-    "ctrl+insert": "\x1b[2;5~",  # CSI 2 ; 5 ~
-    "ctrl+shift+insert": "\x1b[2;6~",  # CSI 2 ; 6 ~
-    # Delete
-    "delete": "\x1b[3~",  # CSI 3 ~
-    "shift+delete": "\x1b[3;2~",  # CSI 3 ; 2 ~
-    "ctrl+delete": "\x1b[3;5~",  # CSI 3 ; 5 ~
-    "ctrl+shift+delete": "\x1b[3;6~",  # CSI 3 ; 6 ~
-    # ============================================================================
-    # SPECIAL KEYS
-    # ============================================================================
-    # Tab
-    "tab": "\t",  # Horizontal tab (0x09)
-    "shift+tab": "\x1b[Z",  # CSI Z (Back tab)
-    "ctrl+tab": "\x1b[27;5;9~",  # Modified tab (some terminals)
-    "ctrl+shift+tab": "\x1b[27;6;9~",  # Modified back tab
-    # Enter/Return
-    "enter": "\r",  # Carriage return (0x0D)
-    "ctrl+enter": "\x1b[27;5;13~",  # Modified enter (some terminals)
-    "shift+enter": "\x1b[27;2;13~",  # Modified enter (some terminals)
-    "ctrl+shift+enter": "\x1b[27;6;13~",
-    # Backspace
-    "backspace": "\x7f",  # Delete (0x7F) - most common
-    "ctrl+backspace": "\x08",  # Ctrl+H (0x08)
-    "shift+backspace": "\x7f",  # Usually same as backspace
-    "ctrl+shift+backspace": "\x08",
-    # Escape
-    "escape": "\x1b",  # ESC (0x1B)
-    # Space (for completeness with modifiers)
-    "ctrl+space": "\x00",  # Ctrl+Space = NUL
-    "shift+space": " ",  # Just space
-    # ============================================================================
-    # CTRL+LETTER COMBINATIONS (C0 controls)
-    # ============================================================================
-    # These are traditional C0 control characters
-    "ctrl+a": "\x01",  # SOH
-    "ctrl+b": "\x02",  # STX
-    "ctrl+c": "\x03",  # ETX (interrupt)
-    "ctrl+d": "\x04",  # EOT (EOF)
-    "ctrl+e": "\x05",  # ENQ
-    "ctrl+f": "\x06",  # ACK
-    "ctrl+g": "\x07",  # BEL (bell)
-    "ctrl+h": "\x08",  # BS (backspace)
-    "ctrl+i": "\t",  # HT (tab) - same as tab
-    "ctrl+j": "\n",  # LF (line feed)
-    "ctrl+k": "\x0b",  # VT (vertical tab)
-    "ctrl+l": "\x0c",  # FF (form feed)
-    "ctrl+m": "\r",  # CR (carriage return) - same as enter
-    "ctrl+n": "\x0e",  # SO
-    "ctrl+o": "\x0f",  # SI
-    "ctrl+p": "\x10",  # DLE
-    "ctrl+q": "\x11",  # DC1 (XON)
-    "ctrl+r": "\x12",  # DC2
-    "ctrl+s": "\x13",  # DC3 (XOFF)
-    "ctrl+t": "\x14",  # DC4
-    "ctrl+u": "\x15",  # NAK
-    "ctrl+v": "\x16",  # SYN
-    "ctrl+w": "\x17",  # ETB
-    "ctrl+x": "\x18",  # CAN
-    "ctrl+y": "\x19",  # EM
-    "ctrl+z": "\x1a",  # SUB
-    "ctrl+[": "\x1b",  # ESC (escape) - alternative
-    "ctrl+\\": "\x1c",  # FS
-    "ctrl+]": "\x1d",  # GS
-    "ctrl+^": "\x1e",  # RS (Ctrl+Shift+6)
-    "ctrl+_": "\x1f",  # US (Ctrl+Shift+-)
-    # ============================================================================
-    # CTRL+SHIFT+LETTER COMBINATIONS (where distinct)
-    # ============================================================================
-    # Modern terminals often send different sequences for Ctrl+Shift+Letter
-    # These use the CSI 27 ; modifier ; ascii format
-    "ctrl+shift+a": "\x1b[27;6;65~",  # CSI 27 ; 6 ; 65 ~ (ASCII A=65)
-    "ctrl+shift+b": "\x1b[27;6;66~",
-    "ctrl+shift+c": "\x1b[27;6;67~",
-    "ctrl+shift+d": "\x1b[27;6;68~",
-    "ctrl+shift+e": "\x1b[27;6;69~",
-    "ctrl+shift+f": "\x1b[27;6;70~",
-    "ctrl+shift+g": "\x1b[27;6;71~",
-    "ctrl+shift+h": "\x1b[27;6;72~",
-    "ctrl+shift+i": "\x1b[27;6;73~",
-    "ctrl+shift+j": "\x1b[27;6;74~",
-    "ctrl+shift+k": "\x1b[27;6;75~",
-    "ctrl+shift+l": "\x1b[27;6;76~",
-    "ctrl+shift+m": "\x1b[27;6;77~",
-    "ctrl+shift+n": "\x1b[27;6;78~",
-    "ctrl+shift+o": "\x1b[27;6;79~",
-    "ctrl+shift+p": "\x1b[27;6;80~",
-    "ctrl+shift+q": "\x1b[27;6;81~",
-    "ctrl+shift+r": "\x1b[27;6;82~",
-    "ctrl+shift+s": "\x1b[27;6;83~",
-    "ctrl+shift+t": "\x1b[27;6;84~",
-    "ctrl+shift+u": "\x1b[27;6;85~",
-    "ctrl+shift+v": "\x1b[27;6;86~",
-    "ctrl+shift+w": "\x1b[27;6;87~",
-    "ctrl+shift+x": "\x1b[27;6;88~",
-    "ctrl+shift+y": "\x1b[27;6;89~",
-    "ctrl+shift+z": "\x1b[27;6;90~",
-    # ============================================================================
-    # CTRL+DIGIT COMBINATIONS
-    # ============================================================================
-    "ctrl+0": "\x1b[27;5;48~",  # CSI 27 ; 5 ; 48 ~ (ASCII 0=48)
-    "ctrl+1": "\x1b[27;5;49~",
-    "ctrl+2": "\x00",  # Ctrl+2 = NUL (traditional)
-    "ctrl+3": "\x1b",  # Ctrl+3 = ESC (traditional)
-    "ctrl+4": "\x1c",  # Ctrl+4 = FS (traditional)
-    "ctrl+5": "\x1d",  # Ctrl+5 = GS (traditional)
-    "ctrl+6": "\x1e",  # Ctrl+6 = RS (traditional)
-    "ctrl+7": "\x1f",  # Ctrl+7 = US (traditional)
-    "ctrl+8": "\x7f",  # Ctrl+8 = DEL (traditional)
-    "ctrl+9": "\x1b[27;5;57~",
-    # ============================================================================
-    # CTRL+SYMBOL COMBINATIONS
-    # ============================================================================
-    "ctrl+`": "\x00",  # Ctrl+` = NUL (same as Ctrl+Space)
-    "ctrl+-": "\x1f",  # Ctrl+- = US
-    "ctrl+=": "\x1b[27;5;61~",  # CSI 27 ; 5 ; 61 ~
-    "ctrl+[": "\x1b",  # ESC (same as escape)
-    "ctrl+]": "\x1d",  # GS
-    "ctrl+\\": "\x1c",  # FS
-    "ctrl+;": "\x1b[27;5;59~",
-    "ctrl+'": "\x1b[27;5;39~",
-    "ctrl+,": "\x1b[27;5;44~",
-    "ctrl+.": "\x1b[27;5;46~",
-    "ctrl+/": "\x1f",  # US (Ctrl+/ = Ctrl+_ on many terminals)
-    # ============================================================================
-    # SHIFT+FUNCTION KEYS (F13-F24 mappings)
-    # ============================================================================
-    # Some terminals map Shift+F1-F12 to F13-F24
-    "f13": "\x1b[25~",  # Shift+F1 alternative
-    "f14": "\x1b[26~",  # Shift+F2 alternative
-    "f15": "\x1b[28~",  # Shift+F3 alternative
-    "f16": "\x1b[29~",  # Shift+F4 alternative
-    "f17": "\x1b[31~",  # Shift+F5 alternative
-    "f18": "\x1b[32~",  # Shift+F6 alternative
-    "f19": "\x1b[33~",  # Shift+F7 alternative
-    "f20": "\x1b[34~",  # Shift+F8 alternative
-}
-
-
-CURSOR_KEYS_APPLICATION = {
-    "up": "\x1bOA",
-    "down": "\x1bOB",
-    "right": "\x1bOC",
-    "left": "\x1bOD",
-    "home": "\x1bOH",
-    "end": "\x1bOF",
-}
-
-
 @rich.repr.auto
 class TerminalState:
-    """Abstract terminal state (no renderer)."""
+    """Abstract terminal state."""
 
     def __init__(self, width: int = 80, height: int = 24) -> None:
+        """
+        Args:
+            width: Initial width.
+            height: Initial height.
+        """
         self._ansi_stream = ANSIStream()
         """ANSI stream processor."""
 
@@ -1572,7 +841,6 @@ class TerminalState:
         """Height of the terminal."""
         self.style = NULL_STYLE
         """The current style."""
-
         self.show_cursor = True
         """Is the cursor visible?"""
         self.alternate_screen = False
@@ -1587,21 +855,16 @@ class TerminalState:
         """Should content replaces characters (`True`) or insert (`False`)?"""
         self.auto_wrap = True
         """Should content wrap?"""
-
         self.current_directory: str = ""
         """Current working directory."""
-
         self.scrollback_buffer = Buffer()
         """Scrollbar buffer lines."""
         self.alternate_buffer = Buffer()
         """Alternate buffer lines."""
-
         self.dec_state = DECState()
         """The DEC (character set) state."""
-
         self.mouse_tracking_state = MouseTracking()
         """The mouse tracking state."""
-
         self._updates: int = 0
         """Incrementing integer used in caching."""
 
@@ -1767,23 +1030,12 @@ class TerminalState:
         # from textual import log
 
         buffer = self.buffer
-
-        print(buffer.scroll_margin)
-
         margin_top, margin_bottom = buffer.scroll_margin.get_line_range(self.height)
-        print(margin_top, margin_bottom)
-
-        # margin_top = buffer.scroll_margin.top or 0
-        # margin_bottom = buffer.scroll_margin.bottom or self.height
-
         line_start = margin_top
         line_end = margin_bottom + 1
 
-        print(line_start, line_end)
-
         if direction == -1:
             # up (first in test)
-            print("UP")
             for line_no in range(line_start, line_end):
                 copy_line_no = line_no + lines
                 if copy_line_no > margin_bottom:
@@ -1797,9 +1049,7 @@ class TerminalState:
 
         else:
             # down
-            print("DOWN")
             for line_no in reversed(range(line_start, line_end)):
-                print(line_no)
                 copy_line_no = line_no - lines
                 if copy_line_no < margin_top:
                     copy_line = EMPTY_LINE
@@ -1949,7 +1199,6 @@ class TerminalState:
                 self.clear_buffer(clear)
 
             case ANSIScrollMargin(top, bottom):
-                print("SCROLL REGION", top, bottom)
                 self.buffer.scroll_margin = ScrollMargin(top, bottom)
                 # Setting the scroll margins moves the cursor to (1, 1)
                 buffer = self.buffer
@@ -2059,39 +1308,6 @@ class TerminalState:
 
         for line_no in range(line_index, buffer.line_count):
             line_record = buffer.lines[line_no]
-            # line_record.updates += 1
             buffer.line_to_fold.append(len(buffer.folded_lines))
             for fold in line_record.folds:
                 buffer.folded_lines.append(fold)
-
-        # self.refresh(Region(0, line_index, self._width, refresh_lines))
-
-
-if __name__ == "__main__":
-    from textual.content import Content
-
-    from rich import print
-
-    # content = Content.from_markup(
-    #     "Hello\n[bold magenta]World[/]!\n[ansi_red]This is [i]red\nVisit [link='https://www.willmcgugan.com']My blog[/]."
-    # )
-    content = Content.from_markup(
-        "[red]012345678901234567890123455678901234567789[/red] " * 2
-    )
-    # content = Content.from_markup("[link='https://www.willmcgugan.com']My blog[/].")
-    ansi_text = "".join(
-        segment.style.render(segment.text) if segment.style else segment.text
-        for segment in content.render_segments()
-    )
-    # print(content)
-    # print(repr(ansi_text))
-
-    parser = ANSIStream()
-    from itertools import batched
-
-    for batch in batched(ansi_text, 1000):
-        for ansi_segment in parser.feed("".join(batch)):
-            print(repr(ansi_segment))
-
-    # for line in parser.lines:
-    #     print(line)

@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
     COMMAND = "htop"
     # COMMAND = "uv run python test_ind.py"
-    COMMAND = "nano"
+    # COMMAND = "nano"
     # COMMAND = "uv run textual keys"
 
     class CommandApp(App):
