@@ -725,6 +725,7 @@ class Buffer:
     """The longest line in the buffer."""
     updates: int = 0
     """Updates count (used in caching)."""
+    _updated_lines: set[int] | None = None
 
     @property
     def line_count(self) -> int:
@@ -963,6 +964,8 @@ class TerminalState:
         if not buffer.lines:
             return
 
+        buffer._updated_lines = None
+
         # Unfolded cursor position
         cursor_line, cursor_offset = buffer.cursor
 
@@ -996,14 +999,42 @@ class TerminalState:
             buffer.cursor_line = fold_cursor_line
             buffer.cursor_offset = fold_cursor_offset
 
-    def write(self, text: str) -> None:
+    def write(self, text: str) -> tuple[set[int] | None, set[int] | None]:
         """Write to the terminal.
 
         Args:
             text: Text to write.
+
+        Returns:
+            A set of updated lines, or `None` if everything should change.
         """
+        alternate_buffer = self.alternate_buffer
+        scrollback_buffer = self.scrollback_buffer
+        alternate_buffer._updated_lines = set()
+        scrollback_buffer._updated_lines = set()
         for ansi_command in self._ansi_stream.feed(text):
             self._handle_ansi_command(ansi_command)
+
+        scrollback_updates = (
+            None
+            if scrollback_buffer._updated_lines is None
+            else scrollback_buffer._updated_lines.copy()
+        )
+        alternate_updates = (
+            None
+            if alternate_buffer._updated_lines is None
+            else alternate_buffer._updated_lines.copy()
+        )
+        self.alternate_buffer._updated_lines = set()
+        self.scrollback_buffer._updated_lines = set()
+        return (scrollback_updates, alternate_updates)
+
+        if self._updated_lines is not None:
+            updated_lines = self._updated_lines.copy()
+            self._updated_lines.clear()
+            return updated_lines
+        else:
+            return None
 
     def get_cursor_line_offset(self, buffer: Buffer) -> int:
         """The cursor offset within the un-folded lines."""
@@ -1292,6 +1323,9 @@ class TerminalState:
         buffer.lines.append(line_record)
         folds = line_record.folds
         buffer.line_to_fold.append(len(buffer.folded_lines))
+        fold_count = len(buffer.folded_lines)
+        if buffer._updated_lines is not None:
+            buffer._updated_lines.update(range(fold_count, fold_count + len(folds)))
         buffer.folded_lines.extend(folds)
 
         buffer.updates = updates
@@ -1313,6 +1347,12 @@ class TerminalState:
             line_index, line_expanded_tabs, self.width
         )
         line_record.updates = self.advance_updates()
+
+        if buffer._updated_lines is not None:
+            fold_start = buffer.line_to_fold[line_index]
+            buffer._updated_lines.update(
+                range(fold_start, fold_start + len(line_record.folds))
+            )
 
         fold_line = buffer.line_to_fold[line_index]
         del buffer.line_to_fold[line_index:]
