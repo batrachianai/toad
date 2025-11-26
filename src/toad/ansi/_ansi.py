@@ -988,7 +988,6 @@ class TerminalState:
             return
 
         buffer._updated_lines = None
-
         # Unfolded cursor position
         cursor_line, cursor_offset = buffer.cursor
 
@@ -1031,7 +1030,7 @@ class TerminalState:
         Returns:
             A pair of deltas or `None for full refresh, for scrollback and alternate screen.
         """
-        print(repr(text))
+
         alternate_buffer = self.alternate_buffer
         scrollback_buffer = self.scrollback_buffer
         # Reset updated lines delta

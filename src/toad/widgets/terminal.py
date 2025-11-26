@@ -115,7 +115,6 @@ class Terminal(ScrollView, can_focus=True):
         with timer(f"write {len(text)} characters"):
             scrollback_delta, alternate_delta = self.state.write(text)
         with timer("Update widget"):
-            # self._update_from_state(None, None)
             self._update_from_state(scrollback_delta, alternate_delta)
 
     def _update_from_state(
