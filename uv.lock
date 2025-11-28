@@ -596,6 +596,35 @@ wheels = [
 ]
 
 [[package]]
+name = "textual-speedups"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d4/73/bba3e9feae9ca730c32122306ddac61278a8bc47633346eddad9d52a435d/textual_speedups-0.2.1.tar.gz", hash = "sha256:72cf0f7bdeede015367b59b70bcf724ba2c3080a8641ebc5eb94b36ad1536824", size = 10951, upload-time = "2025-11-28T09:38:51.582Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/ca/b878beabe3ad2c4aa958f55cb32ba34e7badaa09f73c6e94c87195eb531e/textual_speedups-0.2.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:99a88f44c1b846d51dd115b5fb4dbf97bdef83e9f98a84efec16922a5974e230", size = 278485, upload-time = "2025-11-28T09:37:58.941Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/af/9b49ea67a5e9a6f54600deb63bd7c0fd7dbe4a3592300207d41c52762a1b/textual_speedups-0.2.1-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8d2036752ff0df77972b157e71dd942fd75871d9c4feca751f222310bff7c17a", size = 311262, upload-time = "2025-11-28T09:36:57.371Z" },
+    { url = "https://files.pythonhosted.org/packages/81/88/6397efb6bf31c0c815ad12f63e84e3a3f952cab5b4dbdadad3a368ced436/textual_speedups-0.2.1-cp314-cp314-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:267c44974ea63e9742ea6cbb65f96d5dbdd09b2f9979823a4b7f664614dd21af", size = 317933, upload-time = "2025-11-28T09:37:08.745Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/ce/e687d556e6a072b14a6c46ed647a9d5cf862df24c9639c17bd66c0655908/textual_speedups-0.2.1-cp314-cp314-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:cd3f19c6fd7148b6ba86c4c8bde7fdbf96b33687dc42872b8da2fdf67f5ab6d3", size = 438268, upload-time = "2025-11-28T09:37:20.429Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/06/e111d6d5e6a5f927ff3ee940c08d4b904143213a5dc2a325832f66848b9b/textual_speedups-0.2.1-cp314-cp314-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:6245ea2c4883815ed23ecaf852e4de3d2d99e5f082790e780202705730c30b9a", size = 333978, upload-time = "2025-11-28T09:37:31.777Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/20/7030634f4e2c5f2c410cf8e6fbcad6e278d0a6dc7ead5fcf31d497951fce/textual_speedups-0.2.1-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6aaade447724543c60e546542ff91224028992ce4a2a071c81b1927cead114b3", size = 310102, upload-time = "2025-11-28T09:37:51.982Z" },
+    { url = "https://files.pythonhosted.org/packages/15/34/7b2b7d831d3668d27285e21c45ff03fab5c9b41092948995562517e53f8b/textual_speedups-0.2.1-cp314-cp314-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:821d3e57014d0d426c28fc8da4adaa0829f5cdf3ea133559ce6c64baf3aa98d6", size = 335335, upload-time = "2025-11-28T09:37:42.792Z" },
+    { url = "https://files.pythonhosted.org/packages/49/90/909a6fd6cf29e323ae6102474ed254e037ac7d1c534e33860ecd54013d8a/textual_speedups-0.2.1-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:fecfdc25439a890dfb9f7357f2d854ef801c5a6484b595dde1baf6a15d20b945", size = 492172, upload-time = "2025-11-28T09:38:11.021Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/7f/2a50d7c712ad2b6495344bf9f1d0a805291b1cb53595e7ad7b749d253c29/textual_speedups-0.2.1-cp314-cp314-musllinux_1_2_armv7l.whl", hash = "sha256:0df559abaa14324757e8995e27c83171673377effd7348350f2d1b852eb0e8c1", size = 584840, upload-time = "2025-11-28T09:38:23.757Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/a6/ad6b451b5fa550ed13e7084440b9d89bb689b8aa5afe1b26b83b49540057/textual_speedups-0.2.1-cp314-cp314-musllinux_1_2_i686.whl", hash = "sha256:ebc5094080c61d06c71011da6c7522e51635d1425bfa14d693bca6059e64b795", size = 514648, upload-time = "2025-11-28T09:38:35.774Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/45/3c81292f786b57dca7468da732dca902dc7ca1a280b0d785ee7c721f5dc4/textual_speedups-0.2.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:5fee92c2e442b86644769011dfbd4f0dbcd43490eecd577735a09a751f3d4a31", size = 481640, upload-time = "2025-11-28T09:38:46.902Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/33/1894d2433d0e852177857c3a328346aae626d096e34a1064691ccf04eca1/textual_speedups-0.2.1-cp314-cp314-win32.whl", hash = "sha256:8ffcf6711869f4241a751aacc055f46c842fb633000964c94e3d1f1bf4b887c0", size = 151110, upload-time = "2025-11-28T09:38:58.758Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/b3/0b3957b1187c657794d36529d7a0d7e81e2a8af6f68d0e0b57f53f347db1/textual_speedups-0.2.1-cp314-cp314-win_amd64.whl", hash = "sha256:1889ae903263c47f76905443a5274d3cceacf5ee218af8c79ef24598c54ac70e", size = 159722, upload-time = "2025-11-28T09:38:56.653Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/67/0d79c23d74736b51a84a8bb2adcf538a4f4c01b681f916a2f6c12aebc9a1/textual_speedups-0.2.1-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b03ffba57b8d2eb991a2edcc4a873096228ab2c1c3ba8577e502204a721037c8", size = 312683, upload-time = "2025-11-28T09:36:58.758Z" },
+    { url = "https://files.pythonhosted.org/packages/67/d3/9b19fcaaf27799846d89a24b5d4e432425eb3ea4811e61a358685ebcde62/textual_speedups-0.2.1-cp314-cp314t-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:03a8dc93c983215e187c414a66e5d338c8805f30180b8b845c05914e37a1b315", size = 319134, upload-time = "2025-11-28T09:37:09.881Z" },
+    { url = "https://files.pythonhosted.org/packages/44/18/fb492f764e756353e11ce82691eea04bd57d43e7eae86e96a53f49c8830d/textual_speedups-0.2.1-cp314-cp314t-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:3634667a035134cda18890a623f9fc561ff3c22d9a6e97c6244e52047251f454", size = 441148, upload-time = "2025-11-28T09:37:21.541Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/f5/f3f8d27a85de6ba74a97b19f5174b44df9cf4d7188792c39017a0f872937/textual_speedups-0.2.1-cp314-cp314t-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:5786c2c56cf0e99ad89481f1464ec002d1bfe3adbd5bcb5f1f9b9fd03a7cc063", size = 335003, upload-time = "2025-11-28T09:37:32.953Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/53/e74500c99414d44565f1c26c906f382085ce98ba33c986b4ffede69102b9/textual_speedups-0.2.1-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:9d05bdd2c760833c9ed8d1fffb7cca2e293c15031e53e270e06766dbc96771fc", size = 494039, upload-time = "2025-11-28T09:38:12.511Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/9a/b834df281395d5d3311a627ac8587e61f0e4bcdf53c1df451dbd5822e1e0/textual_speedups-0.2.1-cp314-cp314t-musllinux_1_2_armv7l.whl", hash = "sha256:7dc58e59d740e66d1e0a9ce18835ee0e6a72a61bf0a4c1afce38273e217fdf27", size = 586432, upload-time = "2025-11-28T09:38:25.238Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/46/375d5b63a68a48770bf556ca364ef9d9cd79574f3b5dee2c542706177d28/textual_speedups-0.2.1-cp314-cp314t-musllinux_1_2_i686.whl", hash = "sha256:e6e8c74a63080a50a95f26e87818c66d8507de21c6d610ed049f91b84402aafa", size = 516212, upload-time = "2025-11-28T09:38:36.935Z" },
+    { url = "https://files.pythonhosted.org/packages/06/02/80c118df98fa8ef84fa8e690b18c20302dc697c59dfee8a9667b72424aa6/textual_speedups-0.2.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:5fd85522114aec21c3915725992401e2bf6372ae5b1e3b2ebd85e1c3c7115885", size = 483699, upload-time = "2025-11-28T09:38:48.087Z" },
+]
+
+[[package]]
 name = "toad"
 version = "0.2.1"
 source = { editable = "." }
@@ -607,6 +636,7 @@ dependencies = [
     { name = "rich" },
     { name = "textual", extra = ["syntax"] },
     { name = "textual-serve" },
+    { name = "textual-speedups" },
     { name = "tree-sitter" },
     { name = "typeguard" },
     { name = "xdg-base-dirs" },
@@ -627,6 +657,7 @@ requires-dist = [
     { name = "rich" },
     { name = "textual", extras = ["syntax"], specifier = ">=6.5.0" },
     { name = "textual-serve", specifier = ">=1.1.2" },
+    { name = "textual-speedups", specifier = "==0.2.1" },
     { name = "tree-sitter", specifier = ">=0.24.0" },
     { name = "typeguard", specifier = ">=4.4.4" },
     { name = "xdg-base-dirs", specifier = ">=6.0.2" },

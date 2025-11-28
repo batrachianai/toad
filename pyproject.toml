@@ -16,6 +16,7 @@ dependencies = [
     "typeguard>=4.4.4",
     "xdg-base-dirs>=6.0.2",
     "textual-serve>=1.1.2",
+    "textual-speedups==0.2.1",
 ]
 
 [tool.uv.workspace]
