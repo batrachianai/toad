@@ -173,9 +173,7 @@ class Terminal(ScrollView, can_focus=True):
         self._width = width or 80
         self._height = height or 24
         self._width = max(self._width, self.minimum_terminal_width)
-        self.state.update_size(self._width, height)
-        self._terminal_render_cache.clear()
-        self.refresh()
+
         if (
             old_width != self._width
             or old_height != self._height
@@ -185,6 +183,10 @@ class Terminal(ScrollView, can_focus=True):
 
             if (conversation := self.query_ancestor(Conversation)) is not None:
                 conversation.shell.update_size(self._width, self._height)
+
+        self.state.update_size(self._width, height)
+        self._terminal_render_cache.clear()
+        self.refresh()
 
     def on_mount(self) -> None:
         self.auto_links = False
