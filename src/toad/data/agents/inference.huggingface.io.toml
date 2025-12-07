@@ -1,0 +1,33 @@
+# Schema defined in agent_schema.py
+# https://github.com/tao12345666333/amp-acp
+
+# TODO: To be populated by Huggingface
+
+active = false
+identity = "inference.huggingface.io"
+name = "Huggingface Inference"
+short_name = "hf"
+url = "https://huggingface.io"
+protocol = "acp"
+author_name = "Huggingface"
+author_url = "https://huffingface.io"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "chat"
+description = """
+Hugging Face's inference providers playground.
+Sign up now for [bold $success]$100[/] of free credit!"""
+tags = []
+run_command."*" = "echo 'TODO'"
+
+help = '''
+# Hugginface Inference providers
+
+Hugging Face’s Inference Providers give developers access to hundreds of machine learning models, powered by world-class inference providers. They are also integrated into our client SDKs (for JS and Python), making it easy to explore serverless inference of models on your favorite providers.
+
+'''
+recommended = true
+
+[actions."*".install]
+command = "echo 'TODO'"
+description = "Install Huggingface Chat"

@@ -121,7 +121,7 @@ SCHEMA: list[SchemaDict] = [
                 "title": "Tool call expand",
                 "help": "When should Toad expand tool calls?",
                 "type": "choices",
-                "default": "both",
+                "default": "fail",
                 "choices": [
                     ("Never", "never"),
                     ("Always", "always"),
@@ -143,7 +143,7 @@ SCHEMA: list[SchemaDict] = [
                 "title": "Allow commands",
                 "help": "List of commands (one per line) which should be considered shell commands by default, rather than a part of a prompt.",
                 "type": "text",
-                "default": "python\ngit\nls\ncat\ncd\nmv\ncp\ntree\nrm\necho\nrmdir\nmkdir\ntouch\nopen\npwd",
+                "default": "python\ngit\nls\ncat\ncd\nmv\ncp\ntree\nrm\necho\nrmdir\nmkdir\ntouch\nopen\npwd\nnano",
             },
             {
                 "key": "directory_commands",
@@ -243,6 +243,21 @@ SCHEMA: list[SchemaDict] = [
                 "validate": [{"type": "is_email"}],
                 "default": "",
             },
+        ],
+    },
+    {
+        "key": "launcher",
+        "title": "Launcher settings",
+        "help": "Customize the launcher",
+        "type": "object",
+        "editable": False,
+        "fields": [
+            {
+                "key": "agents",
+                "title": "Agents to show in the launcher",
+                "type": "text",
+                "default": "",
+            }
         ],
     },
 ]

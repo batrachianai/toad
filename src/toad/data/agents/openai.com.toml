@@ -1,0 +1,57 @@
+# Schema defined in agent_schema.py
+# https://github.com/openai/codex
+
+identity = "openai.com"
+name = "Codex CLI"
+short_name = "codex"
+url = "https://developers.openai.com/codex/cli/"
+protocol = "acp"
+author_name = "OpenAI"
+author_url = "https://www.openai.com/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Lightweight coding agent by OpenAI that runs in your terminal with native ACP support."
+tags = []
+run_command."*" = "codex-acp"
+
+help = '''
+# Codex CLI
+
+**Lightweight coding agent that runs in your terminal**
+
+Codex CLI is OpenAI's terminal-based coding agent with built-in support for the Agent Client Protocol.
+
+## Features
+
+- **Agent Client Protocol (ACP)**: Native ACP support for seamless editor integration
+- **Zed Integration**: Built-in support in Zed IDE (v0.208+)
+- **Terminal-First**: Designed for developers who live in the command line
+
+## ACP Integration
+
+Codex works out-of-the-box with ACP-compatible editors:
+- Zed: Open agent panel (cmd-?/ctrl-?) and start a new Codex thread
+- Other ACP clients: Use the `codex-acp` command
+
+## Installation
+
+Install globally via npm or Homebrew:
+- npm: `npm i -g @openai/codex`
+- Homebrew: `brew install --cask codex`
+
+For ACP adapter (used by editors): Install from https://github.com/zed-industries/codex-acp/releases
+
+---
+
+**GitHub**: https://github.com/openai/codex  
+**ACP Adapter**: https://github.com/zed-industries/codex-acp
+'''
+
+[actions."*".install]
+command = "npm install -g @openai/codex"
+description = "Install Codex CLI"
+
+[actions."*".install_homebrew]
+command = "brew install --cask codex"
+description = "Install Codex CLI via Homebrew"

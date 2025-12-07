@@ -14,6 +14,8 @@ from textual.message_pump import MessagePump
 from textual import log
 
 from toad import jsonrpc
+import toad
+from toad.agent_schema import Agent as AgentData
 from toad.agent import AgentBase, AgentReady, AgentFail
 from toad.acp import protocol
 from toad.acp import api
@@ -38,7 +40,7 @@ class Mode(NamedTuple):
 class Agent(AgentBase):
     """An agent that speaks the APC (https://agentclientprotocol.com/overview/introduction) protocol."""
 
-    def __init__(self, project_root: Path, command: str) -> None:
+    def __init__(self, project_root: Path, agent: AgentData) -> None:
         """
 
         Args:
@@ -47,7 +49,7 @@ class Agent(AgentBase):
         """
         super().__init__(project_root)
 
-        self.command = command
+        self._agent_data = agent
 
         self.server = jsonrpc.Server()
         self.server.expose_instance(self)
@@ -72,12 +74,19 @@ class Agent(AgentBase):
 
         self._terminal_count: int = 0
 
+    @property
+    def command(self) -> str | None:
+        """The command used to launch the agent, or `None` if there isn't one."""
+        acp_command = toad.get_os_matrix(self._agent_data["run_command"])
+        return acp_command
+
     def __rich_repr__(self) -> rich.repr.Result:
         yield self.project_root_path
         yield self.command
 
     def get_info(self) -> Content:
-        return Content(self.command)
+        agent_name = self._agent_data["name"]
+        return Content(agent_name)
 
     def start(self, message_target: MessagePump | None = None) -> None:
         """Start the agent."""
@@ -306,9 +315,9 @@ class Agent(AgentBase):
     async def rpc_terminal_output(
         self, sessionId: str, terminalId: str, _meta: dict | None = None
     ) -> protocol.TerminalOutputResponse:
-        from toad.widgets.terminal import TerminalState
+        from toad.widgets.terminal_tool import ToolState
 
-        result_future: asyncio.Future[TerminalState] = asyncio.Future()
+        result_future: asyncio.Future[ToolState] = asyncio.Future()
 
         if not self.post_message(messages.GetTerminalState(terminalId, result_future)):
             raise RuntimeError("Unable to get terminal output")
@@ -356,9 +365,15 @@ class Agent(AgentBase):
         env = os.environ.copy()
         env["TOAD_CWD"] = str(Path("./").absolute())
 
+        if (command := self.command) is None:
+            self.post_message(
+                AgentFail("Failed to start agent; no run command for this OS")
+            )
+            return
+
         try:
             process = self._process = await asyncio.create_subprocess_shell(
-                self.command,
+                command,
                 stdin=PIPE,
                 stdout=PIPE,
                 stderr=PIPE,
@@ -387,11 +402,10 @@ class Agent(AgentBase):
                     tasks.discard(task)
 
         while line := await process.stdout.readline():
-            print("READ LINE bytes", repr(line))
-            print("READ LINE utf8", repr(line.decode("utf-8")))
             # This line should contain JSON, which may be:
             #   A) a JSONRPC request
             #   B) a JSONRPC response to a previous request
+            print(repr(line))
             if not line.strip():
                 continue
 
@@ -401,13 +415,14 @@ class Agent(AgentBase):
             try:
                 line_str = line.decode("utf-8")
             except Exception as error:
-                print("Unable to decode utf-8from agent:", error)
+                print("Unable to decode utf-8 from agent:", error)
                 continue
 
             try:
                 agent_data: jsonrpc.JSONType = json.loads(line_str)
             except Exception as error:
-                print("Error decodeing JSON from agent:", error)
+                print(repr(line_str))
+                print("Error decoding JSON from agent:", error)
                 continue
 
             log(agent_data)
@@ -452,12 +467,21 @@ class Agent(AgentBase):
     async def run(self) -> None:
         """The main logic of the Agent."""
         if constants.ACP_INITIALIZE:
-            # Boilerplate to initialize comms
-            await self.acp_initialize()
-            # Create a new session
-            await self.acp_new_session()
-
-            self.post_message(AgentReady())
+            try:
+                # Boilerplate to initialize comms
+                await self.acp_initialize()
+                # Create a new session
+                await self.acp_new_session()
+            except jsonrpc.APIError as error:
+                if isinstance(error.data, dict):
+                    reason = str(error.data.get("reason") or "")
+                    details = str(error.data.get("details") or "")
+                else:
+                    reason = "Failed to initialize agent"
+                    details = ""
+                self.post_message(AgentFail(reason, details))
+                
+        self.post_message(AgentReady())
 
     async def send_prompt(self, prompt: str) -> str | None:
         """Send a prompt to the agent.
@@ -485,6 +509,7 @@ class Agent(AgentBase):
                     },
                     "terminal": True,
                 },
+                {"name": toad.NAME, "title": toad.TITLE, "version": toad.get_version()},
             )
 
         response = await initialize_response.wait()
@@ -562,15 +587,3 @@ class Agent(AgentBase):
 
     async def cancel(self) -> bool:
         return await self.acp_session_cancel()
-
-
-if __name__ == "__main__":
-    from rich import print
-
-    async def run_agent():
-        agent = Agent(Path("./"), "gemini --experimental-acp")
-        print(agent)
-        agent.start()
-        await agent.done_event.wait()
-
-    asyncio.run(run_agent())

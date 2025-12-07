@@ -21,6 +21,7 @@ class FutureText(Static):
         height: 1;
         text-wrap: nowrap;
         text-align: center;
+        color: $primary;
         &>.future-text--cursor {
             color: $primary;
         }

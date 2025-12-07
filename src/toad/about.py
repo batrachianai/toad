@@ -1,9 +1,7 @@
 import os
 from importlib.metadata import version
 import platform
-
 from string import Template
-
 
 from toad.app import ToadApp
 
@@ -74,7 +72,3 @@ def render(app: ToadApp) -> str:
         "CONFIG": config,
     }
     return ABOUT_TEMPLATE.safe_substitute(template_data)
-
-
-if __name__ == "__main__":
-    print(render())

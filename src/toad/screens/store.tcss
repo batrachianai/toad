@@ -1,0 +1,197 @@
+StoreScreen {    
+
+    #container {
+        hatch: right $primary 15%;
+    }
+
+    .instruction-text {
+        text-style: dim italic;
+        padding: 1 2;
+    }
+
+    .heading {
+        margin: 0 0 0 0;
+        padding: 1 1 0 2;
+        # width: 100%;
+        # border-bottom: solid $text-secondary 50%;
+        text-style: underline ;         
+        color: $text-warning;
+    }
+
+    #title-container {
+        align: center top;
+        dock: top;
+        
+        #title-grid {
+            margin: 0 1;
+            border: block black 20%;
+            background: black 20%;
+            grid-size: 2 1;
+            # max-width: 100;
+            height: auto;
+            grid-columns: 24 1fr;
+            grid-rows: auto;
+            grid-gutter: 1 2;
+            min-width: 40;
+
+            #info {
+                
+            }
+
+            Mandelbrot {   
+                border: none;             
+                height: 100%;                                                
+                # min-height: 8;
+            }
+        }        
+    }
+
+    LoadingIndicator {
+        height: 3;
+    }
+
+    GridSelect {
+        height: auto;        
+        padding: 0;        
+        margin: 0 0;    
+
+        &.-highlight {
+            background: $panel;
+            border: tall $primary 30%;
+        }
+
+        &:focus * {
+            &.-highlight {
+                background: $panel;
+                border: tall $primary;
+            }
+        }         
+
+    }
+
+    #sponsored-agents {                
+        GridSelect {
+            margin:0 1;
+            grid-gutter: 1;
+            keyline: thin white 10%;
+        }
+    }
+   
+
+    AgentItem {
+        height: auto;             
+        border: tall transparent;
+        padding: 0 1;
+        &:hover {
+            background: $panel;
+        }
+
+        Grid {
+            grid-size: 2 1;
+            grid-columns: 1fr auto;
+            height: auto;
+            #type {
+                text-align: right;
+            }
+        }
+        #description {
+            text-style: dim;
+        }
+        #author {
+            text-style: italic;
+            color: $text-secondary;
+        }
+    }
+    Launcher {
+        GridSelect {
+            width: 1fr;            
+        }
+        &.-empty {
+            LauncherGridSelect {
+                visibility: hidden;
+            }
+        }
+        .no-agents {
+            text-style: dim italic;
+            padding: 1 2;
+        }
+            
+    }
+
+    LauncherItem {
+        # width: 40;
+        # max-width: 40;        
+        height: auto;               
+        border: tall transparent;
+        padding: 0 1;
+        &:hover {
+            background: $panel;
+        }
+        Digits {
+            width: auto;
+            padding: 0 1 0 0;
+            color: $text-success;
+            # text-style: bold;
+        }
+        #description {
+            text-style: dim;
+            text-wrap: nowrap;
+            text-overflow: ellipsis;
+        }
+        #author {
+            text-style: italic;
+            color: $text-secondary;
+        }
+    }
+
+}
+
+AgentModal {    
+    align: center middle;
+    #container {
+        margin: 2 4;
+        padding: 0 1 0 0;
+        max-width: 100;
+        height: auto;
+        border: thick $primary 20%;
+
+        #description-container {
+            height: auto;
+            padding: 0 0 1 1;
+            max-height: 20;
+            overflow-y: auto;
+            scrollbar-gutter: stable;
+        }
+
+        Select {
+            width: 1fr;            
+            margin-right: 1;
+        }
+        Checkbox {
+            margin: 0;                        
+        }
+    }
+}
+
+ActionModal {
+    align: center middle;    
+    #container {
+        margin: 3 6;    
+        height: 1fr;
+        max-height: 24;
+        CommandPane {    
+            padding: 1 1;
+            background: black 10%;          
+            border: tab $primary;                        
+            &.-success {
+                border: tab $text-success 70%;            
+            }
+            &.-fail {
+                border: tab $text-error 50%;            
+            }                        
+        }
+        Button {            
+            width: 100%;
+        }
+    }
+}

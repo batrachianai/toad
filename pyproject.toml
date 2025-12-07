@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "textual[syntax]>=6.5.0",
+    "textual[syntax]>=6.7.0",
     #"textual-speedups>=0.2.0",
     "click>=8.2.1",
     "gitpython>=3.1.44",
@@ -27,6 +27,7 @@ members = [
 [tool.uv.sources]
 #textual-serve = { path = "../textual-serve", editable = true }
 #textual = { path = "../textual", editable = true }
+#textual-dev = { path = "../textual-dev", editable = true }
 #rich = { path = "../rich", editable = true }
 
 [project.scripts]

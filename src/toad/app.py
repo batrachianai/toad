@@ -4,18 +4,17 @@ import json
 from time import monotonic
 from typing import ClassVar, TYPE_CHECKING
 
-import random
-
 from rich import terminal_theme
 
+from textual import work
 from textual.binding import Binding, BindingType
-from textual.content import Content
 from textual.reactive import var, reactive
 from textual.app import App
 from textual.signal import Signal
-from textual.widget import Widget
+
 
 from toad.settings import Schema, Settings
+from toad.agent_schema import Agent as AgentData
 from toad.settings_schema import SCHEMA
 from toad import paths
 from toad import atomic
@@ -23,6 +22,7 @@ from toad import atomic
 if TYPE_CHECKING:
     from toad.screens.main import MainScreen
     from toad.screens.settings import SettingsScreen
+    from toad.screens.store import StoreScreen
 
 
 DRACULA_TERMINAL_THEME = terminal_theme.TerminalTheme(
@@ -199,8 +199,16 @@ def get_settings_screen() -> SettingsScreen:
     return SettingsScreen()
 
 
+def get_store_screen() -> StoreScreen:
+    """Get the store screen (lazily loaded)."""
+    from toad.screens.store import StoreScreen
+
+    return StoreScreen()
+
+
 class ToadApp(App, inherit_bindings=False):
     SCREENS = {"settings": get_settings_screen}
+    MODES = {"store": get_store_screen}
     BINDING_GROUP_TITLE = "System"
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding(
@@ -212,6 +220,12 @@ class ToadApp(App, inherit_bindings=False):
             priority=True,
         ),
         Binding("ctrl+c", "help_quit", show=False, system=True),
+        Binding(
+            "f2,ctrl+comma",
+            "settings",
+            "Settings",
+            tooltip="Settings screen",
+        ),
     ]
     CSS_PATH = "toad.tcss"
     ALLOW_IN_MAXIMIZED_VIEW = ""
@@ -224,28 +238,15 @@ class ToadApp(App, inherit_bindings=False):
 
     def __init__(
         self,
-        acp_command: str | None = None,
+        agent_data: AgentData | None = None,
         project_dir: str | None = None,
+        mode: str | None = None,
     ) -> None:
-        """
-
-        Args:
-            acp_command: Command to launch an ACP agent.
-        """
         self.settings_changed_signal = Signal(self, "settings_changed")
-        self.acp_command = acp_command
+        self.agent_data = agent_data
         self.project_dir = project_dir
+        self._initial_mode = mode
         super().__init__()
-
-    def get_loading_widget(self) -> Widget:
-        throbber = self.settings.get("ui.throbber", str)
-        if throbber == "quotes":
-            from toad.widgets.future_text import FutureText
-
-            quotes = QUOTES.copy()
-            random.shuffle(quotes)
-            return FutureText([Content(quote) for quote in quotes])
-        return super().get_loading_widget()
 
     @property
     def config_path(self) -> Path:
@@ -273,11 +274,11 @@ class ToadApp(App, inherit_bindings=False):
             except Exception as error:
                 self.notify(str(error), title="Settings", severity="error")
             else:
-                self.notify(
-                    f"Saved settings to [$text-success]{path!r}",
-                    title="Settings",
-                    severity="information",
-                )
+                # self.notify(
+                #     f"Saved settings to [$text-success]{path!r}",
+                #     title="Settings",
+                #     severity="information",
+                # )
                 self.settings.up_to_date()
 
     def setting_updated(self, key: str, value: object) -> None:
@@ -316,6 +317,10 @@ class ToadApp(App, inherit_bindings=False):
         self._settings = settings
         self.settings.set_all()
 
+    def on_mount(self) -> None:
+        if mode := self._initial_mode:
+            self.switch_mode(mode)
+
     def get_default_screen(self) -> MainScreen:
         """Make the default screen.
 
@@ -326,11 +331,16 @@ class ToadApp(App, inherit_bindings=False):
         from toad.screens.main import MainScreen
 
         project_path = Path(self.project_dir or "./").resolve().absolute()
-        return MainScreen(project_path).data_bind(
+        return MainScreen(project_path, self.agent_data).data_bind(
             column=ToadApp.column,
             column_width=ToadApp.column_width,
             scrollbar=ToadApp.scrollbar,
         )
+
+    @work
+    async def action_settings(self) -> None:
+        await self.push_screen_wait("settings")
+        self.save_settings()
 
     def action_help_quit(self) -> None:
         if (time := monotonic()) - self.last_ctrl_c_time <= 5.0:

@@ -1,0 +1,61 @@
+# Schema defined in agent_schema.py
+# https://github.com/stakpak/agent
+
+identity = "stakpak.dev"
+name = "Stakpak Agent"
+short_name = "stakpak"
+url = "https://stakpak.dev/"
+protocol = "acp"
+author_name = "Stakpak"
+author_url = "https://stakpak.dev/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Terminal-native DevOps Agent in Rust with enterprise-grade security, ACP support, and IaC generation capabilities."
+tags = []
+run_command."*" = "stakpak acp"
+
+help = '''
+# Stakpak Agent
+
+**The most secure agent built for operations & DevOps**
+
+Stakpak is a terminal-native DevOps Agent built in Rust with enterprise-grade security features and Agent Client Protocol support.
+
+## Key Features
+
+- **Enterprise-Grade Security**: 
+  - Mutual TLS (mTLS) encryption
+  - Dynamic secret redaction
+  - Privacy-first architecture
+- **DevOps Capabilities**: Run commands, edit files, search docs, and generate high-quality IaC
+- **Agent Client Protocol (ACP)**: Native support for editor integration
+- **Rust Performance**: Built in Rust for speed and reliability
+
+## ACP Integration
+
+Stakpak implements the Agent Client Protocol, enabling integration with ACP-compatible editors and development environments like Zed, Neovim, and others.
+
+## Security
+
+Stakpak emphasizes security with:
+- End-to-end encryption via mTLS
+- Automatic detection and redaction of sensitive information
+- Privacy-first design principles
+
+## Use Cases
+
+- Infrastructure as Code (IaC) generation
+- DevOps automation
+- Secure operations in production environments
+- Terminal-based development workflows
+
+---
+
+**GitHub**: https://github.com/stakpak/agent  
+**Website**: https://stakpak.dev/
+'''
+
+[actions."*".install]
+command = "cargo install stakpak"
+description = "Install Stakpak Agent via Cargo"

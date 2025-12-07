@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 
+from contextlib import suppress
 import os
 import asyncio
 import codecs
@@ -11,12 +12,12 @@ import struct
 import termios
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from time import monotonic
 
 from textual.message import Message
 
+from toad.shell_read import shell_read
 
-from toad.widgets.ansi_log import ANSILog
+from toad.widgets.terminal import Terminal
 
 if TYPE_CHECKING:
     from toad.widgets.conversation import Conversation
@@ -27,8 +28,12 @@ IS_MACOS = platform.system() == "Darwin"
 def resize_pty(fd, cols, rows):
     """Resize the pseudo-terminal"""
     # Pack the dimensions into the format expected by TIOCSWINSZ
-    size = struct.pack("HHHH", rows, cols, 0, 0)
-    fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
+    try:
+        size = struct.pack("HHHH", rows, cols, 0, 0)
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
+    except OSError:
+        # Possibly file descriptor closed
+        pass
 
 
 @dataclass
@@ -44,26 +49,24 @@ class ShellFinished(Message):
 
 
 class Shell:
+    """Responsible for shell interactions in Conversation."""
+
     def __init__(
         self,
         conversation: Conversation,
         working_directory: str,
-        max_buffer_duration: float = 1 / 60,
         shell="",
         start="",
     ) -> None:
         self.conversation = conversation
         self.working_directory = working_directory
-        self.max_buffer_duration = max_buffer_duration
 
-        self.ansi_log: ANSILog | None = None
+        self.terminal: Terminal | None = None
         self.new_log: bool = False
         self.shell = shell or os.environ.get("SHELL", "sh")
         self.shell_start = start
         self.master = 0
         self._task: asyncio.Task | None = None
-        self.width = 80
-        self.height = 24
         self._process: asyncio.subprocess.Process | None = None
         self.writer: asyncio.WriteTransport | None = None
 
@@ -76,16 +79,23 @@ class Shell:
 
     async def send(self, command: str, width: int, height: int) -> None:
         await self._ready_event.wait()
-        height = max(height, 1)
-        self.width = width
-        self.height = height
-        resize_pty(self.master, width, height)
-        command = f"{command}\n"
-        self.writer.write(command.encode("utf-8"))
+        assert self.writer is not None
 
-        get_pwd_command = r'printf "\e]2025;$(pwd);\e\\"' + "\n"
+        resize_pty(self.master, width, max(height, 1))
+
+        old_settings = termios.tcgetattr(self.master)
+
+        # Disable echo
+        new_settings = termios.tcgetattr(self.master)
+        new_settings[3] = new_settings[3] & ~termios.ECHO  # lflag is at index 3
+        termios.tcsetattr(self.master, termios.TCSADRAIN, new_settings)
+
+        get_pwd_command = f"{command};" + r'printf "\e]2025;$(pwd);\e\\"' + "\n"
         self.writer.write(get_pwd_command.encode("utf-8"))
-        self.ansi_log = None
+
+        termios.tcsetattr(self.master, termios.TCSADRAIN, old_settings)
+
+        self.terminal = None
 
     def start(self) -> None:
         assert self._task is None
@@ -96,6 +106,16 @@ class Shell:
         if self.writer is not None:
             self.writer.write(b"\x03")
 
+    def update_size(self, width: int, height: int) -> None:
+        """Update the size of the shell pty.
+
+        Args:
+            width: Desired width.
+            height: Desired height.
+        """
+        with suppress(OSError):
+            resize_pty(self.master, width, max(height, 1))
+
     async def run(self) -> None:
         current_directory = self.working_directory
 
@@ -104,16 +124,6 @@ class Shell:
 
         flags = fcntl.fcntl(master, fcntl.F_GETFL)
         fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-
-        # Get terminal attributes
-        attrs = termios.tcgetattr(slave)
-
-        # Disable echo (ECHO flag)
-        attrs[3] &= ~termios.ECHO
-        attrs[0] |= termios.ISIG
-
-        # Apply the changes
-        termios.tcsetattr(slave, termios.TCSANOW, attrs)
 
         env = os.environ.copy()
         env["FORCE_COLOR"] = "1"
@@ -125,6 +135,10 @@ class Shell:
 
         shell = self.shell
 
+        def setup_pty():
+            os.setsid()
+            fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+
         try:
             _process = await asyncio.create_subprocess_shell(
                 shell,
@@ -133,10 +147,14 @@ class Shell:
                 stderr=slave,
                 env=env,
                 cwd=current_directory,
-                start_new_session=True,  # Linux / macOS only
+                preexec_fn=setup_pty,
             )
         except Exception as error:
-            self.conversation.notify(f"Unable to start shell: {error}\n\nCheck your settings.", title="Shell", severity="error")
+            self.conversation.notify(
+                f"Unable to start shell: {error}\n\nCheck your settings.",
+                title="Shell",
+                severity="error",
+            )
             return
 
         os.close(slave)
@@ -158,40 +176,43 @@ class Shell:
         self.writer = write_transport
 
         if shell_start := self.shell_start.strip():
+            # Get terminal attributes
+
+            old_settings = termios.tcgetattr(self.master)
+            new_settings = termios.tcgetattr(self.master)
+            new_settings[3] = new_settings[3] & ~termios.ECHO  # lflag is at index 3
+            termios.tcsetattr(self.master, termios.TCSADRAIN, new_settings)
+
             shell_start = self.shell_start.strip()
             if not shell_start.endswith("\n"):
                 shell_start += "\n"
             self.writer.write(shell_start.encode("utf-8"))
 
+            termios.tcsetattr(slave, termios.TCSADRAIN, old_settings)
+
         unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+
+        def write_stdin(input: str) -> None:
+            if self.writer is not None:
+                self.writer.write(input.encode("utf-8"))
 
         self._ready_event.set()
         try:
             while True:
-                data = await reader.read(BUFFER_SIZE)
-                if data:
-                    buffer_time = monotonic() + self.max_buffer_duration
-                    # Accumulate data for a short period of time, or until we have enough data
-                    # This can reduce the number of refreshes we need to do
-                    # Resulting in faster updates and less flicker.
-                    try:
-                        while (
-                            len(data) < BUFFER_SIZE
-                            and (time := monotonic()) < buffer_time
-                        ):
-                            async with asyncio.timeout(buffer_time - time):
-                                data += await reader.read(BUFFER_SIZE)
-                    except asyncio.TimeoutError:
-                        pass
+                data = await shell_read(reader, BUFFER_SIZE)
 
                 if line := unicode_decoder.decode(data, final=not data):
-                    if self.ansi_log is None or self.ansi_log.is_finalized:
-                        self.ansi_log = await self.conversation.new_ansi_log(
-                            self.width, display=False
+                    if self.terminal is None or self.terminal.is_finalized:
+                        previous_state = (
+                            None if self.terminal is None else self.terminal.state
                         )
-                    if self.ansi_log.write(line):
-                        self.ansi_log.display = True
-                    new_directory = self.ansi_log.current_directory
+                        self.terminal = await self.conversation.new_terminal()
+                        # if previous_state is not None:
+                        #     self.terminal.set_state(previous_state)
+                        self.terminal.set_write_to_stdin(write_stdin)
+                    if self.terminal.write(line):
+                        self.terminal.display = True
+                    new_directory = self.terminal.current_directory
                     if new_directory and new_directory != current_directory:
                         current_directory = new_directory
                         self.conversation.post_message(

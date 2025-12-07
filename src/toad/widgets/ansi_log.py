@@ -14,7 +14,7 @@ from textual.strip import Strip
 from textual.selection import Selection
 from textual.filter import LineFilter
 
-from toad.ansi import (
+from toad.ansi._ansi import (
     ANSIStream,
     ANSICursor,
     ANSIClear,
@@ -110,11 +110,7 @@ class ANSILog(ScrollView, can_focus=False):
         return self._finalized
 
     def _update_width(self) -> None:
-        window_width = (
-            (self.scrollable_content_region.width or 80)
-            - 1
-            - self.parent.styles.scrollbar_size_vertical
-        )
+        window_width = self.scrollable_content_region.width or 80
         self.max_window_width = max(self.max_window_width, window_width)
         if self.minimum_terminal_width == -1 and window_width:
             self.minimum_terminal_width = window_width
@@ -208,6 +204,7 @@ class ANSILog(ScrollView, can_focus=False):
     def _handle_ansi_command(self, ansi_command: ANSICommand) -> bool:
         added_content = False
         folded_lines = self._folded_lines
+        print(ansi_command)
         match ansi_command:
             case ANSICursor(
                 delta_x,
@@ -233,7 +230,7 @@ class ANSILog(ScrollView, can_focus=False):
                     cursor_line_offset = self.cursor_line_offset
 
                     if replace is not None:
-                        start_replace, end_replace = ansi_command.get_replace_offsets(
+                        start_replace, end_replace = ansi_command.get_clear_offsets(
                             cursor_line_offset, len(line.content)
                         )
                         updated_line = Content.assemble(
@@ -241,7 +238,6 @@ class ANSILog(ScrollView, can_focus=False):
                             content,
                             line.content[end_replace + 1 :],
                         )
-
                     else:
                         if cursor_line_offset == len(line.content):
                             updated_line = line.content + content
@@ -256,6 +252,7 @@ class ANSILog(ScrollView, can_focus=False):
                     if not previous_content.is_same(folded_line.content):
                         added_content = True
 
+                original_cursor_line = self.cursor_line
                 if delta_x is not None:
                     self.cursor_offset += delta_x
                     while self.cursor_offset > self._width:
@@ -267,6 +264,10 @@ class ANSILog(ScrollView, can_focus=False):
                     self.cursor_offset = absolute_x
                 if absolute_y is not None:
                     self.cursor_line = max(0, absolute_y)
+                # if original_cursor_line != self.cursor_line:
+                #     self.scroll_to_region(
+                #         Region(0, self.cursor_line, 1, 1), x_axis=False, immediate=True
+                #     )
             case ANSIWorkingDirectory(path):
                 self.current_directory = path
                 self.finalize()
@@ -292,7 +293,6 @@ class ANSILog(ScrollView, can_focus=False):
         for ansi_command in self._ansi_stream.feed(text):
             if self._handle_ansi_command(ansi_command):
                 added_content = True
-
         return added_content
 
     def _fold_line(self, line_no: int, line: Content, width: int) -> list[LineFold]:
@@ -393,7 +393,7 @@ class ANSILog(ScrollView, can_focus=False):
             return Strip.blank(width, rich_style)
 
         unfolded_line = self._lines[line_no]
-        cache_key = (self.scroll_offset.y - y, unfolded_line.updates)
+        cache_key = (line_no, line_offset, unfolded_line.updates, x, width)
         if not selection:
             cached_strip = self._render_line_cache.get(cache_key)
             if cached_strip is not None:

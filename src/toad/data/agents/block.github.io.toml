@@ -1,0 +1,51 @@
+# Schema defined in agent_schema.py
+# https://github.com/block/goose
+
+identity = "block.github.io"
+name = "Goose"
+short_name = "goose"
+url = "https://block.github.io/goose/"
+protocol = "acp"
+author_name = "Block"
+author_url = "https://block.xyz/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "An open source, extensible AI agent that goes beyond code suggestions - install, execute, edit, and test with any LLM."
+tags = []
+run_command."*" = "goose acp"
+
+help = '''
+# Goose 🪿
+
+**An open source, extensible AI agent**
+
+Goose is an open framework for AI agents that goes beyond code suggestions to install dependencies, execute commands, edit files, and run tests.
+
+## Key Features
+
+- **Extensible Framework**: Plugin-based architecture for custom tools and behaviors
+- **Multi-LLM Support**: Works with various LLM providers
+- **Agent Client Protocol (ACP)**: Native ACP support for editor integration
+- **Multiple Interfaces**: CLI, and ACP server modes
+
+## Configuration
+
+You can override ACP configurations using environment variables:
+- `GOOSE_PROVIDER`: Set your preferred LLM provider
+- `GOOSE_MODEL`: Specify the model to use
+
+---
+
+**Documentation**: https://block.github.io/goose/docs/guides/acp-clients/  
+**GitHub**: https://github.com/block/goose  
+**Quickstart**: https://block.github.io/goose/docs/quickstart/
+'''
+
+[actions."*".install]
+command = "curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash"
+description = "Install Goose"
+
+[action."*".update]
+command = "goose update"
+description = "Update Goose"

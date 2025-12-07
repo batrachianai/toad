@@ -1,0 +1,28 @@
+# Schema defined in agent_schema.py
+# https://github.com/google-gemini/gemini-cli
+identity = "geminicli.com"
+name = "Gemini CLI"
+short_name = "gemini"
+url = "https://geminicli.com/"
+protocol = "acp"
+author_name = "Google"
+author_url = "https://www.gooogle.com"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Query and edit large codebases, generate apps from images or PDFs, and automate complex workflows—all from your terminal."
+tags = []
+run_command."*" = "gemini --experimental-acp"
+
+help = '''
+# Gemini CLI
+
+**Build  debug & deploy with AI**
+
+Query and edit large codebases, generate apps from images or PDFs, and automate complex workflows—all from your terminal.
+
+'''
+
+[actions."*".install]
+command = "npm install -g @google/gemini-cli"
+description = "Install Gemini CLI"

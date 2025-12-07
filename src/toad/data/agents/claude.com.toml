@@ -1,0 +1,44 @@
+# Schema defined in agent_schema.py
+# https://www.claude.com/product/claude-code
+
+identity = "claude.com"
+name = "Claude Code"
+short_name = "claude"
+url = "https://www.claude.com/product/claude-code"
+protocol = "acp"
+author_name = "Anthropic"
+author_url = "https://www.anthropic.com/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Unleash Claude’s raw power directly in your terminal."
+tags = []
+run_command."*" = "claude-code-acp"
+
+help = '''
+# Claude Code
+
+Built for developers
+Unleash Claude’s raw power directly in your terminal.
+Search million-line codebases instantly.
+Turn hours-long workflows into a single command.
+Your tools.
+Your workflow.
+Your codebase, evolving at thought speed.
+
+--- 
+[ACP adapter for Claude Code](https://github.com/zed-industries/claude-code-acp) by Zed Industries.
+
+'''
+
+[actions."*".test]
+command = '''echo "Hello, World!"'''
+description = "Test action"
+
+[actions."*".install]
+command = "curl -fsSL https://claude.ai/install.sh | bash &&  npm install -g @zed-industries/claude-code-acp"
+description = "Install Claude Code + ACP adapter"
+
+[actions."*".install_acp]
+command = "npm install @zed-industries/claude-code-acp"
+description = "Install ACP adapter"

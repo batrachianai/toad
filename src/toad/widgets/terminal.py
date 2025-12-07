@@ -1,349 +1,513 @@
-from __future__ import annotations
-
-import asyncio
-from asyncio.subprocess import Process
-import codecs
-import fcntl
-import os
-import pty
-import shlex
-from collections import deque
 from dataclasses import dataclass
-import struct
-import termios
-from typing import Mapping
 
-from textual.content import Content
-from textual.reactive import var
+from time import monotonic
+from typing import Any, Callable
 
-from toad.pill import pill
-from toad.widgets.ansi_log import ANSILog
+from textual.cache import LRUCache
 
-
-@dataclass
-class Command:
-    """A command and corresponding environment."""
-
-    command: str
-    """Command to run."""
-    args: list[str]
-    """List of arguments."""
-    env: Mapping[str, str]
-    """Environment variables."""
-    cwd: str
-    """Current working directory."""
-
-    def __str__(self) -> str:
-        command_str = shlex.join([self.command, *self.args]).strip("'")
-        return command_str
+from textual import on
+from textual import events
+from textual.css.query import NoMatches
+from textual.message import Message
+from textual.reactive import reactive
+from textual.selection import Selection
+from textual.style import Style
+from textual.geometry import Region, Size
+from textual.scroll_view import ScrollView
+from textual.strip import Strip
+from textual.timer import Timer
 
 
-@dataclass
-class TerminalState:
-    """Current state of the terminal."""
-
-    output: str
-    truncated: bool
-    return_code: int | None = None
-    signal: str | None = None
+from toad import ansi
 
 
-class Terminal(ANSILog):
-    DEFAULT_CSS = """
-    Terminal {
-        height: auto;
-        border: panel $text-primary;
-    }
-    """
+# Time required to double tab escape
+ESCAPE_TAP_DURATION = 400 / 1000
 
-    _command: var[Command | None] = var(None)
+
+class Terminal(ScrollView, can_focus=True):
+    CURSOR_STYLE = Style.parse("reverse")
+
+    hide_cursor = reactive(False)
+
+    @dataclass
+    class Finalized(Message):
+        """Terminal was finalized."""
+
+        terminal: Terminal
+
+        @property
+        def control(self) -> Terminal:
+            return self.terminal
+
+    @dataclass
+    class AlternateScreenChanged(Message):
+        """Terminal enabled or disabled alternate screen."""
+
+        terminal: Terminal
+        enabled: bool
+
+        @property
+        def control(self) -> Terminal:
+            return self.terminal
 
     def __init__(
         self,
-        command: Command,
-        *,
-        output_byte_limit: int | None = None,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
         disabled: bool = False,
-        minimum_terminal_width: int = -1,
+        minimum_terminal_width: int = 0,
+        size: tuple[int, int] | None = None,
+        get_terminal_dimensions: Callable[[], tuple[int, int]] | None = None,
     ):
         super().__init__(
             name=name,
             id=id,
             classes=classes,
             disabled=disabled,
-            minimum_terminal_width=minimum_terminal_width,
         )
-        self._command = command
-        self._output_byte_limit = output_byte_limit
-        self._command_task: asyncio.Task | None = None
-        self._output: deque[bytes] = deque()
+        self.minimum_terminal_width = minimum_terminal_width
+        self._get_terminal_dimensions = get_terminal_dimensions
 
-        self._process: Process | None = None
-        self._bytes_read = 0
-        self._output_bytes_count = 0
-        self._shell_fd: int | None = None
-        self._return_code: int | None = None
-        self._released: bool = False
-        self._ready_event = asyncio.Event()
-        self._exit_event = asyncio.Event()
+        self.state = ansi.TerminalState(self.write_process_stdin)
 
-        self._width: int | None = None
-        self._height: int | None = None
+        if size is None:
+            self._width = minimum_terminal_width or 80
+            self._height: int = 24
+        else:
+            width, height = size
+            self._width = width
+            self._height = height
+
+        self.minimum_terminal_width = self._width
+
+        self.max_window_width = 0
+        self._escape_time = monotonic()
+        self._escaping = False
+        self._escape_reset_timer: Timer | None = None
+        self._finalized: bool = False
+        self.current_directory: str | None = None
+        self._alternate_screen: bool = False
+
+        self._terminal_render_cache: LRUCache[tuple, Strip] = LRUCache(1024)
+        self._write_to_stdin: Callable[[str], Any] | None = None
 
     @property
-    def return_code(self) -> int | None:
-        """The command return code, or `None` if not yet set."""
-        return self._return_code
+    def is_finalized(self) -> bool:
+        """Finalized terminals will not accept writes or receive input."""
+        return self._finalized
 
     @property
-    def released(self) -> bool:
-        """Has the terminal been released?"""
-        return self._released
+    def width(self) -> int:
+        """Width of the terminal."""
+        return self._width
 
     @property
-    def state(self) -> TerminalState:
-        """Get the current terminal state."""
-        output, truncated = self.get_output()
-        # TODO: report signal
-        return TerminalState(
-            output=output, truncated=truncated, return_code=self.return_code
-        )
+    def height(self) -> int:
+        """Height of the terminal."""
+        return self._height
 
-    @staticmethod
-    def resize_pty(fd: int, columns: int, rows: int) -> None:
-        """Resize the pseudo terminal.
+    @property
+    def size(self) -> Size:
+        return Size(self.width, self.height)
+
+    def set_state(self, state: ansi.TerminalState) -> None:
+        """Set the terminal state, if this terminal is to inherit an existing state.
 
         Args:
-            fd: File descriptor.
-            columns: Columns (width).
-            rows: Rows (height).
+            state: Terminal state object.
         """
-        # Pack the dimensions into the format expected by TIOCSWINSZ
-        size = struct.pack("HHHH", rows, columns, 0, 0)
-        fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
+        self.state = state
 
-    async def wait_for_exit(self) -> tuple[int | None, str | None]:
-        """Wait for the terminal process to exit."""
-        if self._process is None or self._command_task is None:
-            return None, None
-        # await self._task
-        await self._exit_event.wait()
-        return (self.return_code or 0, None)
+    def set_write_to_stdin(self, write_to_stdin: Callable[[str], Any]) -> None:
+        """Set a callable which is invoked with input, to be sent to stdin.
 
-    def kill(self) -> bool:
-        """Kill the terminal process.
+        Args:
+            write_to_stdin: Callable which takes a string.
+        """
+        self._write_to_stdin = write_to_stdin
+
+    def finalize(self) -> None:
+        """FInalize the terminal.
+
+        The finalized terminal will reject new writes.
+        Adds the TCSS class `-finalize`
+        """
+        if not self._finalized:
+            self._finalized = True
+            self.state.show_cursor = False
+            self.add_class("-finalized")
+            self._terminal_render_cache.clear()
+            self.refresh()
+            self.blur()
+            self.post_message(self.Finalized(self))
+
+    def allow_focus(self) -> bool:
+        """Prohibit focus when the terminal is finalized and couldn't accept input."""
+        return not self.is_finalized
+
+    def get_selection(self, selection: Selection) -> tuple[str, str] | None:
+        """Get the text under the selection.
+
+        Args:
+            selection: Selection information.
 
         Returns:
-            Returns `True` if the process was killed, or `False` if there
-                was no running process.
+            Tuple of extracted text and ending (typically "\n" or " "), or `None` if no text could be extracted.
         """
-        if self.return_code is not None:
-            return False
-        if self._process is None:
-            return False
-        try:
-            self._process.kill()
-        except Exception:
-            return False
-        return True
+        text = "\n".join(
+            line_record.content.plain for line_record in self.state.buffer.lines
+        )
+        return selection.extract(text), "\n"
 
-    def release(self) -> None:
-        """Release the terminal (may no longer be used from ACP)."""
-        self._released = True
+    def _on_resize(self, event: events.Resize) -> None:
+        if self._get_terminal_dimensions is None:
+            width, height = self.scrollable_content_region.size
+        else:
+            width, height = self._get_terminal_dimensions()
+        self.update_size(width, height)
 
-    def watch__command(self, command: Command) -> None:
-        self.border_title = str(command)
-
-    async def start(self, width: int = 0, height: int = 0) -> None:
-        assert self._command is not None
+    def update_size(self, width: int, height: int) -> None:
+        old_width = self._width
+        old_height = self._height
+        self._terminal_render_cache.grow(height * 2)
         self._width = width or 80
-        self._height = height or 80
-        self._command_task = asyncio.create_task(
-            self.run(), name=f"Terminal {self._command}"
-        )
-        await self._ready_event.wait()
+        self._height = height or 24
+        self._width = max(self._width, self.minimum_terminal_width)
 
-    async def run(self) -> None:
-        try:
-            await self._run()
-        except Exception:
-            from traceback import print_exc
+        if (
+            old_width != self._width
+            or old_height != self._height
+            and not self.is_finalized
+        ):
+            from toad.widgets.conversation import Conversation
 
-            print_exc()
-        finally:
-            self._exit_event.set()
+            try:
+                conversation = self.query_ancestor(Conversation)
+            except NoMatches:
+                pass
+            else:
+                conversation.shell.update_size(self._width, self._height)
 
-    async def _run(self) -> None:
-        self._command_task = asyncio.current_task()
+        self.state.update_size(self._width, height)
+        self._terminal_render_cache.clear()
+        self.refresh()
 
-        assert self._command is not None
-        master, slave = pty.openpty()
-        self._shell_fd = master
-
-        flags = fcntl.fcntl(master, fcntl.F_GETFL)
-        fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-
-        # Get terminal attributes
-        attrs = termios.tcgetattr(slave)
-
-        # Disable echo (ECHO flag)
-        attrs[3] &= ~termios.ECHO
-
-        # Apply the changes
-        termios.tcsetattr(slave, termios.TCSANOW, attrs)
-
-        command = self._command
-        environment = os.environ | command.env
-
-        if " " in command.command:
-            run_command = command.command
+    def on_mount(self) -> None:
+        self.auto_links = False
+        self.anchor()
+        if self._get_terminal_dimensions is None:
+            width, height = self.scrollable_content_region.size
         else:
-            run_command = f"{command.command} {shlex.join(command.args)}"
+            width, height = self._get_terminal_dimensions()
+        self.update_size(width, height)
 
-        shell = os.environ.get("SHELL", "sh")
-        run_command = shlex.join([shell, "-c", run_command])
+    def write(self, text: str) -> bool:
+        """Write sequences to the terminal.
 
-        try:
-            process = self._process = await asyncio.create_subprocess_shell(
-                run_command,
-                stdin=slave,
-                stdout=slave,
-                stderr=slave,
-                env=environment,
-                cwd=command.cwd,
-            )
-        except Exception as error:
-            self._ready_event.set()
-            print(error)
-            raise
-
-        self._ready_event.set()
-
-        self.resize_pty(
-            master,
-            self._width or 80,
-            self._height or 24,
-        )
-
-        os.close(slave)
-        BUFFER_SIZE = 64 * 1024 * 2
-        reader = asyncio.StreamReader(BUFFER_SIZE)
-        protocol = asyncio.StreamReaderProtocol(reader)
-
-        loop = asyncio.get_event_loop()
-        transport, _ = await loop.connect_read_pipe(
-            lambda: protocol, os.fdopen(master, "rb", 0)
-        )
-        # Create write transport
-        writer_protocol = asyncio.BaseProtocol()
-        write_transport, _ = await loop.connect_write_pipe(
-            lambda: writer_protocol,
-            os.fdopen(os.dup(master), "wb", 0),
-        )
-        self.writer = write_transport
-
-        unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
-        try:
-            while True:
-                data = await reader.read(BUFFER_SIZE)
-                if process_data := unicode_decoder.decode(data, final=not data):
-                    self._record_output(data)
-                    if self.write(process_data):
-                        self.display = True
-                if not data:
-                    break
-        finally:
-            transport.close()
-
-        return_code = self._return_code = await process.wait()
-
-        if return_code == 0:
-            self.add_class("-success")
-        else:
-            self.add_class("-error")
-            self.border_title = Content.assemble(
-                f"{command} [{return_code}]",
-            )
-
-    def _record_output(self, data: bytes) -> None:
-        """Keep a record of the bytes left.
-
-        Store at most the limit set in self._output_byte_limit (if set).
-
-        """
-
-        self._output.append(data)
-        self._output_bytes_count += len(data)
-        self._bytes_read += len(data)
-
-        if self._output_byte_limit is None:
-            return
-
-        while self._output_bytes_count > self._output_byte_limit and self._output:
-            oldest_bytes = self._output[0]
-            oldest_bytes_count = len(oldest_bytes)
-            if self._output_bytes_count - oldest_bytes_count < self._output_byte_limit:
-                break
-            self._output.popleft()
-            self._output_bytes_count -= oldest_bytes_count
-
-    def get_output(self) -> tuple[str, bool]:
-        """Get the output.
+        Args:
+            text: Text with ANSI escape sequences.
 
         Returns:
-            A tuple of the output and a bool to indicate if the output was truncated.
+            `True` if the state visuals changed, `False` if no visual change.
         """
-        output_bytes = b"".join(self._output)
 
-        def is_continuation(byte_value: int) -> bool:
-            """Check if the given byte is a utf-8 continuation byte.
+        scrollback_delta, alternate_delta = self.state.write(text)
+        self._update_from_state(scrollback_delta, alternate_delta)
+        scrollback_changed = bool(scrollback_delta is None or scrollback_delta)
+        alternate_changed = bool(alternate_delta is None or alternate_delta)
 
-            Args:
-                byte_value: Ordinal of the byte.
+        if self._alternate_screen != self.state.alternate_screen:
+            self.post_message(
+                self.AlternateScreenChanged(self, enabled=self.state.alternate_screen)
+            )
+        self._alternate_screen = self.state.alternate_screen
+        return scrollback_changed or alternate_changed
 
-            Returns:
-                `True` if the byte is a continuation, or `False` if it is the start of a character.
-            """
-            return (byte_value & 0b11000000) == 0b10000000
+    def on_click(self, event: events.Click) -> None:
+        self.focus()
+        event.stop()
 
-        truncated = False
+    def _update_from_state(
+        self, scrollback_delta: set[int] | None, alternate_delta: set[int] | None
+    ) -> None:
+        if self.state.current_directory:
+            self.current_directory = self.state.current_directory
+            self.finalize()
+        width = self.state.width
+        height = self.state.scrollback_buffer.height
+        if self.state.alternate_screen:
+            height += self.state.alternate_buffer.height
+        self.virtual_size = Size(min(self.state.buffer.max_line_width, width), height)
+        if self._anchored and not self._anchor_released:
+            self.scroll_y = self.max_scroll_y
+
+        scroll_y = int(self.scroll_y)
+        visible_lines = frozenset(range(scroll_y, scroll_y + height))
+
+        if scrollback_delta is None and alternate_delta is None:
+            self.refresh()
+        else:
+            window_width = self.region.width
+            scrollback_height = self.state.scrollback_buffer.line_count
+            if scrollback_delta is None:
+                self.refresh(Region(0, 0, window_width, scrollback_height))
+            else:
+                refresh_lines = [
+                    Region(0, y - scroll_y, window_width, 1)
+                    for y in sorted(scrollback_delta & visible_lines)
+                ]
+                if refresh_lines:
+                    self.refresh(*refresh_lines)
+            alternate_height = self.state.alternate_buffer.line_count
+            if alternate_delta is None:
+                self.refresh(
+                    Region(
+                        0,
+                        scrollback_height - scroll_y,
+                        window_width,
+                        scrollback_height + alternate_height,
+                    )
+                )
+            else:
+                alternate_delta = {
+                    line_no + scrollback_height for line_no in alternate_delta
+                }
+                refresh_lines = [
+                    Region(0, y - scroll_y, window_width, 1)
+                    for y in sorted(alternate_delta & visible_lines)
+                ]
+                if refresh_lines:
+                    self.refresh(*refresh_lines)
+
+    def render_line(self, y: int) -> Strip:
+        scroll_x, scroll_y = self.scroll_offset
+        strip = self._render_line(scroll_x, scroll_y + y, self._width)
+        return strip
+
+    def on_focus(self) -> None:
+        self.border_subtitle = "Tap [b]esc[/b] [i]twice[/i] to exit"
+
+    def on_blur(self) -> None:
+        self.border_subtitle = "Click to focus"
+
+    def _render_line(self, x: int, y: int, width: int) -> Strip:
+        selection = self.text_selection
+        visual_style = self.visual_style
+        rich_style = visual_style.rich_style
+
+        state = self.state
+        buffer = state.scrollback_buffer
+        buffer_offset = 0
+        # If alternate screen is active place it (virtually) at the end
+        if y >= len(buffer.folded_lines) and state.alternate_screen:
+            buffer_offset = len(buffer.folded_lines)
+            buffer = state.alternate_buffer
+        # Get the folded line, which as a one to one relationship with y
+        try:
+            folded_line_ = buffer.folded_lines[y - buffer_offset]
+            line_no, line_offset, offset, line, updates = folded_line_
+        except IndexError:
+            return Strip.blank(width, rich_style)
+
+        line_record = buffer.lines[line_no]
+        cache_key: tuple | None = (
+            self.state.alternate_screen,
+            y,
+            line_record.updates,
+            updates,
+        )
+
+        # Add in cursor
         if (
-            self._output_byte_limit is not None
-            and len(output_bytes) > self._output_byte_limit
+            not self.hide_cursor
+            and state.show_cursor
+            and buffer.cursor_line == y - buffer_offset
         ):
-            truncated = True
-            output_bytes = output_bytes[-self._output_byte_limit :]
-            # Must start on a utf-8 boundary
-            # Discard initial bytes that aren't a utf-8 continuation byte.
-            for offset, byte_value in enumerate(output_bytes):
-                if not is_continuation(byte_value):
-                    if offset:
-                        output_bytes = output_bytes[offset:]
-                    break
+            if buffer.cursor_offset >= len(line):
+                line = line.pad_right(buffer.cursor_offset - len(line) + 1)
+            line_cursor_offset = buffer.cursor_offset
+            line = line.stylize(
+                self.CURSOR_STYLE, line_cursor_offset, line_cursor_offset + 1
+            )
+            cache_key = None
 
-        output = output_bytes.decode("utf-8", "replace")
-        return output, truncated
+        # get cached strip if there is no selection
+        if (
+            not selection
+            and cache_key is not None
+            and (strip := self._terminal_render_cache.get(cache_key))
+        ):
+            strip = strip.crop(x, x + width)
+            strip = strip.adjust_cell_length(
+                width, (visual_style + line_record.style).rich_style
+            )
+            strip = strip.apply_offsets(x + offset, line_no)
+            return strip
+
+        # Apply selection
+        if selection is not None and (select_span := selection.get_span(line_no)):
+            unfolded_content = line_record.content.expand_tabs(8)
+            start, end = select_span
+            if end == -1:
+                end = len(unfolded_content)
+            selection_style = self.screen.get_visual_style("screen--selection")
+            unfolded_content = unfolded_content.stylize(selection_style, start, end)
+            try:
+                folded_lines = self.state._fold_line(line_no, unfolded_content, width)
+                line = folded_lines[line_offset].content
+                cache_key = None
+            except IndexError:
+                pass
+
+        try:
+            strip = Strip(
+                line.render_segments(visual_style), cell_length=line.cell_length
+            )
+        except Exception:
+            # TODO: Is this neccesary?
+            strip = Strip.blank(line.cell_length)
+
+        if cache_key is not None:
+            self._terminal_render_cache[cache_key] = strip
+
+        strip = strip.crop(x, x + width)
+        strip = strip.adjust_cell_length(
+            width, (visual_style + line_record.style).rich_style
+        )
+        strip = strip.apply_offsets(x + offset, line_no)
+
+        return strip
+
+    def _reset_escaping(self) -> None:
+        if self._escaping:
+            self.write_process_stdin(self.state.key_escape())
+        self._escaping = False
+
+    def on_key(self, event: events.Key):
+        event.prevent_default()
+        event.stop()
+
+        if event.key == "escape":
+            if self._escaping:
+                if monotonic() < self._escape_time + ESCAPE_TAP_DURATION:
+                    self.blur()
+                    self._escaping = False
+                    return
+                else:
+                    self.write_process_stdin(self.state.key_escape())
+            else:
+                self._escaping = True
+                self._escape_time = monotonic()
+                self._escape_reset_timer = self.set_timer(
+                    ESCAPE_TAP_DURATION, self._reset_escaping
+                )
+                return
+        else:
+            self._reset_escaping()
+            if self._escape_reset_timer is not None:
+                self._escape_reset_timer.stop()
+
+        if (stdin := self.state.key_event_to_stdin(event)) is not None:
+            self.write_process_stdin(stdin)
+
+    @property
+    def allow_select(self) -> bool:
+        return self.is_finalized or not self._alternate_screen
+
+    def _encode_mouse_event_sgr(self, event: events.MouseEvent) -> str:
+        x = int(event.x)
+        y = int(event.y)
+
+        if isinstance(event, events.MouseMove):
+            button = event.button + 32 if event.button else 35
+        else:
+            button = event.button - 1
+            if button >= 4:
+                button = button - 4 + 128
+            if event.shift:
+                button += 4
+            if event.meta:
+                button += 8
+            if event.ctrl:
+                button += 16
+
+        if isinstance(event, events.MouseDown):
+            final_character = "M"
+        elif isinstance(event, events.MouseUp):
+            button = 0
+            final_character = "m"
+        else:
+            final_character = "M"
+        mouse_stdin = f"\x1b[<{button};{x + 1};{y + 1}{final_character}"
+        return mouse_stdin
+
+    @on(events.MouseMove)
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        if self.is_finalized:
+            return
+        if (mouse_tracking := self.state.mouse_tracking) is None:
+            return
+        if mouse_tracking.tracking == "all" or (
+            event.button and mouse_tracking.tracking == "drag"
+        ):
+            self._handle_mouse_event(event)
+            event.prevent_default()
+            event.stop()
+
+    @on(events.MouseDown)
+    @on(events.MouseUp)
+    def on_mouse_button(self, event: events.MouseUp | events.MouseDown) -> None:
+        if self.is_finalized:
+            return
+        if self.state.mouse_tracking is None:
+            return
+        self._handle_mouse_event(event)
+        event.prevent_default()
+        event.stop()
+
+    def _handle_mouse_event(self, event: events.MouseEvent) -> None:
+        if (mouse_tracking := self.state.mouse_tracking) is None:
+            return
+        # TODO: Other mouse tracking formats
+        match mouse_tracking.format:
+            case "sgr":
+                self.write_process_stdin(self._encode_mouse_event_sgr(event))
+
+    def on_paste(self, event: events.Paste) -> None:
+        for character in event.text:
+            self.write_process_stdin(character)
+
+    def write_process_stdin(self, input: str) -> None:
+        if self._write_to_stdin is not None:
+            self._write_to_stdin(input)
 
 
 if __name__ == "__main__":
     from textual.app import App, ComposeResult
 
-    command = Command("python", ["mandelbrot.py"], os.environ.copy(), os.curdir)
+    TEST = (
+        "\033[31mThis is red text\033[0m\n"
+        "\033[32mThis is green text\033[0m\n"
+        "\033[33mThis is yellow text\033[0m\n"
+        "\033[34mThis is blue text\033[0m\n"
+        "\033[35mThis is magenta text\033[0m\n"
+        "\033[36mThis is cyan text\033[0m\n"
+        "\033[1mThis is bold text\033[0m\n"
+        "\033[4mThis is underlined text\033[0m\n"
+        "\033[1;31mThis is bold red text\033[0m\n"
+        "\033[42mThis has a green background\033[0m\n"
+        "\033[97;44mWhite text on blue background\033[0m"
+    )
 
     class TApp(App):
-        CSS = """
-        Terminal.-success  {
-            border: panel $text-success 90%;
-        }
-        """
-
         def compose(self) -> ComposeResult:
-            yield Terminal(command)
+            yield Terminal()
 
         def on_mount(self) -> None:
-            self.query_one(Terminal).start()
+            terminal = self.query_one(Terminal)
+            terminal.write(TEST)
 
-    TApp().run()
+    app = TApp()
+    app.run()

@@ -41,6 +41,8 @@ class SettingsScreen(ModalScreen):
             group_title: str, settings_map: dict[str, Setting]
         ) -> ComposeResult:
             for _key, setting in settings_map.items():
+                if not setting.editable:
+                    continue
                 if setting.type == "object":
                     if setting.children is not None:
                         with containers.VerticalGroup(classes="setting-object"):

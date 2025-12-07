@@ -1,0 +1,53 @@
+# Schema defined in agent_schema.py
+# https://github.com/docker/cagent
+
+identity = "docker.com"
+name = "Docker cagent"
+short_name = "cagent"
+url = "https://docs.docker.com/ai/cagent/"
+protocol = "acp"
+author_name = "Docker"
+author_url = "https://www.docker.com/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Agent Builder and Runtime by Docker Engineering. Build, orchestrate, and share AI agents with MCP and ACP support."
+tags = []
+run_command."*" = "cagent acp"
+
+help = '''
+# Docker cagent
+
+**Agent Builder and Runtime by Docker Engineering**
+
+Docker cagent lets you build, orchestrate, and share AI agents that work together as a team.
+
+## Key Features
+
+- **Hierarchical Agent System**: Intelligent task delegation between multiple agents
+- **Model Context Protocol (MCP)**: Rich tool ecosystem via MCP integration
+- **Multiple Interfaces**: CLI, TUI, API server, and MCP server modes
+- **Share & Distribute**: Package and share agents to Docker Hub as OCI artifacts
+
+## Agent Client Protocol Support
+
+cagent supports ACP, enabling integration with ACP-compatible editors and development environments.
+
+## Installation
+
+The easiest way to get cagent is to install Docker Desktop version 4.49 or later, which includes cagent.
+
+## Distribution
+
+Agent configurations can be packaged and shared using the `cagent push` command, treating agents as reproducible OCI artifacts.
+
+---
+
+**Documentation**: https://docs.docker.com/ai/cagent/  
+**GitHub**: https://github.com/docker/cagent  
+**Blog Post**: https://www.docker.com/blog/cagent-build-and-distribute-ai-agents-and-workflows/
+'''
+
+[actions."*".install]
+command = "echo 'Install Docker Desktop 4.49+ which includes cagent: https://www.docker.com/products/docker-desktop/'"
+description = "Install Docker Desktop with cagent"

@@ -2,6 +2,8 @@
     margin: 1 1 1 0;  
 }
 
+
+
 LoadingIndicator {
     background: transparent;
 }
@@ -124,9 +126,11 @@ SideBar Plan {
     }
 }
 
+
 Conversation {
     
-    Window {
+        
+    Window {        
         layout: stream;
         margin: 0;                
         scrollbar-size-vertical: 2;        
@@ -258,7 +262,7 @@ Conversation {
         }  
     }
     
-    ANSILog {        
+    Terminal {        
         width: 1fr;
         height: auto;
         padding: 0 1 0 0;
@@ -266,10 +270,11 @@ Conversation {
         overflow: scroll;
         scrollbar-size: 0 0;  
         # &.-finalized {            
-        # }      
+        # }
+        
     }
 
-    Terminal {
+    TerminalTool {
         height: auto;   
         border: panel $text-secondary 90%;          
         padding: 1 1 0 1;                
@@ -334,8 +339,8 @@ Prompt {
         }
     }
 
-    # &.-not-ready {
-    #     opacity: 0.5;
+    # &.-not-ready {        
+    
     # }
 
     PathSearch {
@@ -597,8 +602,8 @@ Footer {
     .footer-key--key {
         color: $text;
         background: transparent;
-        text-style: bold;
-        padding: 0 1;
+        # text-style: not bold;
+        padding: 0 1;        
     }
 
     .footer-key--description {
@@ -628,6 +633,12 @@ Footer {
         color: $text-muted;
         background: $footer-description-background;
     }
+
+    FooterKey.-disabled {
+        .footer-key--key {
+            text-opacity: 0.6;       
+        }
+    }
 }
 
 HelpPanel {    
@@ -636,6 +647,14 @@ HelpPanel {
         scrollbar-gutter: stable;        
         &> BindingsTable > .bindings-table--description {
             color: $text-muted;
+        }
+        .bindings-table--key {
+            color: $text;
+            # text-style: not bold;
+        }
+        &> BindingsTable > .bindings-table--header {        
+            color: $text-warning;
+            text-style: underline;
         }
     }
 }

@@ -1,0 +1,40 @@
+# Schema defined in agent_schema.py
+# https://github.com/augmentcode/auggie
+
+identity = "augmentcode.com"
+name = "Auggie (Augment Code)"
+short_name = "auggie"
+url = "https://www.augmentcode.com/product/CLI"
+protocol = "acp"
+author_name = "Augment Code"
+author_url = "https://www.augmentcode.com/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "An AI agent that brings Augment Code's power to the terminal with ACP support for Zed, Neovim, and Emacs."
+tags = []
+run_command."*" = "auggie --acp"
+
+help = '''
+# Auggie (Augment Code)
+
+*The agentic CLI that goes where your code does*
+
+## Features
+
+- **Agent Client Protocol (ACP) Support**: Use Auggie in Zed, Neovim, Emacs, and other ACP-compatible editors
+- **Autonomous Code Analysis**: Intelligently explore codebases and build working memory
+- **Multi-Editor Integration**: Seamlessly integrates with your favorite development environment
+
+---
+
+**Documentation**: https://docs.augmentcode.com/cli/setup-auggie/install-auggie-cli
+'''
+
+[actions."*".install]
+command = "npm install -g @augmentcode/auggie"
+description = "Install Auggie CLI (requires Node 22+)"
+
+[actions."*".login]
+command = "auggie login"
+description = "Login it Auggie (run once)"

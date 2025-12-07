@@ -14,7 +14,7 @@ from toad.acp.encode_tool_call_id import encode_tool_call_id
 from toad.acp.agent import Mode
 
 if TYPE_CHECKING:
-    from toad.widgets.terminal import TerminalState
+    from toad.widgets.terminal_tool import ToolState
 
 
 class AgentMessage(Message):
@@ -99,7 +99,7 @@ class GetTerminalState(AgentMessage):
     """Get the state of the terminal."""
 
     terminal_id: str
-    result_future: Future[TerminalState]
+    result_future: Future[ToolState]
 
 
 @dataclass

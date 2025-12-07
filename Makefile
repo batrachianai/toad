@@ -7,16 +7,16 @@ run:
 
 .PHONY: gemini-acp
 gemini-acp:
-	$(run) acp "gemini --experimental-acp" --project-dir ~/sandbox
+	$(run) acp "gemini --experimental-acp" --project-dir ~/sandbox --title "Google Gemini"
 
 .PHONY: claude-acp
 claude-acp:
-	$(run) acp "claude-code-acp" --project-dir ~/sandbox
+	$(run) acp "claude-code-acp" --project-dir ~/sandbox --title "Claude"
 
 
 .PHONE: codex-acp
 codex-acp:
-	$(run) acp "codex-acp"  --project-dir ~/sandbox
+	$(run) acp "codex-acp"  --project-dir ~/sandbox --title="OpenAI Codex"
 
 .PHONY: replay
 replay:

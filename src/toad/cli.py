@@ -6,16 +6,23 @@ from toad.app import ToadApp
 
 @click.group(invoke_without_command=True)
 @click.pass_context
-def main(ctx):
+@click.option("--project-dir", metavar="PATH", default=None)
+def main(ctx, project_dir: str | None):
     """Toad. The Batrachian AI."""
     if ctx.invoked_subcommand is not None:
         return
-    app = ToadApp()
+    app = ToadApp(mode="store", project_dir=project_dir)
     app.run()
 
 
 @main.command("acp")
 @click.argument("command", metavar="COMMAND")
+@click.option(
+    "--title",
+    metavar="TITLE",
+    help="Optional title to display in the status bar",
+    default=None,
+)
 @click.option("--project-dir", metavar="PATH", default=None)
 @click.option(
     "--port",
@@ -32,10 +39,35 @@ def main(ctx):
 )
 @click.option("--serve", is_flag=True, help="Serve Toad as a web application")
 def acp(
-    command: str, host: str, port: int, project_dir: str | None, serve: bool = False
+    command: str,
+    host: str,
+    port: int,
+    title: str | None,
+    project_dir: str | None,
+    serve: bool = False,
 ) -> None:
     """Run an ACP client."""
-    app = ToadApp(acp_command=command, project_dir=project_dir)
+
+    from toad.agent_schema import Agent as AgentData
+
+    agent_data: AgentData = {
+        "identity": "toad.custom",
+        "name": title or command.partition(" ")[0],
+        "short_name": "agent",
+        "url": "https://github.com/textualize/toad",
+        "protocol": "acp",
+        "type": "coding",
+        "author_name": "Will McGugan",
+        "author_url": "https://willmcgugan.github.io/",
+        "publisher_name": "Will McGugan",
+        "publisher_url": "https://willmcgugan.github.io/",
+        "description": "Agent launched from CLI",
+        "tags": [],
+        "help": "",
+        "run_command": {"*": command},
+        "actions": {},
+    }
+    app = ToadApp(agent_data=agent_data, project_dir=project_dir)
     if serve:
         import shlex
         from textual_serve.server import Server

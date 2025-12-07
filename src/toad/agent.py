@@ -53,6 +53,7 @@ class AgentBase(ABC):
             bool: `True` if success, `False` if the turn wasn't cancelled.
 
         """
+        return False
 
     def get_info(self) -> Content:
         return Content("")

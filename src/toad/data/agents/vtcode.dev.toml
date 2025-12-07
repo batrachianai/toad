@@ -1,0 +1,62 @@
+# Schema defined in agent_schema.py
+# https://github.com/vinhnx/vtcode
+
+identity = "vtcode.dev"
+name = "VT Code"
+short_name = "vtcode"
+url = "https://github.com/vinhnx/vtcode"
+protocol = "acp"
+author_name = "Vinh Nguyen"
+author_url = "https://github.com/vinhnx"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Rust-based terminal coding agent with semantic code intelligence via Tree-sitter, ast-grep, and native Zed IDE integration via ACP."
+tags = []
+run_command."*" = "vtcode acp"
+
+help = '''
+# VT Code
+
+**Semantic Coding Agent**
+
+VT Code is a Rust-based terminal coding agent with semantic code intelligence and native support for the Agent Client Protocol.
+
+## Key Features
+
+- **Semantic Code Intelligence**: 
+  - Tree-sitter integration for syntax-aware analysis
+  - ast-grep integration for semantic search
+  - Advanced token budget tracking
+- **Multi-LLM Support**: Works with multiple LLM providers with automatic failover
+- **Rich Terminal UI**: Real-time streaming in a beautiful TUI
+- **Editor Integration**: Native support for Zed IDE via ACP
+- **Security**: Defense-in-depth security model
+
+## Smart Tools
+
+- Built-in code analysis and refactoring
+- File operations with semantic understanding
+- Terminal command execution
+- Lifecycle hooks for custom shell commands
+
+## Agent Client Protocol (ACP)
+
+VT Code integrates natively with Zed IDE and other ACP-compatible editors. The ACP standardizes communication between code editors and coding agents.
+
+## Context Management
+
+Efficient context curation with:
+- Semantic search capabilities
+- Token budget tracking
+- Smart context window management
+
+---
+
+**GitHub**: https://github.com/vinhnx/vtcode  
+**Author**: Vinh Nguyen (@vinhnx)
+'''
+
+[actions."*".install]
+command = "cargo install --git https://github.com/vinhnx/vtcode"
+description = "Install VT Code via Cargo"

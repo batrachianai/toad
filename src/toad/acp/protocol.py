@@ -20,6 +20,13 @@ class ClientCapabilities(SchemaDict, total=False):
     terminal: bool
 
 
+# https://agentclientprotocol.com/protocol/schema#implementation
+class Implementation(SchemaDict, total=False):
+    name: Required[str]
+    title: str | None
+    version: Required[str]
+
+
 # https://agentclientprotocol.com/protocol/schema#promptcapabilities
 class PromptCapabilities(SchemaDict, total=False):
     audio: bool

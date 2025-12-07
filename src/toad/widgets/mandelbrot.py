@@ -1,13 +1,17 @@
 from typing import NamedTuple
 
+from rich.segment import Segment
+from rich.color import Color as RichColor
+from rich.style import Style as RichStyle
+
 from textual import events
 from textual.color import Color
-from textual.content import Content, Span
+from textual.content import Content
 from textual.geometry import NULL_SIZE, Offset
 from textual.reactive import reactive, var
-from textual.style import Style
+from textual.strip import Strip
 from textual.app import App, ComposeResult
-from textual.widgets import Static
+from textual.widget import Widget
 from textual.timer import Timer
 
 
@@ -73,11 +77,10 @@ class MandelbrotRegion(NamedTuple):
         return MandelbrotRegion(new_x_min, new_x_max, new_y_min, new_y_max)
 
 
-class Mandelbrot(Static):
+class Mandelbrot(Widget):
     ALLOW_SELECT = False
     DEFAULT_CSS = """
-    Mandelbrot {
-        
+    Mandelbrot {        
         border: block black 20%;
         text-wrap: nowrap;
         text-overflow: clip;
@@ -107,6 +110,15 @@ class Mandelbrot(Static):
         (128, 1, 3),
     ]
 
+    def __init__(
+        self,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+    ) -> None:
+        self._strip_cache: dict[int, Strip] = {}
+        super().__init__(name=name, id=id, classes=classes)
+
     @staticmethod
     def mandelbrot(c_real: float, c_imag: float, max_iterations: int):
         """
@@ -134,8 +146,8 @@ class Mandelbrot(Static):
         if x_plus_one * x_plus_one + c_imag * c_imag < 0.0625:
             return max_iterations
 
-        z_real = 0
-        z_imag = 0
+        z_real = 0.0
+        z_imag = 0.0
         for i in range(max_iterations):
             z_real_new = z_real * z_real - z_imag * z_imag + c_real
             z_imag_new = 2 * z_real * z_imag + c_imag
@@ -146,22 +158,21 @@ class Mandelbrot(Static):
         return max_iterations
 
     def on_mount(self):
-        self.call_after_refresh(self.update_mandelbrot)
+        self.call_after_refresh(self.refresh)
 
-    def update_mandelbrot(self) -> None:
-        mandelbrot = self.generate()
-        self.update(mandelbrot)
+    def on_resize(self) -> None:
+        self._strip_cache.clear()
 
     def on_mouse_down(self, event: events.Click) -> None:
         if self.zoom_timer:
             self.zoom_timer.stop()
-
         self.zoom_position = event.offset
         self.zoom_scale = 0.95 if event.ctrl else 1.05
-        self.zoom_timer = self.set_interval(1 / 16, self.zoom)
+        self.zoom_timer = self.set_interval(1 / 20, self.zoom)
         self.capture_mouse()
 
     def on_mouse_up(self, event: events.Click) -> None:
+        self.release_mouse()
         if self.zoom_timer:
             self.zoom_timer.stop()
 
@@ -181,17 +192,18 @@ class Mandelbrot(Static):
 
         self.set_region = self.set_region.zoom(x, y, self.zoom_scale)
 
+    def notify_style_update(self) -> None:
+        self._strip_cache.clear()
+        return super().notify_style_update()
+
     def watch_set_region(self) -> None:
-        self.rendered_set = Content("")
-        self.update_mandelbrot()
+        self._strip_cache.clear()
+        self.refresh()
 
-    def render(self) -> Content:
-        return self.generate()
+    def render_line(self, y: int) -> Strip:
+        if (cached_line := self._strip_cache.get(y)) is not None:
+            return cached_line
 
-    def generate(self) -> Content:
-        if self.rendered_set and self.size == self.rendered_size:
-            return self.rendered_set
-        lines: list[Content] = []
         width, height = self.content_size
         x_min, x_max, y_min, y_max = self.set_region
         mandelbrot_width = x_max - x_min
@@ -206,58 +218,57 @@ class Mandelbrot(Static):
         PATCH_COORDS = self.PATCH_COORDS
         max_color = len(COLORS) - 1
 
-        for row in range(0, height * 4, 4):
-            line: list[str] = []
-            spans: list[Span] = []
-            colors: list[tuple[int, int, int]] = []
+        row = y * 4
 
-            for column in range(0, width * 2, 2):
+        colors: list[tuple[int, int, int]] = []
+
+        segments: list[Segment] = []
+        base_style = self.rich_style
+
+        for column in range(0, width * 2, 2):
+            braille_key = 0
+            for bit, dot_x, dot_y in PATCH_COORDS:
+                patch_x: int = column + dot_x
+                patch_y: int = row + dot_y
+                c_real: float = x_min + mandelbrot_width * patch_x / set_width
+                c_imag: float = y_min + mandelbrot_height * patch_y / set_height
+                if (
+                    iterations := mandelbrot(c_real, c_imag, max_iterations)
+                ) < max_iterations:
+                    braille_key |= bit
+                    colors.append(
+                        COLORS[round((iterations / max_iterations) * max_color)]
+                    )
+
+            if colors:
+                patch_red = 0
+                patch_green = 0
+                patch_blue = 0
+                for red, green, blue in colors:
+                    patch_red += red
+                    patch_green += green
+                    patch_blue += blue
+
+                color_count = len(colors)
+                patch_color = RichColor.from_rgb(
+                    patch_red // color_count,
+                    patch_green // color_count,
+                    patch_blue // color_count,
+                )
+                segments.append(
+                    Segment(
+                        BRAILLE_MAP[braille_key],
+                        base_style + RichStyle.from_color(patch_color),
+                    )
+                )
                 colors.clear()
-                braille_key = 0
+            else:
+                segments.append(Segment(" ", base_style))
 
-                for bit, dot_x, dot_y in PATCH_COORDS:
-                    x: int = column + dot_x
-                    y: int = row + dot_y
-                    c_real: float = x_min + mandelbrot_width * x / set_width
-                    c_imag: float = y_min + mandelbrot_height * y / set_height
-                    if (
-                        iterations := mandelbrot(c_real, c_imag, max_iterations)
-                    ) < max_iterations:
-                        braille_key |= bit
-                        colors.append(
-                            COLORS[round((iterations / max_iterations) * max_color)]
-                        )
-
-                if colors:
-                    patch_red = 0
-                    patch_green = 0
-                    patch_blue = 0
-                    for red, green, blue in colors:
-                        patch_red += red
-                        patch_green += green
-                        patch_blue += blue
-
-                    color_count = len(colors)
-                    patch_color = Color(
-                        int(patch_red / color_count),
-                        int(patch_green / color_count),
-                        int(patch_blue / color_count),
-                    )
-                    line.append(BRAILLE_MAP[braille_key])
-                    span_column = column // 2
-                    spans.append(
-                        Span(
-                            span_column, span_column + 1, Style(foreground=patch_color)
-                        )
-                    )
-                else:
-                    line.append(" ")
-
-            lines.append(Content("".join(line), spans=spans).simplify())
-
-        self.rendered_set = Content("\n", cell_length=width).join(lines)
-        self.rendered_size = self.size
-        return self.rendered_set
+        strip = Strip(segments, cell_length=width)
+        strip.simplify()
+        self._strip_cache[y] = strip
+        return strip
 
 
 if __name__ == "__main__":

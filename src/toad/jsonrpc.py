@@ -259,9 +259,10 @@ class Server:
             error.id = request_id
             raise error
         except Exception as error:
-            raise
-            print("JSON error", repr(error))
-            log.debug(f"Error in exposed JSONRPC method; {error}")
+            # raise
+            # print("JSON error", repr(error))
+            # log.debug(f"Error in exposed JSONRPC method; {error}")
+            print("INTERNAL ERROR")
             raise InternalError(str(error), id=request_id)
 
         if request_id is None:

@@ -1,0 +1,78 @@
+# Schema defined in agent_schema.py
+# https://github.com/MoonshotAI/kimi-cli
+
+identity = "moonshotai.com"
+name = "Kimi CLI"
+short_name = "kimi"
+url = "https://www.kimi.com/coding/docs/en/kimi-cli.html"
+protocol = "acp"
+author_name = "Moonshot AI"
+author_url = "https://www.moonshotai.com/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Kimi CLI is your next CLI agent from Moonshot AI, supporting ACP for seamless editor integration and terminal operations."
+tags = []
+run_command."*" = "kimi --acp"
+
+help = '''
+# Kimi CLI
+
+**Your next command-line AI agent from Moonshot AI**
+
+Kimi CLI is a command-line agent tool that supports Agent Client Protocol out of the box and can help with software development tasks and terminal operations.
+
+## Key Features
+
+- **Agent Client Protocol (ACP)**: Native ACP support for editor integration
+- **Model Context Protocol (MCP)**: Supports MCP config convention for external system integration
+- **Zsh Integration**: Dedicated plugin for Oh My Zsh users
+- **Multi-Platform**: Supports macOS and Linux (Windows coming soon)
+
+## ACP Integration
+
+Use Kimi CLI with any ACP-compatible editor or IDE. For Zed, add to ~/.config/zed/settings.json:
+
+```json
+{
+  "agent_servers": {
+    "Kimi": {
+      "command": "kimi",
+      "args": ["--acp"]
+    }
+  }
+}
+```
+
+## Zsh Plugin
+
+For Zsh users, install the plugin:
+```bash
+git clone https://github.com/MoonshotAI/zsh-kimi-cli.git \\
+  ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/kimi-cli
+```
+
+Add `kimi-cli` to your plugins in ~/.zshrc, then press Ctrl-X to enter agent mode.
+
+## Installation
+
+It's highly recommended to install with uv (requires Python 3.13):
+```bash
+uv tool install --python 3.13 kimi-cli
+```
+
+Run `kimi --help` to verify installation.
+
+---
+
+**GitHub**: https://github.com/MoonshotAI/kimi-cli  
+**Documentation**: https://www.kimi.com/coding/docs/en/kimi-cli.html
+'''
+
+[actions."*".install]
+command = "uv tool install --python 3.13 kimi-cli"
+description = "Install Kimi CLI with uv (requires Python 3.13)"
+
+[actions."*".install_pip]
+command = "pip install kimi-cli"
+description = "Install Kimi CLI with pip"

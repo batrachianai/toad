@@ -1,0 +1,51 @@
+# Schema defined in agent_schema.py
+# https://github.com/tao12345666333/amp-acp
+
+identity = "ampcode.com"
+name = "Amp (AmpCode)"
+short_name = "amp"
+url = "https://ampcode.com"
+protocol = "acp"
+author_name = "AmpCode"
+author_url = "https://ampcode.com"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Open-source ACP adapter that exposes the Amp CLI to editors such as Zed via the Agent Client Protocol."
+tags = []
+run_command."*" = "npx -y amp-acp"
+
+help = '''
+# Amp (AmpCode)
+
+Amp is a frontier coding agent for your terminal and editor, built by Sourcegraph.
+
+- **Multi-Model** Sonnet, GPT-5, fast models—Amp uses them all, for what each model is best at.
+- **Opinionated** You're always using the good parts of Amp. If we don't use and love a feature, we kill it.
+- **On the Frontier** Amp goes where the models take it. No backcompat, no legacy features.
+- **Threads** You can save and share your interactions with Amp. You wouldn't code without version control, would you?
+
+## Prerequisites
+
+- Node.js 18+ so `npx` can run the adapter
+- Ensure the `AMP_EXECUTABLE` environment variable points at your Amp binary (or place `amp` on `PATH`)
+
+
+---
+
+## ACP adapter for AmpCode
+
+**Repository**: https://github.com/tao12345666333/amp-acp
+'''
+
+[actions."*".install]
+command = "curl -fsSL https://ampcode.com/install.sh | bash && npm install -g amp-acp"
+description = "Install AMP Code"
+
+[actions."*".install_adapter]
+command = "npm install -g amp-acp"
+description = "Install the Amp ACP adapter"
+
+[actions."*".login]
+command = "amp login"
+description = "Login to Amp (run once)"

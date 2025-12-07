@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from asyncio import Future
 import asyncio
+from itertools import filterfalse
 from operator import attrgetter
 import platform
 from typing import TYPE_CHECKING, Literal
@@ -31,6 +32,7 @@ from textual.layout import WidgetPlacement
 
 from toad import jsonrpc, messages
 from toad import paths
+from toad.agent_schema import Agent as AgentData
 from toad.acp import messages as acp_messages
 from toad.app import ToadApp
 from toad.acp import protocol as acp_protocol
@@ -42,6 +44,7 @@ from toad.widgets.flash import Flash
 from toad.widgets.menu import Menu
 from toad.widgets.note import Note
 from toad.widgets.prompt import Prompt
+from toad.widgets.terminal import Terminal
 from toad.widgets.throbber import Throbber
 from toad.widgets.user_input import UserInput
 from toad.shell import Shell, CurrentWorkingDirectoryChanged, ShellFinished
@@ -50,10 +53,10 @@ from toad.protocol import BlockProtocol, MenuProtocol, ExpandProtocol
 from toad.menus import MenuItem
 
 if TYPE_CHECKING:
-    from toad.widgets.ansi_log import ANSILog
+    from toad.widgets.terminal import Terminal
     from toad.widgets.agent_response import AgentResponse
     from toad.widgets.agent_thought import AgentThought
-    from toad.widgets.terminal import Terminal
+    from toad.widgets.terminal_tool import TerminalTool
 
 
 class Loading(Static):
@@ -155,7 +158,12 @@ class Conversation(containers.Vertical):
             "Block cursor down",
             group=CURSOR_BINDING_GROUP,
         ),
-        Binding("enter", "select_block", "Select", tooltip="Select this block"),
+        Binding(
+            "enter",
+            "select_block",
+            "Select",
+            tooltip="Select this block",
+        ),
         Binding(
             "space",
             "expand_block",
@@ -177,16 +185,17 @@ class Conversation(containers.Vertical):
             tooltip="Cancel agent's turn",
         ),
         Binding(
+            "ctrl+f",
+            "focus_terminal",
+            "Focus",
+            tooltip="Focus the active terminal",
+            priority=True,
+        ),
+        Binding(
             "ctrl+m",
             "mode_switcher",
             "Modes",
             tooltip="Open the mode switcher",
-        ),
-        Binding(
-            "ctrl+comma,f2",
-            "settings",
-            "Settings",
-            tooltip="Settings screen",
         ),
         Binding(
             "ctrl+c",
@@ -219,22 +228,24 @@ class Conversation(containers.Vertical):
     current_mode: var[Mode | None] = var(None)
     turn: var[Literal["agent", "client"] | None] = var(None, bindings=True)
 
-    def __init__(self, project_path: Path) -> None:
+    def __init__(self, project_path: Path, agent: AgentData | None = None) -> None:
         super().__init__()
 
         project_path = project_path.resolve().absolute()
-        # self.project_path = project_path
-        # self.working_directory = str(project_path)
+
         self.set_reactive(Conversation.project_path, project_path)
         self.set_reactive(Conversation.working_directory, str(project_path))
         self.agent_slash_commands: list[SlashCommand] = []
         self.slash_command_hints: dict[str, str] = {}
-        self.terminals: dict[str, Terminal] = {}
+        self.terminals: dict[str, TerminalTool] = {}
         self._loading: Loading | None = None
         self._agent_response: AgentResponse | None = None
         self._agent_thought: AgentThought | None = None
-        self._ansi_log: ANSILog | None = None
         self._last_escape_time: float = monotonic()
+        self._agent_data = agent
+        self._mouse_down_offset: Offset | None = None
+
+        self._focusable_terminals: list[Terminal] = []
 
         self.project_data_path = paths.get_project_data(project_path)
         self.shell_history = History(self.project_data_path / "shell_history.jsonl")
@@ -287,6 +298,57 @@ class Conversation(containers.Vertical):
             modes=Conversation.modes,
         )
 
+    @property
+    def _terminal(self) -> Terminal | None:
+        """Return the last focusable terminal, if there is one.
+
+        Returns:
+            A focusable (non finalized) terminal.
+        """
+        # Terminals should be removed in response to the Terminal.FInalized message
+        # This is a bit of a sanity check
+        self._focusable_terminals[:] = list(
+            filterfalse(attrgetter("is_finalized"), self._focusable_terminals)
+        )
+        if self._focusable_terminals:
+            return self._focusable_terminals[-1]
+        return None
+
+    def add_focusable_terminal(self, terminal: Terminal) -> None:
+        """Add a focusable terminal.
+
+        Args:
+            terminal: Terminal instance.
+        """
+        if not terminal.is_finalized:
+            self._focusable_terminals.append(terminal)
+
+    @on(Terminal.Finalized)
+    def on_terminal_finalized(self, event: Terminal.Finalized) -> None:
+        """Terminal was finalized, so we can remove it from the list."""
+        try:
+            self._focusable_terminals.remove(event.terminal)
+        except ValueError:
+            pass
+
+    @on(Terminal.AlternateScreenChanged)
+    def on_terminal_alternate_screen_(
+        self, event: Terminal.AlternateScreenChanged
+    ) -> None:
+        """A terminal enabled or disabled alternate screen."""
+        if event.enabled:
+            event.terminal.focus()
+        else:
+            self.focus_prompt()
+
+    @on(events.DescendantFocus, "Terminal")
+    def on_terminal_focus(self, event: events.DescendantFocus) -> None:
+        self.flash("Press [b]escape[/b] [i]twice[/] to exit terminal", style="success")
+
+    @on(events.DescendantBlur, "Terminal")
+    def on_terminal_blur(self, event: events.DescendantFocus) -> None:
+        self.focus_prompt()
+
     @on(messages.Flash)
     def on_flash(self, event: messages.Flash) -> None:
         event.stop()
@@ -309,6 +371,8 @@ class Conversation(containers.Vertical):
         self.query_one(Flash).flash(content, duration=duration, style=style)
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "focus_terminal":
+            return None if self._terminal is None else True
         if action == "mode_switcher":
             return bool(self.modes)
         if action == "cancel":
@@ -324,6 +388,12 @@ class Conversation(containers.Vertical):
             return None if action == "expand_block" else False
 
         return True
+
+    async def action_focus_terminal(self) -> None:
+        if self._terminal is not None:
+            self._terminal.focus()
+        else:
+            self.flash("Nothing to focus...", style="error")
 
     async def action_expand_block(self) -> None:
         if (cursor_block := self.cursor_block) is not None:
@@ -406,7 +476,16 @@ class Conversation(containers.Vertical):
     async def on_agent_fail(self, message: AgentFail) -> None:
         self.agent_ready = True
         self.notify(message.message, title="Agent failure", severity="error", timeout=5)
-        await self.post(Note(message.details.strip(), classes="-error"))
+
+        if message.message:
+            error = Content.assemble(
+                (message.message, "bold"),
+                " ",
+                message.details.strip()
+            )
+        else:
+            error = Content(message.details.strip())
+        await self.post(Note(error, classes="-error"))
 
     @on(messages.WorkStarted)
     def on_work_started(self) -> None:
@@ -510,14 +589,14 @@ class Conversation(containers.Vertical):
     def on_current_working_directory_changed(
         self, event: CurrentWorkingDirectoryChanged
     ) -> None:
-        if self._ansi_log is not None:
-            self._ansi_log.finalize()
+        if self._terminal is not None:
+            self._terminal.finalize()
         self.working_directory = str(Path(event.path).resolve().absolute())
 
     @on(ShellFinished)
     def on_shell_finished(self) -> None:
-        if self._ansi_log is not None:
-            self._ansi_log.finalize()
+        if self._terminal is not None:
+            self._terminal.finalize()
 
     def watch_busy_count(self, busy: int) -> None:
         self.throbber.set_class(busy > 0, "-busy")
@@ -610,7 +689,7 @@ class Conversation(containers.Vertical):
         self.agent_slash_commands = slash_commands
         self.update_slash_commands()
 
-    def get_terminal(self, terminal_id: str) -> Terminal | None:
+    def get_terminal(self, terminal_id: str) -> TerminalTool | None:
         """Get a terminal from its id.
 
         Args:
@@ -619,10 +698,10 @@ class Conversation(containers.Vertical):
         Returns:
             Terminal instance, or `None` if no terminal was found.
         """
-        from toad.widgets.terminal import Terminal
+        from toad.widgets.terminal_tool import TerminalTool
 
         try:
-            terminal = self.contents.query_one(f"#{terminal_id}", Terminal)
+            terminal = self.contents.query_one(f"#{terminal_id}", TerminalTool)
         except NoMatches:
             return None
         if terminal.released:
@@ -630,7 +709,7 @@ class Conversation(containers.Vertical):
         return terminal
 
     async def action_interrupt(self) -> None:
-        if self._ansi_log is not None and not self._ansi_log.is_finalized:
+        if self._terminal is not None:
             await self.shell.interrupt()
             self._shell = None
             self.flash("Command interrupted", style="success")
@@ -640,7 +719,7 @@ class Conversation(containers.Vertical):
     @work
     @on(acp_messages.CreateTerminal)
     async def on_acp_create_terminal(self, message: acp_messages.CreateTerminal):
-        from toad.widgets.terminal import Terminal, Command
+        from toad.widgets.terminal_tool import TerminalTool, Command
 
         command = Command(
             message.command,
@@ -651,7 +730,7 @@ class Conversation(containers.Vertical):
         width = self.window.size.width - 5 - self.window.styles.scrollbar_size_vertical
         height = self.window.scrollable_content_region.height - 2
 
-        terminal = Terminal(
+        terminal = TerminalTool(
             command,
             output_byte_limit=message.output_byte_limit,
             id=message.terminal_id,
@@ -686,7 +765,7 @@ class Conversation(containers.Vertical):
                 KeyError(f"No terminal with id {message.terminal_id!r}")
             )
         else:
-            message.result_future.set_result(terminal.state)
+            message.result_future.set_result(terminal.tool_state)
 
     @on(acp_messages.ReleaseTerminal)
     def on_acp_terminal_release(self, message: acp_messages.ReleaseTerminal):
@@ -858,7 +937,7 @@ class Conversation(containers.Vertical):
 
     def _build_slash_commands(self) -> list[SlashCommand]:
         slash_commands = [
-            SlashCommand("/about", "About Toad"),
+            SlashCommand("/about-toad", "About Toad"),
         ]
         slash_commands.extend(self.agent_slash_commands)
         slash_commands.sort(key=attrgetter("command"))
@@ -886,13 +965,14 @@ class Conversation(containers.Vertical):
             self.app.settings.get("shell.allow_commands", expect_type=str).split()
         )
 
-        if self.app.acp_command:
+        if self._agent_data is not None:
 
-            def start_agent():
+            def start_agent() -> None:
+                """Start the agent after refreshing the UI."""
+                assert self._agent_data is not None
                 from toad.acp.agent import Agent
 
-                assert self.app.acp_command is not None
-                self.agent = Agent(self.project_path, self.app.acp_command)
+                self.agent = Agent(self.project_path, self._agent_data)
                 self.agent.start(self)
 
             self.call_after_refresh(start_agent)
@@ -904,26 +984,10 @@ class Conversation(containers.Vertical):
         key, value = setting_item
         if key == "shell.allow_commands":
             self.shell_history.complete.add_words(value.split())
-        # if key == "llm.model":
-        #     self.conversation = llm.get_model(value).conversation()
 
     @work
     async def post_welcome(self) -> None:
-        # from toad.widgets.welcome import Welcome
-
-        # await self.post(Welcome(classes="note", name="welcome"), anchor=False)
-
-        await self.post(
-            Note(f"project directory is [$text-success]'{self.project_path!s}'"),
-            anchor=True,
-        )
-
-        await self.post(
-            Note(
-                f"project data directory is [$text-success]'{self.project_data_path!s}'"
-            ),
-            anchor=True,
-        )
+        """Post any welcome content."""
 
     def watch_agent(self, agent: AgentBase | None) -> None:
         if agent is None:
@@ -932,7 +996,22 @@ class Conversation(containers.Vertical):
             self.agent_info = agent.get_info()
             self.agent_ready = False
 
+    async def watch_agent_ready(self, ready: bool) -> None:
+        if ready and (agent_data := self._agent_data) is not None:
+            welcome = agent_data.get("welcome", None)
+            from toad.widgets.markdown_note import MarkdownNote
+
+            await self.post(MarkdownNote(welcome))
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        self._mouse_down_offset = event.screen_offset
+
     def on_click(self, event: events.Click) -> None:
+        if (
+            self._mouse_down_offset is not None
+            and event.screen_offset != self._mouse_down_offset
+        ):
+            return
         widget = event.widget
         contents = self.contents
         if self.screen.get_selected_text():
@@ -975,26 +1054,42 @@ class Conversation(containers.Vertical):
             self.window.anchor()
         return widget
 
-    async def new_ansi_log(self, width: int, display: bool = True) -> ANSILog:
-        """Create a new ANSI log.
+    async def new_terminal(self) -> Terminal:
+        """Create a new interactive Terminal.
 
         Args:
-            width: Initial width of the ansi log.
+            width: Initial width of the terminal.
             display: Initial display.
 
         Returns:
-            A new (mounted) ANSILog widget.
+            A new (mounted) Terminal widget.
         """
-        from toad.widgets.ansi_log import ANSILog
+        from toad.widgets.shell_terminal import ShellTerminal
 
-        if self._ansi_log is not None:
-            self._ansi_log.finalize()
+        if self._terminal is not None:
+            self._terminal.finalize()
+        terminal_width, terminal_height = self.get_terminal_dimensions()
+        terminal = ShellTerminal(
+            size=(terminal_width, terminal_height),
+            get_terminal_dimensions=self.get_terminal_dimensions,
+        )
+        terminal.display = False
+        terminal = await self.post(terminal)
+        self.add_focusable_terminal(terminal)
+        self.refresh_bindings()
+        return terminal
 
-        ansi_log = ANSILog(minimum_terminal_width=width)
-        ansi_log.display = display
-        ansi_log = await self.post(ansi_log)
-        self._ansi_log = ansi_log
-        return ansi_log
+    def get_terminal_dimensions(self) -> tuple[int, int]:
+        """Get the default dimensions of new terminals.
+
+        Returns:
+            Tuple of (WIDTH, HEIGHT)
+        """
+        terminal_width = (
+            self.window.size.width - 2 - self.window.styles.scrollbar_size_vertical
+        )
+        terminal_height = self.window.scrollable_content_region.height - 4
+        return terminal_width, terminal_height
 
     @property
     def shell(self) -> Shell:
@@ -1025,12 +1120,8 @@ class Conversation(containers.Vertical):
 
         if command.strip():
             await self.post(ShellResult(command))
-            self.call_after_refresh(
-                self.shell.send,
-                command,
-                self.window.size.width - 2 - self.window.styles.scrollbar_size_vertical,
-                self.window.scrollable_content_region.height - 4,
-            )
+            width, height = self.get_terminal_dimensions()
+            await self.shell.send(command, width, height)
 
     def action_cursor_up(self) -> None:
         if not self.contents.displayed_children or self.cursor_offset == 0:
@@ -1229,11 +1320,6 @@ class Conversation(containers.Vertical):
 
         webbrowser.open(f"file:///{svg_path}")
 
-    @work
-    async def action_settings(self) -> None:
-        await self.app.push_screen_wait("settings")
-        self.app.save_settings()
-
     async def action_mode_switcher(self) -> None:
         self.prompt.mode_switcher.focus()
 
@@ -1282,7 +1368,7 @@ class Conversation(containers.Vertical):
                 be forwarded to the agent.
         """
         command, _, parameters = text[1:].partition(" ")
-        if command == "about":
+        if command == "about-toad":
             from toad import about
             from toad.widgets.markdown_note import MarkdownNote
 
@@ -1291,7 +1377,8 @@ class Conversation(containers.Vertical):
             await self.post(MarkdownNote(about_md, classes="about"))
             self.app.copy_to_clipboard(about_md)
             self.notify(
-                "A copy of /about has been placed in your clipboard", title="About"
+                "A copy of /about-about has been placed in your clipboard",
+                title="About",
             )
             return True
         return False

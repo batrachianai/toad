@@ -22,6 +22,7 @@ class Setting:
     default: object | None = None
     validate: list[dict] | None = None
     children: dict[str, Setting] | None = None
+    editable: bool = True
 
 
 class SchemaDict(TypedDict, total=False):
@@ -35,6 +36,7 @@ class SchemaDict(TypedDict, total=False):
     default: object
     fields: list[SchemaDict]
     validate: list[dict]
+    editable: bool
 
 
 type SettingsType = dict[str, object]
@@ -204,6 +206,7 @@ class Schema:
                         schema["key"]: build_settings(f"{name}.{schema['key']}", schema)
                         for schema in schema.get("fields", [])
                     },
+                    editable=schema.get("editable", True),
                 )
             else:
                 return Setting(
@@ -214,6 +217,7 @@ class Schema:
                     help=schema.get("help") or "",
                     default=schema.get("default", default),
                     validate=schema.get("validate"),
+                    editable=schema.get("editable", True),
                 )
 
         for sub_schema in self.schema:

@@ -11,7 +11,9 @@ API = jsonrpc.API()
 
 @API.method()
 def initialize(
-    protocolVersion: int, clientCapabilities: protocol.ClientCapabilities
+    protocolVersion: int,
+    clientCapabilities: protocol.ClientCapabilities,
+    clientInfo: protocol.Implementation,
 ) -> protocol.InitializeResponse:
     """https://agentclientprotocol.com/protocol/initialization"""
     ...
