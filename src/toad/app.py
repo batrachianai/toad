@@ -390,9 +390,12 @@ class ToadApp(App, inherit_bindings=False):
     @work(exit_on_error=False)
     async def run_version_check(self) -> None:
         """Check remote version."""
-        from toad.version import check_version
+        from toad.version import check_version, VersionCheckFailed
 
-        update_required, version_meta = await check_version()
+        try:
+            update_required, version_meta = await check_version()
+        except VersionCheckFailed:
+            return
         self.version_meta = version_meta
         self.update_required = update_required
 

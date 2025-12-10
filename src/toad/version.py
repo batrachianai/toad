@@ -36,13 +36,16 @@ async def check_version() -> tuple[bool, VersionMeta]:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(VERSION_TOML_URL)
-            response.text
             version_toml_bytes = await response.aread()
     except Exception as error:
         raise VersionCheckFailed(f"Failed to retrieve version;{error}")
 
-    version_toml = version_toml_bytes.decode("utf-8", "replace")
-    version_meta = tomllib.loads(version_toml)
+    try:
+        version_toml = version_toml_bytes.decode("utf-8", "replace")
+        version_meta = tomllib.loads(version_toml)
+    except Exception as error:
+        raise VersionCheckFailed(f"Failed to decode version TOML;{error}")
+
     if not isinstance(version_meta, dict):
         raise VersionCheckFailed("Response isn't TOML")
 
