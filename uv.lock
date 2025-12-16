@@ -127,6 +127,59 @@ wheels = [
 ]
 
 [[package]]
+name = "batrachian-toad"
+version = "0.5.0a7"
+source = { editable = "." }
+dependencies = [
+    { name = "bashlex" },
+    { name = "click" },
+    { name = "gitpython" },
+    { name = "httpx" },
+    { name = "packaging" },
+    { name = "pathspec" },
+    { name = "platformdirs" },
+    { name = "posthog" },
+    { name = "rich" },
+    { name = "textual", extra = ["syntax"] },
+    { name = "textual-serve" },
+    { name = "textual-speedups" },
+    { name = "tree-sitter" },
+    { name = "typeguard" },
+    { name = "xdg-base-dirs" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pyinstrument" },
+    { name = "textual-dev" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bashlex", specifier = ">=0.18" },
+    { name = "click", specifier = ">=8.2.1" },
+    { name = "gitpython", specifier = ">=3.1.44" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "packaging", specifier = ">=25.0" },
+    { name = "pathspec", specifier = ">=0.12.1" },
+    { name = "platformdirs", specifier = ">=4.3.8" },
+    { name = "posthog", specifier = ">=7.0.1" },
+    { name = "rich" },
+    { name = "textual", extras = ["syntax"], specifier = ">=6.10.0" },
+    { name = "textual-serve", specifier = ">=1.1.2" },
+    { name = "textual-speedups", specifier = "==0.2.1" },
+    { name = "tree-sitter", specifier = ">=0.24.0" },
+    { name = "typeguard", specifier = ">=4.4.4" },
+    { name = "xdg-base-dirs", specifier = ">=6.0.2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyinstrument", specifier = ">=5.1.1" },
+    { name = "textual-dev", specifier = ">=1.8.0" },
+]
+
+[[package]]
 name = "certifi"
 version = "2025.11.12"
 source = { registry = "https://pypi.org/simple" }
@@ -735,59 +788,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ff/9a/b834df281395d5d3311a627ac8587e61f0e4bcdf53c1df451dbd5822e1e0/textual_speedups-0.2.1-cp314-cp314t-musllinux_1_2_armv7l.whl", hash = "sha256:7dc58e59d740e66d1e0a9ce18835ee0e6a72a61bf0a4c1afce38273e217fdf27", size = 586432, upload-time = "2025-11-28T09:38:25.238Z" },
     { url = "https://files.pythonhosted.org/packages/6b/46/375d5b63a68a48770bf556ca364ef9d9cd79574f3b5dee2c542706177d28/textual_speedups-0.2.1-cp314-cp314t-musllinux_1_2_i686.whl", hash = "sha256:e6e8c74a63080a50a95f26e87818c66d8507de21c6d610ed049f91b84402aafa", size = 516212, upload-time = "2025-11-28T09:38:36.935Z" },
     { url = "https://files.pythonhosted.org/packages/06/02/80c118df98fa8ef84fa8e690b18c20302dc697c59dfee8a9667b72424aa6/textual_speedups-0.2.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:5fd85522114aec21c3915725992401e2bf6372ae5b1e3b2ebd85e1c3c7115885", size = 483699, upload-time = "2025-11-28T09:38:48.087Z" },
-]
-
-[[package]]
-name = "toad"
-version = "0.2.2"
-source = { editable = "." }
-dependencies = [
-    { name = "bashlex" },
-    { name = "click" },
-    { name = "gitpython" },
-    { name = "httpx" },
-    { name = "packaging" },
-    { name = "pathspec" },
-    { name = "platformdirs" },
-    { name = "posthog" },
-    { name = "rich" },
-    { name = "textual", extra = ["syntax"] },
-    { name = "textual-serve" },
-    { name = "textual-speedups" },
-    { name = "tree-sitter" },
-    { name = "typeguard" },
-    { name = "xdg-base-dirs" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pyinstrument" },
-    { name = "textual-dev" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "bashlex", specifier = ">=0.18" },
-    { name = "click", specifier = ">=8.2.1" },
-    { name = "gitpython", specifier = ">=3.1.44" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "packaging", specifier = ">=25.0" },
-    { name = "pathspec", specifier = ">=0.12.1" },
-    { name = "platformdirs", specifier = ">=4.3.8" },
-    { name = "posthog", specifier = ">=7.0.1" },
-    { name = "rich" },
-    { name = "textual", extras = ["syntax"], specifier = ">=6.10.0" },
-    { name = "textual-serve", specifier = ">=1.1.2" },
-    { name = "textual-speedups", specifier = "==0.2.1" },
-    { name = "tree-sitter", specifier = ">=0.24.0" },
-    { name = "typeguard", specifier = ">=4.4.4" },
-    { name = "xdg-base-dirs", specifier = ">=6.0.2" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pyinstrument", specifier = ">=5.1.1" },
-    { name = "textual-dev", specifier = ">=1.8.0" },
 ]
 
 [[package]]

@@ -1,6 +1,5 @@
 from contextlib import suppress
 from dataclasses import dataclass
-from importlib.metadata import version
 from itertools import zip_longest
 import os
 from pathlib import Path
@@ -270,9 +269,10 @@ class StoreScreen(Screen):
         yield widgets.Footer()
 
     def get_info(self) -> Content:
+        toad_version = toad.get_version()
         content = Content.assemble(
             Content.from_markup("🐸 Toad"),
-            pill(f"v{version('toad')}", "$primary-muted", "$text-primary"),
+            pill(f"v{toad_version}", "$primary-muted", "$text-primary"),
             ("\nThe universal interface for AI in your terminal", "$text-success"),
             (
                 "\nSoftware lovingly crafted by hand (with a dash of AI) in Edinburgh, Scotland",

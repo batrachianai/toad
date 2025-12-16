@@ -1,3 +1,7 @@
+import os
+
+os.environ["PYTHONWARNINGS"] = "ignore::SyntaxWarning"
+
 from typing import Literal, Mapping
 import platform
 
@@ -37,4 +41,10 @@ def get_version() -> str:
     """
     from importlib.metadata import version
 
-    return version("toad")
+    try:
+        return version("batrachian-toad")
+    except Exception:
+        try:
+            return version("toad")
+        except Exception:
+            return "0.1.0unknown"

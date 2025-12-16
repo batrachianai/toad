@@ -5,6 +5,7 @@ from string import Template
 
 from toad.app import ToadApp
 from toad import paths
+from toad import get_version
 
 ABOUT_TEMPLATE = Template("""\
 # About Toad v${TOAD_VERSION}
@@ -63,7 +64,7 @@ def render(app: ToadApp) -> str:
 
     template_data = {
         "DATA_PATH": paths.get_data(),
-        "TOAD_VERSION": version("toad"),
+        "TOAD_VERSION": get_version(),
         "TEXTUAL_VERSION": version("textual"),
         "RICH_VERSION": version("rich"),
         "PYTHON": f"{platform.python_implementation()} {platform.python_version()}",

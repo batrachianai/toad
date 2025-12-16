@@ -1,7 +1,7 @@
 [project]
-name = "toad"
-version = "0.2.2"
-description = "Add your description here"
+name = "batrachian-toad"
+version = "0.5.0a10"
+description = "A unified experience for AI in your terminal."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -37,8 +37,11 @@ members = [
 toad = "toad.cli:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.28.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/toad"]
 
 [dependency-groups]
 dev = [

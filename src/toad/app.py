@@ -289,9 +289,9 @@ class ToadApp(App, inherit_bindings=False):
     @cached_property
     def version(self) -> str:
         """Version of the app."""
-        from importlib.metadata import version
+        from toad import get_version
 
-        return version("toad")
+        return get_version()
 
     @cached_property
     def settings(self) -> Settings:

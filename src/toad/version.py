@@ -25,11 +25,12 @@ async def check_version() -> tuple[bool, VersionMeta]:
     """
     import httpx
     import packaging.version
-    from importlib.metadata import version
     import tomllib
 
+    from toad import get_version
+
     try:
-        current_version = packaging.version.parse(version("toad"))
+        current_version = packaging.version.parse(get_version())
     except packaging.version.InvalidVersion as error:
         raise VersionCheckFailed(f"Invalid version;{error}")
 

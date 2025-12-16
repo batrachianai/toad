@@ -1,3 +1,9 @@
+import os
+
+# Suppress a SyntaxWarning from Posthog
+os.environ["PYTHONWARNINGS"] = "ignore::SyntaxWarning"
+
+
 import sys
 
 import click
