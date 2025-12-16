@@ -1147,10 +1147,11 @@ class Conversation(containers.Vertical):
         Returns:
             Tuple of (WIDTH, HEIGHT)
         """
-        terminal_width = (
-            self.window.size.width - 2 - self.window.styles.scrollbar_size_vertical
+        terminal_width = max(
+            16,
+            (self.window.size.width - 2 - self.window.styles.scrollbar_size_vertical),
         )
-        terminal_height = self.window.scrollable_content_region.height - 4
+        terminal_height = max(8, self.window.scrollable_content_region.height - 6)
         return terminal_width, terminal_height
 
     @property

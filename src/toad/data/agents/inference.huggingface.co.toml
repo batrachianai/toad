@@ -29,5 +29,5 @@ Create an account at huggingface.co/join and register with [Toad Explorers](http
 recommended = true
 
 [actions."*".install]
-command = "uv tool install -U hf-inference-acp"
+command = "uv tool install -U hf-inference-acp --with-executables-from huggingface_hub"
 description = "Install Hugging Face Inference Providers"
