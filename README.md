@@ -67,7 +67,7 @@ To see all the keys, summon the command palette with `ctrl+p` and search for "ke
 
 ### Toad CLI
 
-WHen running Toad, the current working directory is assumed to be your project directory.
+When running Toad, the current working directory is assumed to be your project directory.
 To use another project directory, add the path to the command.
 For example:
 
@@ -112,3 +112,4 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Dicussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
