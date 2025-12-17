@@ -1,12 +1,12 @@
 name: Bug Report
 description: Report a bug or issue
-title: "[Bug]: "
+title: ""
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Issues require an initial discussion, and will be promoted to an issue once the work has been agreed upon or started.
+        Issues require an initial discussion and approval by a Toad developer before creating an issue.
   - type: input
     id: discussion-link
     attributes:
