@@ -96,6 +96,20 @@ class PromptTextArea(HighlightedTextArea):
             priority=True,
             show=False,
         ),
+        Binding(
+            "alt+backspace",
+            "delete_word_left",
+            "Delete word left",
+            tooltip="Delete the word to the left of cursor",
+            show=False,
+        ),
+        Binding(
+            "alt+delete",
+            "delete_word_right",
+            "Delete word right",
+            tooltip="Delete the word to the right of cursor",
+            show=False,
+        ),
     ]
 
     app = getters.app(ToadApp)
