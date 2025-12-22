@@ -245,6 +245,7 @@ class Conversation(containers.Vertical):
     current_mode: var[Mode | None] = var(None)
     turn: var[Literal["agent", "client"] | None] = var(None, bindings=True)
     status: var[str] = var("")
+    column: var[bool] = var(False, toggle_class="-column")
 
     def __init__(self, project_path: Path, agent: AgentData | None = None) -> None:
         super().__init__()

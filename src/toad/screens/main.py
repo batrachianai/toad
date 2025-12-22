@@ -113,7 +113,8 @@ class MainScreen(Screen, can_focus=False):
                 ),
             )
             yield Conversation(self.project_path, self._agent).data_bind(
-                MainScreen.project_path
+                project_path=MainScreen.project_path,
+                column=MainScreen.column,
             )
         yield Footer()
 
@@ -170,7 +171,6 @@ class MainScreen(Screen, can_focus=False):
         self.conversation.focus_prompt()
 
     def watch_column(self, column: bool) -> None:
-        self.conversation.set_class(column, "-column")
         self.conversation.styles.max_width = (
             max(10, self.column_width) if column else None
         )
