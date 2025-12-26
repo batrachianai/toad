@@ -338,9 +338,7 @@ class ToadApp(App, inherit_bindings=False):
         }
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(POSTHOG_EVENT_URL, json=body_json)
-                self.log(response.status_code)
-                self.log(response.text)
+                await client.post(POSTHOG_EVENT_URL, json=body_json)
         except Exception:
             pass
 

@@ -9,14 +9,11 @@ from __future__ import annotations
 
 from functools import lru_cache
 from operator import itemgetter
-from re import finditer
+from re2 import finditer
 from typing import Iterable, Sequence
 
-import rich.repr
 
 from textual.cache import LRUCache
-from textual.content import Content
-from textual.visual import Style
 
 
 class FuzzySearch:

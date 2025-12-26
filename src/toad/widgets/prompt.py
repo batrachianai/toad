@@ -71,6 +71,13 @@ class StatusLine(Label):
         self.tooltip = status
 
 
+class PromptContainer(containers.HorizontalGroup):
+    def on_mouse_down(self, event: events.MouseUp) -> None:
+        prompt_text_area = self.query_one(PromptTextArea)
+        if not prompt_text_area.has_focus:
+            prompt_text_area.focus()
+
+
 class PromptTextArea(HighlightedTextArea):
     BINDING_GROUP_TITLE = "Prompt"
 
@@ -334,9 +341,11 @@ class PromptTextArea(HighlightedTextArea):
                 )
                 self.suggestion = self.suggestions[self.suggestions_index]
 
-    def watch_selection(
+    async def watch_selection(
         self, previous_selection: Selection, selection: Selection
     ) -> None:
+        if previous_selection == selection:
+            return
         if selection.start == selection.end:
             previous_y, previous_x = previous_selection.end
             y, x = selection.end
@@ -435,10 +444,6 @@ class Prompt(containers.VerticalGroup):
             self.prompt_text_area.get_cursor_line_end_location()
         )
 
-    def on_mouse_up(self) -> None:
-        if not self.has_focus:
-            self.focus()
-
     def watch_current_mode(self, mode: Mode | None) -> None:
         self.set_class(mode is not None, "-has-mode")
         if mode is not None:
@@ -448,6 +453,10 @@ class Prompt(containers.VerticalGroup):
             )
             self.query_one(ModeInfo).with_tooltip(tooltip).update(mode.name)
         self.watch_modes(self.modes)
+
+    async def watch_project_path(self) -> None:
+        """Initial refresh of paths."""
+        self.call_later(self.path_search.refresh_paths)
 
     def ask(self, ask: Ask) -> None:
         """Replace the textarea prompt with a menu of options.
@@ -493,7 +502,6 @@ class Prompt(containers.VerticalGroup):
     def watch_agent_ready(self, ready: bool) -> None:
         self.set_class(not ready, "-not-ready")
         if ready:
-            # self.prompt_text_area.focus()
             self.query_one(AgentInfo).update(self.agent_info)
 
     def watch_agent_info(self, agent_info: Content) -> None:
@@ -596,6 +604,10 @@ class Prompt(containers.VerticalGroup):
     def watch_show_slash_complete(self, show: bool) -> None:
         self.slash_complete.focus()
 
+    def project_directory_updted(self) -> None:
+        """Called when there is may be new files"""
+        self.path_search.refresh_paths()
+
     @on(PromptTextArea.RequestShellMode)
     def on_request_shell_mode(self, event: PromptTextArea.RequestShellMode):
         self.shell_mode = True
@@ -619,8 +631,9 @@ class Prompt(containers.VerticalGroup):
     @on(InvokeFileSearch)
     def on_invoke_file_search(self, event: InvokeFileSearch) -> None:
         event.stop()
-        self.show_path_search = True
-        self.path_search.load_paths()
+        if not self.shell_mode:
+            self.show_path_search = True
+            self.path_search.reset()
 
     @on(InvokeSlashComplete)
     def on_invoke_slash_complete(self, event: InvokeSlashComplete) -> None:
@@ -686,7 +699,7 @@ class Prompt(containers.VerticalGroup):
     def compose(self) -> ComposeResult:
         yield PathSearch().data_bind(root=Prompt.project_path)
         yield SlashComplete().data_bind(slash_commands=Prompt.slash_commands)
-        with containers.HorizontalGroup(id="prompt-container"):
+        with PromptContainer(id="prompt-container"):
             yield Question()
             with containers.HorizontalGroup(id="text-prompt"):
                 yield Label(self.PROMPT_AI, id="prompt")

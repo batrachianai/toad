@@ -1,6 +1,6 @@
 from functools import lru_cache
 import io
-import re
+import re2 as re
 
 import rich.repr
 

@@ -375,8 +375,11 @@ Prompt {
             padding: 0;
             margin: 0 1;                     
             overflow: hidden;
+            text-wrap: nowrap;
+            text-overflow: ellipsis;  
             & > .option-list--option {
-                padding: 0 1;            
+                padding: 0 1;    
+         
             }
         }
     }
@@ -408,7 +411,7 @@ Prompt {
         }
     }
 
-    #prompt-container {
+    PromptContainer {       
         &:dark {
             background: black 10%;
         }

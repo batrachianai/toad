@@ -16,9 +16,10 @@ dependencies = [
     "xdg-base-dirs>=6.0.2",
     "textual-serve>=1.1.2",
     "textual-speedups==0.2.1",
-    "packaging>=25.0",    
+    "packaging>=25.0",
     "bashlex>=0.18",
     "pathspec>=0.12.1",
+    "google-re2>=1.1.20251105",
 ]
 
 [tool.uv.workspace]

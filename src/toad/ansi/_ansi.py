@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from itertools import accumulate
-import re
+import re2 as re
 
 from dataclasses import dataclass, field
 from functools import lru_cache

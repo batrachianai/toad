@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import fnmatch
-from typing import Callable, Iterable, Sequence
+from typing import Callable
 from time import time
 from os import PathLike
 from pathlib import Path
 
-from pathspec import PathSpec
+
+from toad.path_filter import PathFilter
 
 
 class ScanJob:
@@ -18,17 +18,13 @@ class ScanJob:
         name: str,
         queue: asyncio.Queue[Path],
         results: list[Path],
-        exclude_dirs: Sequence[str],
-        exclude_files: Sequence[str],
-        path_spec: PathSpec | None = None,
+        path_filter: PathFilter | None = None,
         add_directories=False,
     ) -> None:
         self.queue = queue
         self.results = results
-        self.exclude_dirs = exclude_dirs
-        self.exclude_files = exclude_files
         self.name = name
-        self.path_spec = path_spec
+        self.path_filter = path_filter
         self.add_directories = add_directories
 
     def start(self) -> None:
@@ -73,24 +69,14 @@ class ScanJob:
                 break
             paths = await self._scan(scan_path)
             for path in paths:
-                if self.path_spec is not None and self.path_spec.match_file(path):
+                if self.path_filter is not None and self.path_filter.match(path):
                     continue
-                if await self.is_file(path):
-                    str_path = str(path.name)
-                    for exclude in self.exclude_files:
-                        if fnmatch.fnmatch(str_path, exclude):
-                            break
-                    else:
+                if await self.is_dir(path):
+                    if add_directories:
                         results.append(path)
-                elif await self.is_dir(path):
-                    str_path = str(path.name)
-                    for exclude in self.exclude_dirs:
-                        if fnmatch.fnmatch(str_path, exclude):
-                            break
-                    else:
-                        if add_directories:
-                            results.append(path)
-                        await queue.put(path)
+                    await queue.put(path)
+                else:
+                    results.append(path)
             queue.task_done()
 
     async def _scan(self, root: Path) -> list[Path]:
@@ -115,10 +101,8 @@ class ScanJob:
 async def scan(
     root: Path,
     *,
-    max_simultaneous: int = 5,
-    exclude_dirs: Sequence[str] | None = None,
-    exclude_files: Sequence[str] | None = None,
-    path_spec: PathSpec | None = None,
+    max_simultaneous: int = 10,
+    path_filter: PathFilter | None = None,
     add_directories: bool = False,
 ) -> list[Path]:
     """Scan a directory for paths.
@@ -126,8 +110,6 @@ async def scan(
     Args:
         root: Root directory to scan.
         max_simultaneous: Maximum number of scan jobs.
-        exclude_dirs: Wildcards to exclude directories.
-        exclude_files: Wildcards to exclude paths.
 
     Returns:
         A list of Paths.
@@ -139,9 +121,7 @@ async def scan(
             f"scan-job #{index}",
             queue,
             results,
-            exclude_dirs=exclude_dirs or [],
-            exclude_files=exclude_files or [],
-            path_spec=path_spec,
+            path_filter=path_filter,
             add_directories=add_directories,
         )
         for index in range(max_simultaneous)
@@ -198,6 +178,8 @@ class Scan:
 
 
 class DirectoryScanner:
+    """Object to recursively scan a directory."""
+
     def __init__(self, root: PathLike) -> None:
         self.root = Path(root)
         self.directories: dict[Path, Scan] = {}
@@ -249,7 +231,6 @@ if __name__ == "__main__":
     async def run_scan():
         paths = await scan(
             Path("./"),
-            # exclude_dirs=[".*", "__pycache__"],
         )
         str_paths = [str(path) for path in paths]
         matcher = Matcher("psputils")

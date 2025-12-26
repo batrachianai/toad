@@ -1,4 +1,4 @@
-import re
+import re2 as re
 from typing import Iterable
 
 

@@ -5,11 +5,9 @@ import asyncio
 from functools import lru_cache
 from operator import itemgetter
 from pathlib import Path
-import re
+import re2 as re
 from typing import Sequence
 
-import pathspec.patterns
-from pathspec import PathSpec
 
 from textual import on
 from textual.app import ComposeResult
@@ -17,6 +15,7 @@ from textual.binding import Binding
 from textual import work
 from textual import getters
 from textual import containers
+from textual import events
 from textual.reactive import var, Initialize
 from textual.content import Content, Span
 from textual.widget import Widget
@@ -27,6 +26,7 @@ from textual.widgets.option_list import Option
 from toad import directory
 from toad.fuzzy import FuzzySearch
 from toad.messages import Dismiss, InsertPath, PromptSuggestion
+from toad.path_filter import PathFilter
 
 
 class PathFuzzySearch(FuzzySearch):
@@ -129,6 +129,7 @@ class PathSearch(containers.VerticalGroup):
         scores = sorted(
             [score for score in scores if score[0]], key=itemgetter(0), reverse=True
         )
+        scores = scores[:20]
 
         def highlight_offsets(path: Content, offsets: Sequence[int]) -> Content:
             return path.add_spans(
@@ -137,8 +138,11 @@ class PathSearch(containers.VerticalGroup):
 
         self.option_list.set_options(
             [
-                Option(highlight_offsets(path, offsets), id=path.plain)
-                for score, offsets, path in scores
+                Option(
+                    highlight_offsets(path, offsets) if index < 20 else path,
+                    id=path.plain,
+                )
+                for index, (score, offsets, path) in enumerate(scores)
             ]
         )
         self.option_list.highlighted = 0
@@ -155,6 +159,9 @@ class PathSearch(containers.VerticalGroup):
 
     def focus(self, scroll_visible: bool = False) -> Self:
         return self.input.focus(scroll_visible=scroll_visible)
+
+    def on_descendant_blur(self) -> None:
+        self.post_message(Dismiss(self))
 
     @on(Input.Changed)
     async def on_input_changed(self, event: Input.Changed):
@@ -177,46 +184,38 @@ class PathSearch(containers.VerticalGroup):
                 self.post_message(InsertPath(option.id))
                 self.post_message(Dismiss(self))
 
-    def watch_root(self, root: Path) -> None:
-        pass
-
-    def get_path_spec(self, git_ignore_path: Path) -> PathSpec | None:
-        """Get a path spec instance if there is a .gitignore file present.
+    def get_path_filter(self, project_path: Path) -> PathFilter:
+        """Get a PathFilter insance for the give project path.
 
         Args:
-            git_ignore_path): Path to .gitignore.
+            project_path: Project path.
 
         Returns:
-            A `PathSpec` instance.
+            `PathFilter` object.
         """
-        try:
-            if git_ignore_path.is_file():
-                spec_text = git_ignore_path.read_text()
-                spec = PathSpec.from_lines(
-                    pathspec.patterns.GitWildMatchPattern, spec_text.splitlines()
-                )
-                return spec
-        except OSError:
-            return None
-        return None
+        path_filter = PathFilter.from_git_root(project_path)
+        return path_filter
 
-    @work(exclusive=True)
-    async def load_paths(self) -> None:
+    def reset(self) -> None:
+        """Reset and focus input."""
         self.input.clear()
         self.input.focus()
-        root = self.root
 
+    @work(exclusive=True)
+    async def refresh_paths(self):
         self.loading = True
+        root = self.root
+        try:
+            path_filter = await asyncio.to_thread(self.get_path_filter, root)
+            paths = await directory.scan(
+                root, path_filter=path_filter, add_directories=True
+            )
 
-        path_spec = await asyncio.to_thread(self.get_path_spec, root / ".gitignore")
-        # path_spec = await self.get_path_spec(root / ".gitignore").wait()
-        paths = await directory.scan(root, path_spec=path_spec, add_directories=True)
-
-        paths = [path.absolute() for path in paths]
-        # paths.sort(key=lambda path: (len(path.parts), str(path).lower()))
-        self.root = root
-        self.paths = paths
-        self.loading = False
+            paths = [path.absolute() for path in paths]
+            self.root = root
+            self.paths = paths
+        finally:
+            self.loading = False
 
     def get_loading_widget(self) -> Widget:
         from textual.widgets import LoadingIndicator
@@ -255,8 +254,7 @@ class PathSearch(containers.VerticalGroup):
             [
                 Option(highlighted_path, id=highlighted_path.plain)
                 for highlighted_path in self.highlighted_paths
-            ],
+            ][:20]
         )
         self.option_list.highlighted = 0
         self.post_message(PromptSuggestion(""))
-        self.input.focus()
