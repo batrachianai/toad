@@ -66,10 +66,15 @@ AGENT_FAIL_HELP = """\
 
 Check that the agent is installed and up-to-date.
 
+Note that some agents require an ACP adapter to be installed to work with Toad.
+
 - Exit the app, and run `toad` agin
 - Select the agent and hit ENTER
 - Click the dropdown, select "Install"
 - Click the GO button
+- Repeat the process to install an ACP adapte (if requried)
+
+Some agents may require you to restart your shell (open a new terminal) after installing.
 
 If that fails, please file a bug!
 """
