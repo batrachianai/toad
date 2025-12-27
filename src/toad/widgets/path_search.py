@@ -140,7 +140,7 @@ class PathSearch(containers.VerticalGroup):
         with widgets.ContentSwitcher(initial="path-search-fuzzy"):
             with containers.VerticalGroup(id="path-search-fuzzy"):
                 yield FuzzyInput(
-                    compact=True, placeholder="fuzzy search \t[r]▌tab▐[/r] tree picker"
+                    compact=True, placeholder="fuzzy search \t[r]▌tab▐[/r] tree view"
                 )
                 yield OptionList()
             with containers.VerticalGroup(id="path-search-tree"):
