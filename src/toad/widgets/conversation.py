@@ -901,7 +901,6 @@ class Conversation(containers.Vertical):
     @on(acp_messages.SetModes)
     async def on_acp_set_modes(self, message: acp_messages.SetModes):
         self.modes = message.modes
-        print("SET MODES")
         self.log(self.modes)
         self.current_mode = self.modes[message.current_mode]
 
