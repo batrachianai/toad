@@ -112,7 +112,7 @@ Loading {
 
 
 Plan {        
-    border: panel $secondary;        
+    border: panel $secondary;            
     background: transparent;        
     margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
     padding: 1 0 0 1;        
@@ -267,7 +267,7 @@ Conversation {
     }
 
     ToolCall {
-        padding: 0 1;        
+        padding: 0 0 0 1;        
         width: 1fr;
         layout: stream;
         height: auto;

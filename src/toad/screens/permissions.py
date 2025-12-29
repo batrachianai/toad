@@ -118,6 +118,8 @@ class PermissionsScreen(Screen[Answer]):
 
     TAB_GROUP = Binding.Group("Focus")
     NAVIGATION_GROUP = Binding.Group("Navigation", compact=True)
+    ALLOW_GROUP = Binding.Group("Allow once/always", compact=True)
+    REJECT_GROUP = Binding.Group("Reject once/always", compact=True)
     BINDINGS = [
         Binding("j", "next", "Next", group=NAVIGATION_GROUP),
         Binding("k", "previous", "Previous", group=NAVIGATION_GROUP),
@@ -137,10 +139,39 @@ class PermissionsScreen(Screen[Answer]):
             show=True,
             priority=True,
         ),
+        Binding(
+            "a",
+            "select_kind(('allow_once', 'allow'))",
+            "Allow once",
+            group=ALLOW_GROUP,
+            priority=True,
+        ),
+        Binding(
+            "A",
+            "select_kind('allow_always')",
+            "Allow always",
+            group=ALLOW_GROUP,
+            priority=True,
+        ),
+        Binding(
+            "r",
+            "select_kind(('reject_once', 'reject'))",
+            "Reject once",
+            group=REJECT_GROUP,
+            priority=True,
+        ),
+        Binding(
+            "R",
+            "select_kind('reject_always')",
+            "Reject always",
+            group=REJECT_GROUP,
+            priority=True,
+        ),
     ]
 
     tool_container = getters.query_one("#tool-container", containers.VerticalScroll)
     navigator = getters.query_one("#navigator", OptionList)
+    question = getters.query_one(PermissionsQuestion)
     index: var[int] = var(0)
 
     def __init__(
@@ -188,6 +219,27 @@ class PermissionsScreen(Screen[Answer]):
 
         yield Footer()
 
+    def action_select_kind(self, kind: str | tuple[str]) -> None:
+        self.question.action_select_kind(kind)
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "select_kind":
+            kinds = {
+                answer.kind
+                for answer in self.question.options
+                if answer.kind is not None
+            }
+            check_kinds = set()
+            for parameter in parameters:
+                if isinstance(parameter, str):
+                    check_kinds.add(parameter)
+                elif isinstance(parameter, tuple):
+                    check_kinds.update(parameter)
+
+            return any(kind in kinds for kind in check_kinds)
+
+        return True
+
     async def on_mount(self):
         app = self.app
         if isinstance(app, ToadApp):
@@ -202,8 +254,7 @@ class PermissionsScreen(Screen[Answer]):
                     await self.populate_callback(self)
 
             asyncio.create_task(run_populate())
-
-        # await self.add_diff("foo.py", "foo.py", SOURCE1, SOURCE2)
+        self.question.focus()
 
     async def add_diff(
         self, path1: str, path2: str, before: str | None, after: str
@@ -327,7 +378,8 @@ def loop_first_last(values: Iterable[ValueType]) -> Iterable[tuple[bool, bool, V
         @work
         async def on_mount(self) -> None:
             screen = PermissionsScreen(
-                [Answer("Foo", "foo"), Answer("Bar", "bar")], None
+                [Answer("Foo", "allow_once", kind="allow_once"), Answer("Bar", "bar")],
+                None,
             )
             result = await self.push_screen_wait(screen)
             self.notify(str(result))

@@ -28,18 +28,6 @@ from textual import containers
 type Annotation = Literal["+", "-", "/", " "]
 
 
-def _format_range_unified(start, stop):
-    'Convert range to the "ed" format'
-    # Per the diff spec at http://www.unix.org/single_unix_specification/
-    beginning = start + 1  # lines start numbering with one
-    length = stop - start
-    if length == 1:
-        return "{}".format(beginning)
-    if not length:
-        beginning -= 1  # empty ranges begin at line just before the range
-    return "{},{}".format(beginning, length)
-
-
 class DiffScrollContainer(containers.HorizontalGroup):
     scroll_link: var[Widget | None] = var(None)
     DEFAULT_CSS = """
@@ -54,18 +42,6 @@ class DiffScrollContainer(containers.HorizontalGroup):
         super().watch_scroll_x(old_value, new_value)
         if self.scroll_link:
             self.scroll_link.scroll_x = new_value
-
-
-class GroupHeading(Static):
-    DEFAULT_CSS = """
-    GroupHeading {
-        width: auto;
-        text-opacity: 0.7;
-        text-align: center;
-        margin-top: 1;
-        padding-left: 1;              
-    }
-    """
 
 
 class LineContent(Visual):
@@ -241,15 +217,15 @@ class DiffView(containers.VerticalGroup):
         .diff-group {
             height: auto;
             background: $foreground 4%;
-        }
-        
-        border-top: wide $foreground 30%;
-        border-bottom: wide $foreground 30%;
-        border-title-align: center;
+            margin-bottom: 1;
+        }                
 
         .annotations { width: 1; }
         &.-with-annotations {
             .annotations { width: auto; }
+        }
+        .title {            
+            border-bottom: dashed $foreground 20%;
         }
         
     }
@@ -385,7 +361,7 @@ class DiffView(containers.VerticalGroup):
         """
         additions, removals = self.counts
         title = Content.from_markup(
-            "[b]$path[/b] [b]([/b][$text-success][b]$additions[/b] $additions_label[/], [$text-error][b]$removals[/b] $removals_label[/][b])[/b]",
+            "📄 [dim]$path[/dim] ([$text-success][b]+$additions[/b][/], [$text-error][b]-$removals[/b][/])",
             path=self.path2,
             additions=additions,
             removals=removals,
@@ -397,8 +373,7 @@ class DiffView(containers.VerticalGroup):
     def compose(self) -> ComposeResult:
         """Compose either split or unified view."""
 
-        self.border_title = self.get_title()
-        # yield DiffTitle(self.path2, additions, removals)
+        yield Static(self.get_title(), classes="title")
         if self.split:
             yield from self.compose_split()
         else:
@@ -433,14 +408,6 @@ class DiffView(containers.VerticalGroup):
             line_numbers_b: list[int | None] = []
             annotations: list[str] = []
             code_lines: list[Content | None] = []
-            first, last = group[0], group[-1]
-            file1_range = _format_range_unified(first[1], last[2])
-            file2_range = _format_range_unified(first[3], last[4])
-            yield GroupHeading(
-                "@@ [$text-error]-{}[/] [$text-success]+{}[/] @@".format(
-                    file1_range, file2_range
-                )
-            )
             for tag, i1, i2, j1, j2 in group:
                 if tag == "equal":
                     for line_offset, line in enumerate(lines_a[i1:i2], 1):
@@ -537,14 +504,6 @@ class DiffView(containers.VerticalGroup):
             return annotation_blank
 
         for group in self.grouped_opcodes:
-            first, last = group[0], group[-1]
-            file1_range = _format_range_unified(first[1], last[2])
-            file2_range = _format_range_unified(first[3], last[4])
-            yield GroupHeading(
-                "@@ [$text-error]-{}[/] [$text-success]+{}[/] @@".format(
-                    file1_range, file2_range
-                )
-            )
             line_numbers_a: list[int | None] = []
             line_numbers_b: list[int | None] = []
             annotations_a: list[Annotation] = []

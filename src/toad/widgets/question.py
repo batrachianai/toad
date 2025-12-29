@@ -267,12 +267,17 @@ class Question(Widget, can_focus=True):
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if self.selected and action in ("selection_up", "selection_down"):
             return False
-        kinds = {answer.kind for answer in self.options}
-        if (
-            action in {"allow_once", "allow_always", "reject_once", "reject_always"}
-            and parameters[0] not in kinds
-        ):
-            return False
+        if action == "select_kind":
+            kinds = {answer.kind for answer in self.options if answer.kind is not None}
+            check_kinds = set()
+            for parameter in parameters:
+                if isinstance(parameter, str):
+                    check_kinds.add(parameter)
+                elif isinstance(parameter, tuple):
+                    check_kinds.update(parameter)
+
+            return any(kind in kinds for kind in check_kinds)
+
         return True
 
     def watch_blink(self, blink: bool) -> None:
