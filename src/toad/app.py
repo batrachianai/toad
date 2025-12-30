@@ -10,10 +10,12 @@ from rich import terminal_theme
 
 from textual import on, work
 from textual.binding import Binding, BindingType
+from textual.content import Content
 from textual.reactive import var, reactive
 from textual.app import App
 from textual import events
 from textual.signal import Signal
+from textual.notifications import Notify
 
 
 from toad.settings import Schema, Settings
@@ -341,6 +343,48 @@ class ToadApp(App, inherit_bindings=False):
                 await client.post(POSTHOG_EVENT_URL, json=body_json)
         except Exception:
             pass
+
+    @work(thread=True)
+    def system_notify(self, message: str, *, title: str = "") -> None:
+        """Use OS level notifications.
+
+        Args:
+            message: Message to display.
+            title: Title of the notificaiton.
+        """
+        system_notifications = self.settings.get("notifications.system", str)
+        if not (
+            system_notifications == "always"
+            or (system_notifications == "blur" and not self.app_focus)
+        ):
+            return
+
+        from notifypy import Notify
+
+        notification = Notify()
+        notification.message = message
+        notification.title = title
+        notification.application_name = "🐸 Toad"
+        notification.send()
+
+    def on_notify(self, event: Notify) -> None:
+        """Handle notification message."""
+        system_notifications = self.settings.get("notifications.system", str)
+        if system_notifications == "always" or (
+            system_notifications == "blur" and not self.app_focus
+        ):
+            hide_low_severity = self.settings.get(
+                "notifications.hide_low_severity", bool
+            )
+            if event.notification.markup:
+                # Strip content markup
+                message = Content.from_markup(event.notification.message).plain
+            else:
+                message = event.notification.message
+            if not (hide_low_severity and event.notification.severity == "information"):
+                self.system_notify(message, title=event.notification.title)
+        self._notifications.add(event.notification)
+        self._refresh_notifications()
 
     def save_settings(self) -> None:
         if self.settings.changed:

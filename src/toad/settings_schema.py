@@ -121,6 +121,31 @@ SCHEMA: list[SchemaDict] = [
         ],
     },
     {
+        "key": "notifications",
+        "title": "Notification (toasts) settings",
+        "help": "Customize how Toad displays notifications",
+        "type": "object",
+        "fields": [
+            {
+                "key": "system",
+                "title": "Show Toad notifications on your desktop?",
+                "type": "choices",
+                "default": "blur",
+                "choices": [
+                    ("Never", "never"),
+                    ("When app is not focused", "blur"),
+                    ("Always", "always"),
+                ],
+            },
+            {
+                "key": "hide_low_severity",
+                "title": "Limit desktop notifications to warning and errors?",
+                "type": "boolean",
+                "default": True,
+            },
+        ],
+    },
+    {
         "key": "sidebar",
         "title": "Sidebar settings",
         "help": "Customize how the sidebar is displayed.",

@@ -279,6 +279,12 @@ class Conversation(containers.Vertical):
 
         self.session_start_time: float | None = None
 
+    @property
+    def agent_title(self) -> str | None:
+        if self._agent_data is not None:
+            return self._agent_data["name"]
+        return None
+
     def validate_shell_history_index(self, index: int) -> int:
         return clamp(index, -self.shell_history.size, 0)
 
@@ -1028,6 +1034,15 @@ class Conversation(containers.Vertical):
             callback: Optional callable that will be invoked with the result.
         """
         from toad.widgets.question import Ask
+
+        self.agent_info
+
+        if self.agent_title:
+            notify_title = f"[{self.agent_title}] {question}"
+        else:
+            notify_title = question
+        notify_message = "\n".join(f" • {option.text}" for option in options)
+        self.app.system_notify(notify_message, title=notify_title)
 
         self.prompt.ask(Ask(question, options, callback))
 

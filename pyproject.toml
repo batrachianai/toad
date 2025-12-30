@@ -20,6 +20,7 @@ dependencies = [
     "bashlex>=0.18",
     "pathspec>=0.12.1",
     "google-re2>=1.1.20251105",
+    "notify-py>=0.3.43",
 ]
 
 [tool.uv.workspace]
