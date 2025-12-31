@@ -139,10 +139,16 @@ and explanation.
 Under the hood, this is powered by the ACP `terminal/*` tools. For agents that
 are aware of Toad, a small helper tool is also available:
 
-- `toad/create_orchestrator_terminal(sessionId, role, cwd)`  
+- `toad/create_orchestrator_terminal(sessionId, role, cwd, command, args, env)`  
   - `role` (optional): a free-form label such as `"worker"`, `"validator"`, etc.
   - `cwd` (optional): working directory for the terminal (defaults to the project root).
+  - `command` (optional): executable to run. If omitted, Toad uses the current shell.
+  - `args` (optional): list of arguments for the command.
+  - `env` (optional): list of `{name, value}` environment variables to set.
   - Returns: `{"terminalId": "...", "role": "..."}`.
+
+This allows an agent to spawn either a shell or another CLI client directly, for
+example a tool-specific CLI that talks to a different model.
 
 Once created, the orchestrator terminal is displayed in the conversation and can
 be managed entirely by the AI via the standard ACP terminal tools:

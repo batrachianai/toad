@@ -388,24 +388,33 @@ class Agent(AgentBase):
         sessionId: str,
         role: str | None = None,
         cwd: str | None = None,
+        command: str | None = None,
+        args: list[str] | None = None,
+        env: list[protocol.EnvVariable] | None = None,
         _meta: dict | None = None,
     ) -> dict[str, Any]:
         """Toad-specific helper to create an AI-managed orchestrator terminal.
 
         This is a convenience wrapper around terminal/create that uses the
-        project root as the default cwd and the current shell as the command.
+        project root as the default cwd and either the current shell or a
+        supplied CLI command.
         """
-        shell = os.environ.get("SHELL", "sh")
-        env: list[protocol.EnvVariable] | None = None
+        run_command = command or os.environ.get("SHELL", "sh")
+
+        terminal_env: list[protocol.EnvVariable] = []
+        if env:
+            terminal_env.extend(env)
         if role:
-            env = [{"name": "TOAD_ORCHESTRATOR_ROLE", "value": role}]  # type: ignore[assignment]
+            terminal_env.append(
+                {"name": "TOAD_ORCHESTRATOR_ROLE", "value": role}  # type: ignore[typeddict-item]
+            )
 
         response = await self.rpc_terminal_create(
-            command=shell,
+            command=run_command,
             _meta=_meta,
-            args=None,
+            args=args,
             cwd=cwd or str(self.project_root_path),
-            env=env,
+            env=terminal_env or None,
             outputByteLimit=None,
             sessionId=sessionId,
         )
