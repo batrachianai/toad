@@ -105,6 +105,60 @@ To see all subcommands and switches, add the `--help` switch:
 toad --help
 ```
 
+### Multi-agent sessions
+
+Toad can run multiple ACP agents concurrently in a single conversation.
+
+You can start a multi-agent session from the CLI by passing a comma-separated list
+of agents to `-a`:
+
+```bash
+toad -a open-hands,claude.com,goose.ai
+```
+
+- All listed agents are started in the same project directory.
+- Prompts you type are broadcast to every agent.
+- Responses and “thinking” streams are merged into a single conversation view.
+- In multi-agent sessions, messages are prefixed with the agent name (for example `[OpenHands]`, `[Claude]`) so you can see who produced each output.
+
+You can also launch multi-agent sessions from the Store screen:
+
+- Press `T` on agents in any list (Launcher, Recommended, Coding agents, Chat & more) to add/remove them from a **team**.
+- A status line below the launcher shows the current team members.
+- Press `L` (on the Store screen) to launch a session with the selected team.
+  - The first team member is treated as the primary agent for display.
+  - The full team runs together as a multi-agent session.
+
+### AI-managed “orchestrator” terminals
+
+Agents running under ACP can request fully AI-managed terminals inside the
+conversation. These are useful as dedicated workspaces for running commands,
+tests, or other tools while keeping the main conversation focused on planning
+and explanation.
+
+Under the hood, this is powered by the ACP `terminal/*` tools. For agents that
+are aware of Toad, a small helper tool is also available:
+
+- `toad/create_orchestrator_terminal(sessionId, role, cwd, command, args, env)`  
+  - `role` (optional): a free-form label such as `"worker"`, `"validator"`, etc.
+  - `cwd` (optional): working directory for the terminal (defaults to the project root).
+  - `command` (optional): executable to run. If omitted, Toad uses the current shell.
+  - `args` (optional): list of arguments for the command.
+  - `env` (optional): list of `{name, value}` environment variables to set.
+  - Returns: `{"terminalId": "...", "role": "..."}`.
+
+This allows an agent to spawn either a shell or another CLI client directly, for
+example a tool-specific CLI that talks to a different model.
+
+Once created, the orchestrator terminal is displayed in the conversation and can
+be managed entirely by the AI via the standard ACP terminal tools:
+`terminal/output`, `terminal/wait_for_exit`, `terminal/kill`, and
+`terminal/release`. On the Toad side, these terminals integrate with the normal
+terminal UX (for example, `ctrl+f` will focus the most recent non-finalized
+terminal).bash
+toad --help
+```
+
 ### Web server
 
 You can run Toad as a web application.
@@ -130,7 +184,7 @@ Some planned features:
 - UI for MCP servers
 - Expose model selection (waiting on ACP update)
 - Sessions
-- Multiple agents
+- Richer multi-agent UI and coordination tools
 - Windows native support
 
 ### Reporting bugs

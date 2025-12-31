@@ -1,0 +1,50 @@
+# Schema defined in agent_schema.py
+# Kiro CLI ACP agent
+
+identity = "kiro.dev"
+name = "Kiro CLI"
+short_name = "kiro"
+url = "https://kiro.dev/"
+protocol = "acp"
+author_name = "Kiro"
+author_url = "https://kiro.dev/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Kiro CLI agent for deep project understanding and refactoring workflows."
+tags = []
+
+# By default, assume the kiro CLI provides an ACP server mode.
+# Agents can also use toad/create_orchestrator_terminal with command="kiro-cli" for delegated flows.
+run_command."*" = "kiro-cli acp"
+
+help = '''
+# Kiro CLI
+
+Kiro is an AI code understanding and refactoring tool. This entry integrates the
+Kiro CLI as an ACP agent in Toad.
+
+## Usage
+
+- Configure your Kiro CLI credentials and settings as usual (for example via
+  `kiro-cli login` or environment variables).
+- Launch Kiro inside Toad via the store or from the CLI:
+
+  ```bash
+  toad -a kiro
+  ```
+
+- For advanced setups, you can run Kiro as a delegated worker in a dedicated
+  orchestrator terminal using the `toad/create_orchestrator_terminal` tool
+  with `command="kiro-cli"` and appropriate arguments.
+
+Make sure `kiro-cli` is installed and on your PATH before launching this agent.
+'''
+
+[actions."*".install]
+command = "pip install kiro-cli"
+description = "Install Kiro CLI"
+
+[actions."*".update]
+command = "pip install --upgrade kiro-cli"
+description = "Update Kiro CLI"

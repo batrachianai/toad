@@ -89,6 +89,10 @@ StoreScreen {
             background: $panel;
         }
 
+        &.-team {
+            border: tall $accent;
+        }
+
         Grid {
             grid-size: 2 1;
             grid-columns: 1fr auto;
@@ -129,6 +133,9 @@ StoreScreen {
         padding: 0 1;
         &:hover {
             background: $panel;
+        }
+        &.-team {
+            border: tall $accent;
         }
         Digits {
             width: auto;

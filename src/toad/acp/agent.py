@@ -147,13 +147,25 @@ class Agent(AgentBase):
                 "sessionUpdate": "agent_message_chunk",
                 "content": {"type": type, "text": text},
             }:
-                self.post_message(messages.Update(type, text))
+                self.post_message(
+                    messages.Update(
+                        type,
+                        text,
+                        agent_identity=self._agent_data["identity"],
+                    )
+                )
 
             case {
                 "sessionUpdate": "agent_thought_chunk",
                 "content": {"type": type, "text": text},
             }:
-                self.post_message(messages.Thinking(type, text))
+                self.post_message(
+                    messages.Thinking(
+                        type,
+                        text,
+                        agent_identity=self._agent_data["identity"],
+                    )
+                )
 
             case {
                 "sessionUpdate": "tool_call",
@@ -369,6 +381,44 @@ class Agent(AgentBase):
         await result_future
         return_code, signal = result_future.result()
         return {"exitCode": return_code, "signal": signal}
+
+    @jsonrpc.expose("toad/create_orchestrator_terminal")
+    async def rpc_toad_create_orchestrator_terminal(
+        self,
+        sessionId: str,
+        role: str | None = None,
+        cwd: str | None = None,
+        command: str | None = None,
+        args: list[str] | None = None,
+        env: list[protocol.EnvVariable] | None = None,
+        _meta: dict | None = None,
+    ) -> dict[str, Any]:
+        """Toad-specific helper to create an AI-managed orchestrator terminal.
+
+        This is a convenience wrapper around terminal/create that uses the
+        project root as the default cwd and either the current shell or a
+        supplied CLI command.
+        """
+        run_command = command or os.environ.get("SHELL", "sh")
+
+        terminal_env: list[protocol.EnvVariable] = []
+        if env:
+            terminal_env.extend(env)
+        if role:
+            terminal_env.append(
+                {"name": "TOAD_ORCHESTRATOR_ROLE", "value": role}  # type: ignore[typeddict-item]
+            )
+
+        response = await self.rpc_terminal_create(
+            command=run_command,
+            _meta=_meta,
+            args=args,
+            cwd=cwd or str(self.project_root_path),
+            env=terminal_env or None,
+            outputByteLimit=None,
+            sessionId=sessionId,
+        )
+        return {"terminalId": response["terminalId"], "role": role or "orchestrator"}
 
     async def _run_agent(self) -> None:
         """Task to communicate with the agent subprocess."""

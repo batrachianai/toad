@@ -1,0 +1,52 @@
+# Schema defined in agent_schema.py
+# Factory Droid CLI ACP agent
+
+identity = "factorydroid.dev"
+name = "Factory Droid"
+short_name = "droid"
+url = "https://factorydroid.dev/"
+protocol = "acp"
+author_name = "Factory Droid"
+author_url = "https://factorydroid.dev/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "coding"
+description = "Factory Droid CLI agent for automated coding and refactoring."
+tags = []
+
+# By default, assume the factory droid CLI provides an ACP server mode.
+# Agents can also use toad/create_orchestrator_terminal with command="droid"
+# (or your preferred CLI name) for delegated flows.
+run_command."*" = "droid acp"
+
+help = '''
+# Factory Droid
+
+Factory Droid is an automated coding and refactoring assistant. This entry
+integrates the Factory Droid CLI as an ACP agent in Toad.
+
+## Usage
+
+- Install and configure the Factory Droid CLI according to its documentation.
+- Launch Factory Droid inside Toad via the store or from the CLI:
+
+  ```bash
+  toad -a droid
+  ```
+
+- For advanced orchestrator patterns, you can start Factory Droid as a delegated
+  worker in a dedicated orchestrator terminal via
+  `toad/create_orchestrator_terminal` with `command="factory-droid"` and suitable
+  arguments.
+
+Ensure `factory-droid` (or your configured CLI name) is installed and on your
+PATH before launching this agent.
+'''
+
+[actions."*".install]
+command = "pip install factory-droid"
+description = "Install Factory Droid CLI"
+
+[actions."*".update]
+command = "pip install --upgrade factory-droid"
+description = "Update Factory Droid CLI"

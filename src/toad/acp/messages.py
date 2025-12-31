@@ -25,6 +25,7 @@ class AgentMessage(Message):
 class Thinking(AgentMessage):
     type: str
     text: str
+    agent_identity: str | None = None
 
 
 @dataclass
@@ -36,6 +37,7 @@ class UpdateStatusLine(AgentMessage):
 class Update(AgentMessage):
     type: str
     text: str
+    agent_identity: str | None = None
 
 
 @dataclass

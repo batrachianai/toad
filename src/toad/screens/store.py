@@ -48,6 +48,11 @@ class LaunchAgent(Message):
     identity: str
 
 
+@dataclass
+class ToggleTeam(Message):
+    identity: str
+
+
 class AgentItem(containers.VerticalGroup):
     """An entry in the Agent grid select."""
 
@@ -86,6 +91,12 @@ class LauncherGridSelect(GridSelect):
             "Launch",
             tooltip="Launch highlighted agent",
         ),
+        Binding(
+            "t",
+            "toggle_team",
+            "Team",
+            tooltip="Add/remove highlighted agent from team",
+        ),
     ]
 
     def action_details(self) -> None:
@@ -112,6 +123,13 @@ class LauncherGridSelect(GridSelect):
         child = self.children[self.highlighted]
         assert isinstance(child, LauncherItem)
         self.post_message(LaunchAgent(child.agent["identity"]))
+
+    def action_toggle_team(self) -> None:
+        if self.highlighted is None:
+            return
+        child = self.children[self.highlighted]
+        assert isinstance(child, LauncherItem)
+        self.post_message(ToggleTeam(child.agent["identity"]))
 
 
 class Launcher(containers.VerticalGroup):
@@ -197,6 +215,12 @@ class AgentGridSelect(GridSelect):
     BINDINGS = [
         Binding("enter", "select", "Details", tooltip="Open agent details"),
         Binding("space", "launch", "Launch", tooltip="Launch highlighted agent"),
+        Binding(
+            "t",
+            "toggle_team",
+            "Team",
+            tooltip="Add/remove highlighted agent from team",
+        ),
     ]
     BINDING_GROUP_TITLE = "Agent Select"
 
@@ -206,6 +230,13 @@ class AgentGridSelect(GridSelect):
         child = self.children[self.highlighted]
         assert isinstance(child, AgentItem)
         self.post_message(LaunchAgent(child.agent["identity"]))
+
+    def action_toggle_team(self) -> None:
+        if self.highlighted is None:
+            return
+        child = self.children[self.highlighted]
+        assert isinstance(child, AgentItem)
+        self.post_message(ToggleTeam(child.agent["identity"]))
 
 
 class Container(containers.VerticalScroll):
@@ -239,6 +270,12 @@ class StoreScreen(Screen):
             "Quick launch",
             key_display="1-9 a-f",
         ),
+        Binding(
+            "l",
+            "launch_team",
+            "Launch team",
+            tooltip="Launch selected team of agents",
+        ),
     ]
 
     agents_view = getters.query_one("#agents-view", AgentGridSelect)
@@ -255,6 +292,7 @@ class StoreScreen(Screen):
         self, name: str | None = None, id: str | None = None, classes: str | None = None
     ):
         self._agents: dict[str, Agent] = {}
+        self._team: list[str] = []
         super().__init__(name=name, id=id, classes=classes)
 
     @property
@@ -306,6 +344,8 @@ class StoreScreen(Screen):
         agents = self._agents
 
         yield Launcher(agents, id="launcher")
+        # Team info / instructions
+        yield widgets.Static("", id="team-view", classes="instruction-text")
 
         ordered_agents = sorted(
             agents.values(), key=lambda agent: agent["name"].casefold()
@@ -347,6 +387,43 @@ class StoreScreen(Screen):
                     new_focus.highlight_first()
                 new_focus.focus(scroll_visible=False)
 
+    def _update_team_view(self) -> None:
+        """Update the team info text."""
+        try:
+            team_view = self.container.query_one("#team-view", widgets.Static)
+        except NoMatches:
+            return
+
+        if not self._team:
+            message = (
+                "Press [b]T[/b] on agents to add/remove them from the team. "
+                "Press [b]L[/b] to launch a team session."
+            )
+        else:
+            names: list[str] = []
+            for identity in self._team:
+                agent = self._agents.get(identity)
+                if agent is not None:
+                    names.append(agent["name"])
+            if names:
+                message = (
+                    "Team: "
+                    + ", ".join(names)
+                    + "  — press [b]L[/b] to launch this team."
+                )
+            else:
+                message = "No valid agents in team."
+        team_view.update(Content.from_markup(message))
+
+    def _update_team_classes(self, identity: str, in_team: bool) -> None:
+        """Add/remove the -team CSS class on any widgets showing this agent."""
+        for agent_item in self.query(AgentItem):
+            if agent_item.agent["identity"] == identity:
+                agent_item.set_class(in_team, "-team")
+        for launcher_item in self.query(LauncherItem):
+            if launcher_item.agent["identity"] == identity:
+                launcher_item.set_class(in_team, "-team")
+
     @on(GridSelect.LeaveUp)
     def on_grid_select_leave_up(self, event: GridSelect.LeaveUp):
         event.stop()
@@ -356,6 +433,18 @@ class StoreScreen(Screen):
     def on_grid_select_leave_down(self, event: GridSelect.LeaveUp):
         event.stop()
         self.move_focus(+1)
+
+    @on(ToggleTeam)
+    def on_toggle_team(self, message: ToggleTeam) -> None:
+        identity = message.identity
+        if identity in self._team:
+            self._team.remove(identity)
+            in_team = False
+        else:
+            self._team.append(identity)
+            in_team = True
+        self._update_team_view()
+        self._update_team_classes(identity, in_team)
 
     @on(GridSelect.Selected, ".agents-picker")
     @work
@@ -405,7 +494,46 @@ class StoreScreen(Screen):
 
         agent = self.agents[agent_identity]
         project_path = Path(self.app.project_dir or os.getcwd())
+        # Store launches a single-agent session; multi-agent is configured via CLI.
         screen = MainScreen(project_path, agent).data_bind(
+            column=ToadApp.column,
+            column_width=ToadApp.column_width,
+        )
+        await self.app.push_screen_wait(screen)
+
+    @work
+    async def action_launch_team(self) -> None:
+        """Launch a multi-agent session using the current team selection."""
+        from toad.screens.main import MainScreen
+
+        if not self._team:
+            self.notify(
+                "No agents in team. Press T on agents to add them to the team.",
+                title="Team",
+                severity="error",
+            )
+            self.app.bell()
+            return
+
+        agents: list[Agent] = []
+        for identity in self._team:
+            agent = self._agents.get(identity)
+            if agent is not None and agent not in agents:
+                agents.append(agent)
+
+        if not agents:
+            self.notify(
+                "No valid agents in team.",
+                title="Team",
+                severity="error",
+            )
+            self.app.bell()
+            return
+
+        project_path = Path(self.app.project_dir or os.getcwd())
+
+        # Use the first agent as the primary for display; pass full list as agents_data
+        screen = MainScreen(project_path, agents[0], agents).data_bind(
             column=ToadApp.column,
             column_width=ToadApp.column_width,
         )
@@ -428,6 +556,8 @@ class StoreScreen(Screen):
             )
         else:
             await self.container.mount_compose(self.compose_agents())
+            # Initialize team view content
+            self._update_team_view()
             with suppress(NoMatches):
                 first_grid = self.container.query(GridSelect).first()
                 first_grid.focus(scroll_visible=False)

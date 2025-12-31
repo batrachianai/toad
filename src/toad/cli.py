@@ -18,7 +18,8 @@ def check_directory(path: str) -> None:
         sys.exit(-1)
 
 
-async def get_agent_data(launch_agent) -> Agent | None:
+async def get_agent_data(launch_agent: str) -> Agent | None:
+    """Resolve a single agent name or identity to Agent data."""
     launch_agent = launch_agent.lower()
 
     from toad.agents import read_agents, AgentReadError
@@ -37,6 +38,43 @@ async def get_agent_data(launch_agent) -> Agent | None:
             break
 
     return agents.get(launch_agent)
+
+
+async def get_agents_data(launch_agents: list[str]) -> list[Agent]:
+    """Resolve multiple agent names or identities to Agent data."""
+    from toad.agents import read_agents, AgentReadError
+
+    try:
+        agents = await read_agents()
+    except AgentReadError:
+        agents = {}
+
+    result: list[Agent] = []
+    seen_identities: set[str] = set()
+
+    for launch_agent in launch_agents:
+        launch_agent_lower = launch_agent.lower()
+        selected: Agent | None = None
+
+        for agent_data in agents.values():
+            if (
+                agent_data["short_name"].lower() == launch_agent_lower
+                or agent_data["identity"].lower() == launch_agent_lower
+            ):
+                selected = agent_data
+                break
+
+        if selected is None:
+            print(f"Unknown agent: {launch_agent}")
+            continue
+
+        identity = selected["identity"]
+        if identity in seen_identities:
+            continue
+        seen_identities.add(identity)
+        result.append(selected)
+
+    return result
 
 
 class DefaultCommandGroup(click.Group):
@@ -62,7 +100,13 @@ def main():
 # @click.pass_context
 @main.command("run")
 @click.argument("project_dir", metavar="PATH", required=False, default=".")
-@click.option("-a", "--agent", metavar="AGENT", default="")
+@click.option(
+    "-a",
+    "--agent",
+    metavar="AGENT",
+    default="",
+    help="Agent to run (short name or identity). Use a comma-separated list for multiple agents.",
+)
 @click.option(
     "-p",
     "--port",
@@ -80,22 +124,31 @@ def main():
     help="Host to use in conjunction with --serve",
 )
 @click.option("-s", "--serve", is_flag=True, help="Serve Toad as a web application")
-def run(port: int, host: str, serve: bool, project_dir: str = ".", agent: str = "1"):
+def run(port: int, host: str, serve: bool, project_dir: str = ".", agent: str = ""):
     """Run an installed agent (same as `toad PATH`)."""
 
     check_directory(project_dir)
 
+    agent_data: Agent | None = None
+    agents_data: list[Agent] | None = None
+
     if agent:
         import asyncio
 
-        agent_data = asyncio.run(get_agent_data(agent))
-    else:
-        agent_data = None
+        agent_names = [name.strip() for name in agent.split(",") if name.strip()]
+        if len(agent_names) == 1:
+            agent_data = asyncio.run(get_agent_data(agent_names[0]))
+        else:
+            agents_data = asyncio.run(get_agents_data(agent_names))
+            if not agents_data:
+                print("No valid agents found for multi-agent mode.")
+                sys.exit(-1)
 
     app = ToadApp(
-        mode=None if agent_data else "store",
+        mode=None if (agent_data or agents_data) else "store",
         agent_data=agent_data,
         project_dir=project_dir,
+        agents_data=agents_data,
     )
     if serve:
         import shlex
