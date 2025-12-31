@@ -274,6 +274,8 @@ class Conversation(containers.Vertical):
         self._agent_response: AgentResponse | None = None
         self._agent_thought: AgentThought | None = None
         self._last_escape_time: float = monotonic()
+        self._session_summary: str | None = None
+        self._session_summary_used: bool = False
         # Normalize agents data into a list
         if agents is not None and agents:
             self._agents_data: list[AgentData] = list(agents)
@@ -682,7 +684,19 @@ class Conversation(containers.Vertical):
             self.busy_count += 1
             try:
                 self.turn = "agent"
-                stop_reason = await self.agent.send_prompt(prompt)
+                # If we have a stored session summary that hasn't been used yet,
+                # prepend it to the user's prompt and mark it as used.
+                if self._session_summary and not self._session_summary_used:
+                    combined_prompt = (
+                        "Here is a summary of the previous conversation context:\n\n"
+                        f"{self._session_summary}\n\n"
+                        "Use this as background context, then answer the user's request.\n\n"
+                        f"User: {prompt}"
+                    )
+                    self._session_summary_used = True
+                    stop_reason = await self.agent.send_prompt(combined_prompt)
+                else:
+                    stop_reason = await self.agent.send_prompt(prompt)
             except jsonrpc.APIError:
                 self.turn = "client"
             finally:
@@ -989,6 +1003,8 @@ class Conversation(containers.Vertical):
 
         # Resume this session for future events.
         self.session_store.resume_session(message.session_id)
+        self._session_summary = None
+        self._session_summary_used = False
 
         # Clear current contents.
         for child in list(self.contents.children):
@@ -1002,6 +1018,8 @@ class Conversation(containers.Vertical):
         from textual.widgets import Static
 
         # Rebuild a simple transcript: user prompts, agent messages, and shell activity.
+        # Build a simple textual transcript and keep it for summarization.
+        transcript_lines: list[str] = []
         for event_data in events:
             role = event_data.get("role")
             text = event_data.get("text") or ""
@@ -1010,13 +1028,39 @@ class Conversation(containers.Vertical):
                 continue
             if role == "user" and event_type == "message":
                 await self.post(UserInputWidget(text), anchor=False)
+                transcript_lines.append(f"User: {text}")
             elif role == "agent" and event_type == "message":
                 await self.post(AgentResponseWidget(text), anchor=False)
+                transcript_lines.append(f"Agent: {text}")
             elif role == "shell" and event_type == "shell_command":
                 await self.post(ShellResult(text), anchor=False)
+                transcript_lines.append(f"Shell command: {text}")
             elif role == "shell" and event_type == "shell_output":
                 # Render output as a simple Static block.
                 await self.post(Static(text, classes="shell-output"), anchor=False)
+                transcript_lines.append(f"Shell output: {text}")
+
+        # If the transcript is long, generate a summary that will be injected
+        # into the next prompt sent to the agent.
+        transcript = "\n".join(transcript_lines)
+        if len(transcript) > 2000 and self.agent is not None:
+            # Ask the agent itself to summarize the transcript.
+            summary_prompt = (
+                "Summarize the following previous session into a concise summary "
+                "that captures important goals, decisions, code changes, and open questions. "
+                "Use plain text, no markdown, and keep it under 300 words.\n\n"
+                f"{transcript}"
+            )
+            try:
+                self._session_summary = await self.agent.send_prompt(summary_prompt)
+                self._session_summary_used = False
+                self.flash(
+                    "Session is long; a summary will be used as context for your next prompt.",
+                    style="information",
+                )
+            except Exception:
+                self._session_summary = None
+                self._session_summary_used = False
 
         self.window.scroll_end()
         self.flash("Session loaded. New messages will be appended here.", style="success")
