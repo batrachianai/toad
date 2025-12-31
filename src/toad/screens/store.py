@@ -405,6 +405,7 @@ class StoreScreen(Screen):
 
         agent = self.agents[agent_identity]
         project_path = Path(self.app.project_dir or os.getcwd())
+        # Store launches a single-agent session; multi-agent is configured via CLI.
         screen = MainScreen(project_path, agent).data_bind(
             column=ToadApp.column,
             column_width=ToadApp.column_width,

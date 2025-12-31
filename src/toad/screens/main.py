@@ -83,10 +83,20 @@ class MainScreen(Screen, can_focus=False):
 
     app = getters.app(ToadApp)
 
-    def __init__(self, project_path: Path, agent: Agent | None = None) -> None:
+    def __init__(
+        self,
+        project_path: Path,
+        agent: Agent | None = None,
+        agents: list[Agent] | None = None,
+    ) -> None:
         super().__init__()
         self.set_reactive(MainScreen.project_path, project_path)
-        self._agent = agent
+        if agents is not None:
+            self._agents = agents
+            self._agent = agents[0] if agents else agent
+        else:
+            self._agent = agent
+            self._agents = [agent] if agent is not None else []
 
     def get_loading_widget(self) -> Widget:
         throbber = self.app.settings.get("ui.throbber", str)
@@ -112,7 +122,7 @@ class MainScreen(Screen, can_focus=False):
                     flex=True,
                 ),
             )
-            yield Conversation(self.project_path, self._agent).data_bind(
+            yield Conversation(self.project_path, self._agent, self._agents).data_bind(
                 project_path=MainScreen.project_path,
                 column=MainScreen.column,
             )

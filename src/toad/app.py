@@ -250,6 +250,7 @@ class ToadApp(App, inherit_bindings=False):
         agent_data: AgentData | None = None,
         project_dir: str | None = None,
         mode: str | None = None,
+        agents_data: list[AgentData] | None = None,
     ) -> None:
         """Toad app.
 
@@ -258,9 +259,11 @@ class ToadApp(App, inherit_bindings=False):
             project_dir: Project directory.
             mode: Initial mode.
             agent: Agent identity or shor name.
+            agents_data: Optional list of agents for multi-agent sessions.
         """
         self.settings_changed_signal = Signal(self, "settings_changed")
         self.agent_data = agent_data
+        self.agents_data = agents_data
         self.project_dir = (
             None if project_dir is None else Path(project_dir).expanduser().resolve()
         )
@@ -535,7 +538,7 @@ class ToadApp(App, inherit_bindings=False):
         from toad.screens.main import MainScreen
 
         project_path = Path(self.project_dir or "./").resolve().absolute()
-        return MainScreen(project_path, self.agent_data).data_bind(
+        return MainScreen(project_path, self.agent_data, self.agents_data).data_bind(
             column=ToadApp.column,
             column_width=ToadApp.column_width,
             scrollbar=ToadApp.scrollbar,

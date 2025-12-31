@@ -254,7 +254,12 @@ class Conversation(containers.Vertical):
     status: var[str] = var("")
     column: var[bool] = var(False, toggle_class="-column")
 
-    def __init__(self, project_path: Path, agent: AgentData | None = None) -> None:
+    def __init__(
+        self,
+        project_path: Path,
+        agent: AgentData | None = None,
+        agents: list[AgentData] | None = None,
+    ) -> None:
         super().__init__()
 
         project_path = project_path.resolve().absolute()
@@ -267,7 +272,16 @@ class Conversation(containers.Vertical):
         self._agent_response: AgentResponse | None = None
         self._agent_thought: AgentThought | None = None
         self._last_escape_time: float = monotonic()
-        self._agent_data = agent
+        # Normalize agents data into a list
+        if agents is not None and agents:
+            self._agents_data: list[AgentData] = list(agents)
+        elif agent is not None:
+            self._agents_data = [agent]
+        else:
+            self._agents_data = []
+        self._agent_data: AgentData | None = (
+            self._agents_data[0] if self._agents_data else None
+        )
         self._agent_fail = False
         self._mouse_down_offset: Offset | None = None
 
@@ -281,9 +295,12 @@ class Conversation(containers.Vertical):
 
     @property
     def agent_title(self) -> str | None:
-        if self._agent_data is not None:
-            return self._agent_data["name"]
-        return None
+        if not self._agents_data:
+            return None
+        if len(self._agents_data) == 1:
+            return self._agents_data[0]["name"]
+        names = ", ".join(agent["name"] for agent in self._agents_data)
+        return f"Multi: {names}"
 
     def validate_shell_history_index(self, index: int) -> int:
         return clamp(index, -self.shell_history.size, 0)
@@ -531,29 +548,32 @@ class Conversation(containers.Vertical):
 
     @on(AgentReady)
     async def on_agent_ready(self) -> None:
-        self.session_start_time = monotonic()
-        if self.agent is not None:
-            content = Content.assemble(self.agent.get_info(), " connected")
-            self.flash(content, style="success")
-            if self._agent_data is not None:
-                self.app.capture_event(
-                    "agent-session-begin",
-                    agent=self._agent_data["identity"],
-                )
+        if self.session_start_time is None:
+            self.session_start_time = monotonic()
+            if self.agent is not None:
+                content = Content.assemble(self.agent.get_info(), " connected")
+                self.flash(content, style="success")
+            if self._agents_data:
+                for agent_data in self._agents_data:
+                    self.app.capture_event(
+                        "agent-session-begin",
+                        agent=agent_data["identity"],
+                    )
 
         self.agent_ready = True
 
     async def on_unmount(self) -> None:
         if self.agent is not None:
             await self.agent.stop()
-        if self._agent_data is not None and self.session_start_time is not None:
+        if self._agents_data and self.session_start_time is not None:
             session_time = monotonic() - self.session_start_time
-            await self.app.capture_event(
-                "agent-session-end",
-                agent=self._agent_data["identity"],
-                duration=session_time,
-                agent_session_fail=self._agent_fail,
-            ).wait()
+            for agent_data in self._agents_data:
+                await self.app.capture_event(
+                    "agent-session-end",
+                    agent=agent_data["identity"],
+                    duration=session_time,
+                    agent_session_fail=self._agent_fail,
+                ).wait()
 
     @on(AgentFail)
     async def on_agent_fail(self, message: AgentFail) -> None:
@@ -561,13 +581,14 @@ class Conversation(containers.Vertical):
         self._agent_fail = True
         self.notify(message.message, title="Agent failure", severity="error", timeout=5)
 
-        if self._agent_data is not None:
-            self.app.capture_event(
-                "agent-session-error",
-                agent=self._agent_data["identity"],
-                message=message.message,
-                details=message.details,
-            )
+        if self._agents_data:
+            for agent_data in self._agents_data:
+                self.app.capture_event(
+                    "agent-session-error",
+                    agent=agent_data["identity"],
+                    message=message.message,
+                    details=message.details,
+                )
 
         if message.message:
             error = Content.assemble(
@@ -1080,14 +1101,17 @@ class Conversation(containers.Vertical):
             self.app.settings.get("shell.allow_commands", expect_type=str).split()
         )
 
-        if self._agent_data is not None:
+        if self._agents_data:
 
             def start_agent() -> None:
                 """Start the agent after refreshing the UI."""
-                assert self._agent_data is not None
-                from toad.acp.agent import Agent
+                from toad.acp.agent import Agent as AcpAgent
+                from toad.multi_agent import MultiAgent
 
-                self.agent = Agent(self.project_path, self._agent_data)
+                if len(self._agents_data) == 1:
+                    self.agent = AcpAgent(self.project_path, self._agents_data[0])
+                else:
+                    self.agent = MultiAgent(self.project_path, self._agents_data)
                 self.agent.start(self)
 
             self.call_after_refresh(start_agent)
@@ -1112,9 +1136,10 @@ class Conversation(containers.Vertical):
             self.agent_ready = False
 
     async def watch_agent_ready(self, ready: bool) -> None:
-        if ready and (agent_data := self._agent_data) is not None:
-            welcome = agent_data.get("welcome", None)
+        if ready and self._agents_data:
             from toad.widgets.markdown_note import MarkdownNote
+
+            for agent_data in self._d.widgets.markdown_note import MarkdownNote
 
             await self.post(MarkdownNote(welcome))
 
