@@ -15,9 +15,9 @@ description = "Factory Droid CLI agent for automated coding and refactoring."
 tags = []
 
 # By default, assume the factory droid CLI provides an ACP server mode.
-# Agents can also use toad/create_orchestrator_terminal with command=\"factory-droid\"
+# Agents can also use toad/create_orchestrator_terminal with command="droid"
 # (or your preferred CLI name) for delegated flows.
-run_command."*" = "factory-droid acp"
+run_command."*" = "droid acp"
 
 help = '''
 # Factory Droid
