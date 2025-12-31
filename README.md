@@ -171,6 +171,20 @@ toad serve
 
 ![textual-serve](https://github.com/user-attachments/assets/1d861d48-d30b-44cd-972d-5986a01360bf)
 
+### Sessions
+
+Toad records per-project sessions that you can reopen later.
+
+- User prompts, agent responses, and shell commands / output are stored under the project’s data directory.
+- Use the **Sessions** panel in the sidebar to see recent sessions for the current project.
+  - Open a session to restore its transcript into the conversation view.
+  - Long sessions are automatically summarized; the summary is injected into your next agent turn so the model has compact context.
+- Rename the current or most recent session with:
+
+```text
+/rename-session My current work
+```
+
 ## Toad development
 
 Toad was built by [Will McGugan](https://github.com/willmcgugan) and is currently under active development.
@@ -178,11 +192,8 @@ Toad was built by [Will McGugan](https://github.com/willmcgugan) and is currentl
 To discuss Toad, see the Discussions tab, or join the #toad channel on the [Textualize discord server](https://discord.gg/Enf6Z3qhVr).
 
 ### Roadmap
-
 Some planned features:
-
-- UI for MCP servers
-- Expose model selection (waiting on ACP update)
+- UI for MCP servers-P Expose model selection (waiting on ACP update)-C Richere)
 - Sessions
 - Richer multi-agent UI and coordination tools
 - Windows native support

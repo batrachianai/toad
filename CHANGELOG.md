@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent-labelled output in multi-agent sessions (responses prefixed with agent name)
 - ACP terminals are now focusable via the existing `ctrl+f` terminal focus key
 - Toad-specific ACP helper tool `toad/create_orchestrator_terminal` for creating AI-managed “orchestrator” terminals, including support for running other CLIs (for example `kiro-cli`, `claude-code`) under AI control
+- Persistent sessions:
+  - Per-project session logs for user prompts, agent responses, and shell activity
+  - Sessions sidebar panel for listing and reopening previous conversations
+  - Automatic summarization and summary chaining for long sessions, injected into the next agent turn
+  - `/rename-session <title>` slash command to name or rename sessions
 
 ### Changed
 
