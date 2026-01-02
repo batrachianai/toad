@@ -26,6 +26,7 @@ class AgentResponse(Markdown):
             markdown = apply_bidi_to_markdown(markdown)
         super().__init__(markdown)
         self._stream: MarkdownStream | None = None
+        self._rtl_buffer: str = ""  # Buffer for incomplete lines during streaming
 
     def block_cursor_clear(self) -> None:
         self.block_cursor_offset = -1
@@ -80,6 +81,27 @@ class AgentResponse(Markdown):
 
     async def append_fragment(self, fragment: str) -> None:
         self.loading = False
-        # Apply RTL support for Hebrew, Arabic, and other BiDi languages
-        fragment = apply_bidi_to_markdown(fragment)
-        await self.stream.write(fragment)
+        # Buffer fragments and only apply BiDi to complete lines
+        # This prevents the BiDi algorithm from corrupting partial lines during streaming
+        text = self._rtl_buffer + fragment
+
+        if "\n" in text:
+            # Split into complete lines and remainder
+            lines = text.split("\n")
+            complete_lines = lines[:-1]  # All but last are complete
+            self._rtl_buffer = lines[-1]  # Last line may be incomplete
+
+            # Apply BiDi only to complete lines
+            processed = "\n".join(complete_lines) + "\n"
+            processed = apply_bidi_to_markdown(processed)
+            await self.stream.write(processed)
+        else:
+            # No complete line yet, just buffer
+            self._rtl_buffer = text
+
+    async def flush_rtl_buffer(self) -> None:
+        """Flush any remaining buffered RTL content."""
+        if self._rtl_buffer:
+            processed = apply_bidi_to_markdown(self._rtl_buffer)
+            await self.stream.write(processed)
+            self._rtl_buffer = ""

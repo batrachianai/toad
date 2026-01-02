@@ -673,6 +673,11 @@ class Conversation(containers.Vertical):
             await self._agent_thought.remove()
         if self._loading is not None:
             await self._loading.remove()
+        # Flush any remaining RTL buffered content before clearing
+        if self._agent_response is not None:
+            await self._agent_response.flush_rtl_buffer()
+        if self._agent_thought is not None:
+            await self._agent_thought.flush_rtl_buffer()
         self._agent_response = None
         self._agent_thought = None
         self.post_message(messages.ProjectDirectoryUpdated())

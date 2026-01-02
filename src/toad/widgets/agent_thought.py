@@ -28,6 +28,20 @@ class AgentThought(Markdown, can_focus=True):
     ALLOW_MAXIMIZE = True
     _stream: var[MarkdownStream | None] = var(None)
 
+    def __init__(
+        self,
+        markdown: str | None = None,
+        *,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+    ) -> None:
+        # Apply RTL support for Hebrew, Arabic, and other BiDi languages
+        if markdown is not None:
+            markdown = apply_bidi_to_markdown(markdown)
+        super().__init__(markdown, name=name, id=id, classes=classes)
+        self._rtl_buffer: str = ""  # Buffer for incomplete lines during streaming
+
     def watch_loading(self, loading: bool) -> None:
         self.set_class(loading, "-loading")
 
@@ -39,7 +53,24 @@ class AgentThought(Markdown, can_focus=True):
 
     async def append_fragment(self, fragment: str) -> None:
         self.loading = False
-        # Apply RTL support for Hebrew, Arabic, and other BiDi languages
-        fragment = apply_bidi_to_markdown(fragment)
-        await self.stream.write(fragment)
+        # Buffer fragments and only apply BiDi to complete lines
+        text = self._rtl_buffer + fragment
+
+        if "\n" in text:
+            lines = text.split("\n")
+            complete_lines = lines[:-1]
+            self._rtl_buffer = lines[-1]
+
+            processed = "\n".join(complete_lines) + "\n"
+            processed = apply_bidi_to_markdown(processed)
+            await self.stream.write(processed)
+        else:
+            self._rtl_buffer = text
         self.scroll_end()
+
+    async def flush_rtl_buffer(self) -> None:
+        """Flush any remaining buffered RTL content."""
+        if self._rtl_buffer:
+            processed = apply_bidi_to_markdown(self._rtl_buffer)
+            await self.stream.write(processed)
+            self._rtl_buffer = ""
