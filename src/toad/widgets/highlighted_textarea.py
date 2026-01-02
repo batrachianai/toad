@@ -15,6 +15,8 @@ from textual.widgets.text_area import Selection
 
 from pygments.token import Token
 
+from toad.rtl import apply_bidi, apply_bidi_to_rich_text
+
 
 RE_MATCH_FILE_PROMPT = re.compile(r"(@\S+)|@\"(.*)\"")
 RE_SLASH_COMMAND = re.compile(r"(\/\S*)(\W.*)?$")
@@ -176,5 +178,7 @@ class HighlightedTextArea(TextArea):
             end="",
             no_wrap=True,
         )
+        # Apply RTL support for Hebrew, Arabic, and other BiDi languages
+        text = apply_bidi_to_rich_text(text)
         self._text_cache[line_index] = text.copy()
         return text

@@ -6,6 +6,8 @@ from textual.reactive import var
 from textual.widgets import Markdown
 from textual.widgets.markdown import MarkdownStream
 
+from toad.rtl import apply_bidi_to_markdown
+
 
 class AgentThought(Markdown, can_focus=True):
     """The agent's 'thoughts'."""
@@ -37,5 +39,7 @@ class AgentThought(Markdown, can_focus=True):
 
     async def append_fragment(self, fragment: str) -> None:
         self.loading = False
+        # Apply RTL support for Hebrew, Arabic, and other BiDi languages
+        fragment = apply_bidi_to_markdown(fragment)
         await self.stream.write(fragment)
         self.scroll_end()

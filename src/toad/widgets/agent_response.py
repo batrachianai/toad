@@ -7,6 +7,7 @@ from textual.widgets import Markdown
 from textual.widgets.markdown import MarkdownStream
 
 from toad import messages
+from toad.rtl import apply_bidi_to_markdown
 
 
 SYSTEM = """\
@@ -20,6 +21,9 @@ class AgentResponse(Markdown):
     block_cursor_offset = var(-1)
 
     def __init__(self, markdown: str | None = None) -> None:
+        # Apply RTL support for Hebrew, Arabic, and other BiDi languages
+        if markdown is not None:
+            markdown = apply_bidi_to_markdown(markdown)
         super().__init__(markdown)
         self._stream: MarkdownStream | None = None
 
@@ -76,4 +80,6 @@ class AgentResponse(Markdown):
 
     async def append_fragment(self, fragment: str) -> None:
         self.loading = False
+        # Apply RTL support for Hebrew, Arabic, and other BiDi languages
+        fragment = apply_bidi_to_markdown(fragment)
         await self.stream.write(fragment)

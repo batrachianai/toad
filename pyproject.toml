@@ -22,6 +22,7 @@ dependencies = [
     "google-re2>=1.1.20251105",
     "notify-py>=0.3.43",
     "pyperclip>=1.11.0",
+    "python-bidi>=0.6.3",
 ]
 
 [tool.uv.workspace]
