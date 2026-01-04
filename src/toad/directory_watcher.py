@@ -1,10 +1,11 @@
 import asyncio
+from pathlib import Path
 import rich.repr
 
 from textual.message import Message
 from textual.widget import Widget
 
-from pathlib import Path
+
 from watchdog.events import (
     FileSystemEvent,
     FileSystemEventHandler,
@@ -27,6 +28,12 @@ class DirectoryWatcher(FileSystemEventHandler):
     """Watch for changes to a directory, ignoring purely file data changes."""
 
     def __init__(self, path: Path, widget: Widget) -> None:
+        """
+
+        Args:
+            path: Root path to monitor.
+            widget: Widget which will receive the `DirectoryChanged` event.
+        """
         self._path = path
         self._widget = widget
         self._observer = Observer()
