@@ -10,6 +10,12 @@ from watchdog.events import (
     FileModifiedEvent,
     FileSystemEvent,
     FileSystemEventHandler,
+    FileCreatedEvent,
+    FileDeletedEvent,
+    FileMovedEvent,
+    DirCreatedEvent,
+    DirDeletedEvent,
+    DirMovedEvent,
 )
 from watchdog.observers import Observer
 
@@ -33,9 +39,19 @@ class DirectoryWatcher(FileSystemEventHandler):
 
         We want to ignore any changes changes that are purely file data or metadata.
         """
-        if not isinstance(event, (DirModifiedEvent, FileModifiedEvent)):
-            # We aren't interested in modifications. Only when files are potentially added / removed
-            self._widget.post_message(DirectoryChanged())
+        if not isinstance(
+            event,
+            (
+                FileCreatedEvent,
+                FileDeletedEvent,
+                FileMovedEvent,
+                DirCreatedEvent,
+                DirDeletedEvent,
+                DirMovedEvent,
+            ),
+        ):
+            return
+        self._widget.post_message(DirectoryChanged())
 
     def __rich_repr__(self) -> rich.repr.Result:
         yield self._path
