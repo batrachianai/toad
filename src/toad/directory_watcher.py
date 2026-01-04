@@ -33,7 +33,8 @@ class DirectoryWatcher(FileSystemEventHandler):
 
     def on_any_event(self, event: FileSystemEvent) -> None:
         # Only respond to events that indicate files were added, removed, or moved
-        if isinstance(
+        # Ignore modification, open, and close events
+        if not isinstance(
             event,
             (
                 FileCreatedEvent,
@@ -44,7 +45,8 @@ class DirectoryWatcher(FileSystemEventHandler):
                 DirMovedEvent,
             ),
         ):
-            self._widget.post_message(DirectoryChanged())
+            return
+        self._widget.post_message(DirectoryChanged())
 
     def __rich_repr__(self) -> rich.repr.Result:
         yield self._path
@@ -59,4 +61,4 @@ class DirectoryWatcher(FileSystemEventHandler):
     def stop(self) -> None:
         """Stop the watcher."""
         self._observer.stop()
-        self._observer.join()
+        self._observer.join(timeout=5.0)
