@@ -1,5 +1,6 @@
 import asyncio
 
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -11,7 +12,6 @@ import rich.repr
 from textual.content import Content
 from textual.message import Message
 from textual.message_pump import MessagePump
-from textual import log
 
 from toad import jsonrpc
 import toad
@@ -22,6 +22,7 @@ from toad.acp import api
 from toad.acp.api import API
 from toad.acp import messages
 from toad.acp.prompt import build as build_prompt
+from toad import paths
 from toad import constants
 from toad.answer import Answer
 
@@ -34,6 +35,31 @@ class Mode(NamedTuple):
     id: str
     name: str
     description: str | None
+
+
+def generate_datetime_filename(
+    prefix: str, suffix: str, datetime_format: str | None = None
+) -> str:
+    """Generate a filename which includes the current date and time.
+
+    Useful for ensuring a degree of uniqueness when saving files.
+
+    Args:
+        prefix: Prefix to attach to the start of the filename, before the timestamp string.
+        suffix: Suffix to attach to the end of the filename, after the timestamp string.
+            This should include the file extension.
+        datetime_format: The format of the datetime to include in the filename.
+            If None, the ISO format will be used.
+    """
+    if datetime_format is None:
+        dt = datetime.now().isoformat()
+    else:
+        dt = datetime.now().strftime(datetime_format)
+
+    file_name_stem = f"{prefix} {dt}"
+    for reserved in ' <>:"/\\|?*.':
+        file_name_stem = file_name_stem.replace(reserved, "_")
+    return file_name_stem + suffix
 
 
 @rich.repr.auto
@@ -74,6 +100,12 @@ class Agent(AgentBase):
 
         self._terminal_count: int = 0
 
+        log_filename: str = generate_datetime_filename(f"{agent['name']}", ".txt")
+        if log_path := os.environ.get("TOAD_LOG"):
+            self._log_file_path = Path(log_path).resolve().absolute()
+        else:
+            self._log_file_path = paths.get_log() / log_filename
+
     @property
     def command(self) -> str | None:
         """The command used to launch the agent, or `None` if there isn't one."""
@@ -84,6 +116,38 @@ class Agent(AgentBase):
         yield self.project_root_path
         yield self.command
 
+    def log(self, line: str) -> None:
+        """Write text to the agent log file.
+
+        Args:
+            line: Text to be logged.
+
+        """
+        if self._message_target is not None:
+            self._message_target.call_later(self._log, line)
+
+    async def _log(self, line: str) -> None:
+        """Write text to the agent log file.
+
+        Intended to be called from `log`
+
+        Args:
+            line: Text to be logged.
+        """
+
+        if self._message_target is None:
+            return
+
+        def write_log(log_file_path: Path, line: str):
+            """Write log in a thread."""
+            try:
+                with log_file_path.open("at") as log_file:
+                    log_file.write(line)
+            except OSError:
+                pass
+
+        await asyncio.to_thread(write_log, self._log_file_path, line)
+
     def get_info(self) -> Content:
         agent_name = self._agent_data["name"]
         return Content(agent_name)
@@ -91,6 +155,10 @@ class Agent(AgentBase):
     def start(self, message_target: MessagePump | None = None) -> None:
         """Start the agent."""
         self._message_target = message_target
+        try:
+            self._log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
         self._agent_task = asyncio.create_task(self._run_agent())
 
     def send(self, request: jsonrpc.Request) -> None:
@@ -103,7 +171,8 @@ class Agent(AgentBase):
 
         """
         assert self._process is not None, "Process should be present here"
-        print("SEND", request.body)
+
+        self.log(f"[client] {request.body}")
         if (stdin := self._process.stdin) is not None:
             stdin.write(b"%s\n" % request.body_json)
 
@@ -234,7 +303,6 @@ class Agent(AgentBase):
             tool_call = deepcopy(self.tool_calls[tool_call_id])
 
         message = messages.RequestPermission(options, tool_call, result_future)
-        log(message)
         self.post_message(message)
         await result_future
         ask_result = result_future.result()
@@ -373,11 +441,6 @@ class Agent(AgentBase):
     async def _run_agent(self) -> None:
         """Task to communicate with the agent subprocess."""
 
-        if constants.DEBUG:
-            agent_output = open("agent.jsonl", "wb")
-        else:
-            agent_output = None
-
         PIPE = asyncio.subprocess.PIPE
         env = os.environ.copy()
         env["TOAD_CWD"] = str(Path("./").absolute())
@@ -423,30 +486,21 @@ class Agent(AgentBase):
             # This line should contain JSON, which may be:
             #   A) a JSONRPC request
             #   B) a JSONRPC response to a previous request
-            if constants.DEBUG:
-                log(repr(line))
             if not line.strip():
                 continue
-
-            if agent_output is not None:
-                agent_output.write(line)
-                agent_output.flush()
 
             try:
                 line_str = line.decode("utf-8")
             except Exception as error:
-                log("Unable to decode utf-8 from agent:", error)
+                self.log(f"[error] Unable to decode utf-8 from agent: {error}")
                 continue
 
+            self.log(f"[agent] {line_str}")
             try:
                 agent_data: jsonrpc.JSONType = json.loads(line_str)
             except Exception as error:
-                log(repr(line_str))
-                log("Error decoding JSON from agent:", error)
+                self.log(f"[error] failed to decode JSON from agent: {error}")
                 continue
-
-            if constants.DEBUG:
-                log(agent_data)
 
             if isinstance(agent_data, dict):
                 if "result" in agent_data or "error" in agent_data:
@@ -455,7 +509,7 @@ class Agent(AgentBase):
 
             elif isinstance(agent_data, list):
                 if not all(isinstance(datum, dict) for datum in agent_data):
-                    log.warning(f"Agent sent invalid data: {agent_data!r}")
+                    self.log(f"[error] Agent sent invalid data: {agent_data!r}")
                     continue
                 if all(
                     isinstance(datum, dict) and ("result" in datum or "error" in datum)
@@ -465,7 +519,7 @@ class Agent(AgentBase):
                     continue
 
             if not isinstance(agent_data, dict):
-                log("Invalid JSON from agent:", repr(agent_data))
+                self.log("[error] Invalid JSON from agent {agent_data!r}")
                 continue
 
             # By this point we know it is a JSON RPC call
@@ -481,9 +535,6 @@ class Agent(AgentBase):
                     details=fail_details,
                 )
             )
-
-        if agent_output is not None:
-            agent_output.close()
 
         self._process = None
 
@@ -611,8 +662,7 @@ class Agent(AgentBase):
             response = api.session_cancel(self.session_id, {})
         try:
             await response.wait()
-        except jsonrpc.APIError as error:
-            log(error)
+        except jsonrpc.APIError:
             # No-op if there is nothing to cancel
             return False
         return True

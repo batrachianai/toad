@@ -7,7 +7,8 @@ from toad.app import ToadApp
 from toad import paths
 from toad import get_version
 
-ABOUT_TEMPLATE = Template("""\
+ABOUT_TEMPLATE = Template(
+    """\
 # About Toad v${TOAD_VERSION}
 
 © Will McGugan.
@@ -23,7 +24,12 @@ config read from `$SETTINGS_PATH`
 $CONFIG                       
 ```
 
-Additional app data stored in `$DATA_PATH`
+## Paths
+
+| Name | Path |
+| --- | --- |
+| App data | `$DATA_PATH` |
+| App logs | `$LOG_PATH` |
                           
 ## System
 
@@ -36,9 +42,9 @@ Additional app data stored in `$DATA_PATH`
 
 | Library | Version |
 | --- | --- | 
-| Toad | ${TOAD_VERSION} |
-| Textual | ${TEXTUAL_VERSION} |
-| Rich | ${RICH_VERSION} |
+| Toad | $TOAD_VERSION |
+| Textual | $TEXTUAL_VERSION |
+| Rich | $RICH_VERSION |
                           
 ## Environment
 
@@ -49,7 +55,8 @@ Additional app data stored in `$DATA_PATH`
 | `COLORTERM` | $COLORTERM |
 | `TERM_PROGRAM` | $TERM_PROGRAM |
 | `TERM_PROGRAM_VERSION` | $TERM_PROGRAM_VERSION |
-""")
+"""
+)
 
 
 def render(app: ToadApp) -> str:
@@ -68,6 +75,7 @@ def render(app: ToadApp) -> str:
         "COLORTERM": os.environ.get("COLORTERM", ""),
         "CONFIG": config,
         "DATA_PATH": paths.get_data(),
+        "LOG_PATH": paths.get_log(),
         "PLATFORM": platform.platform(),
         "PYTHON": f"{platform.python_implementation()} {platform.python_version()}",
         "RICH_VERSION": version("rich"),

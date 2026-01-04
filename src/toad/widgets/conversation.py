@@ -82,6 +82,35 @@ If that fails, ask for help in [Discussions](https://github.com/batrachianai/toa
 https://github.com/batrachianai/toad/discussions
 """
 
+HELP_URL = "https://github.com/batrachianai/toad/discussions"
+
+STOP_REASON_MAX_TOKENS = f"""\
+## Maximum tokens reached
+
+$AGENT reported that your account is out of tokens.
+
+- You may need to purchase additional tokens, or fund your account.
+- If your account has tokens, try running any login or auth process again.
+
+If that fails, ask on {HELP_URL}
+"""
+
+STOP_REASON_MAX_TURN_REQUESTS = f"""\
+## Maximum model requests reached
+
+$AGENT has exceeded the maximum number of model requests in a single turn.
+
+Need help? Ask on {HELP_URL}
+"""
+
+STOP_REASON_REFUSAL = """\
+## Agent refusal
+ 
+$AGENT has refused to continue. 
+
+Need help? Ask on {HELP_URL}
+"""
+
 
 class Loading(Static):
     """Tiny widget to show loading indicator."""
@@ -686,6 +715,34 @@ class Conversation(containers.Vertical):
         self.post_message(messages.ProjectDirectoryUpdated())
         self.prompt.project_directory_updated()
         self._turn_count += 1
+
+        if stop_reason != "end_turn":
+            from toad.widgets.markdown_note import MarkdownNote
+
+            agent = (self.agent_title or "agent").title()
+
+            if stop_reason == "max_tokens":
+                await self.post(
+                    MarkdownNote(
+                        STOP_REASON_MAX_TOKENS.replace("$AGENT", agent),
+                        classes="-stop-reason",
+                    )
+                )
+            elif stop_reason == "max_turn_requests":
+                await self.post(
+                    MarkdownNote(
+                        STOP_REASON_MAX_TURN_REQUESTS.replace("$AGENT", agent),
+                        classes="-stop-reason",
+                    )
+                )
+            elif stop_reason == "refusal":
+                await self.post(
+                    MarkdownNote(
+                        STOP_REASON_REFUSAL.replace("$AGENT", agent),
+                        classes="-stop-reason",
+                    )
+                )
+
         if self.app.settings.get("notifications.turn_over", bool):
             self.app.system_notify(
                 f"{self.agent_title} has finished working",
