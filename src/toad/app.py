@@ -246,6 +246,8 @@ class ToadApp(App, inherit_bindings=False):
     last_ctrl_c_time = reactive(0.0)
     update_required: reactive[bool] = reactive(False)
 
+    HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (100, "-wide")]
+
     def __init__(
         self,
         agent_data: AgentData | None = None,

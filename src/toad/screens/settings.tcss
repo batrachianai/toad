@@ -1,7 +1,12 @@
+
 SettingsScreen {    
     overflow: hidden;
     background: $background 60%;
     align-horizontal: right;
+
+    &.-narrow #contents {
+        width: 1fr;
+    }
 
     #contents {
         width: 50%;

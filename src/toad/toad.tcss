@@ -41,10 +41,12 @@ App.-hide-thoughts AgentThought {
     display: none;
 }
 
-App.-hide-sidebar SideBar {
-    display: none;
-    &:focus-within {            
-        display: block;
+App.-hide-sidebar SideBar {    
+    layer: sidebar;
+    offset-x: -100%;
+    &:focus-within {
+        offset-x: 0;            
+        
     }
 }
 
@@ -577,8 +579,7 @@ ModeSwitcher {
 
 MainScreen {    
     background: $background;
-    layers: screen base;
-
+    layers: sidebar screen base;    
 
     SideBar {
         border-right: tall black 10%;
