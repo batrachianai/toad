@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Smarter filesystem monitoring to avoid refreshes were nothing has changed
+- Smarter filesystem monitoring to avoid refreshes where nothing has changed
 
 ## [0.5.19] - 2026-01-04
 
