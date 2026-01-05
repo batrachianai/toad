@@ -72,6 +72,3 @@ class Flash(Message):
 
 class ProjectDirectoryUpdated(Message):
     """The project directory may may changed."""
-
-    def can_replace(self, message: Message) -> bool:
-        return isinstance(message, ProjectDirectoryUpdated)

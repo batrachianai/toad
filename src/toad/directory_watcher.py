@@ -25,6 +25,9 @@ from watchdog.observers.polling import PollingObserver
 class DirectoryChanged(Message):
     """The directory was changed."""
 
+    def can_replace(self, message: Message) -> bool:
+        return isinstance(message, DirectoryChanged)
+
 
 @rich.repr.auto
 class DirectoryWatcher(threading.Thread, FileSystemEventHandler):
