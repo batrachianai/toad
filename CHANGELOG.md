@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings screen will now expand to full width when the screen is < 100 characters
 - Sidebar will float if focused and "hide sidebar when not in use" setting is True
 
+### Fixed
+
+- A more more defensive approach to watching directories, which may fixed stalling problem
+
+
 ## [0.5.20] - 2026-01-04
 
 ### Changed
@@ -143,18 +148,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release. This document will be updated for subsequent releases.
 
-[0.5.18]: https://github.com/Textualize/textual/compare/v0.5.17...v0.5.18
-[0.5.17]: https://github.com/Textualize/textual/compare/v0.5.16...v0.5.17
-[0.5.16]: https://github.com/Textualize/textual/compare/v0.5.15...v0.5.16
-[0.5.15]: https://github.com/Textualize/textual/compare/v0.5.14...v0.5.15
-[0.5.14]: https://github.com/Textualize/textual/compare/v0.5.13...v0.5.14
-[0.5.13]: https://github.com/Textualize/textual/compare/v0.5.12...v0.5.13
-[0.5.12]: https://github.com/Textualize/textual/compare/v0.5.11...v0.5.12
-[0.5.11]: https://github.com/Textualize/textual/compare/v0.5.10...v0.5.11
-[0.5.10]: https://github.com/Textualize/textual/compare/v0.5.9...v0.5.10
-[0.5.9]: https://github.com/Textualize/textual/compare/v0.5.8...v0.5.9
-[0.5.8]: https://github.com/Textualize/textual/compare/v0.5.7...v0.5.8
-[0.5.7]: https://github.com/Textualize/textual/compare/v0.5.6...v0.5.7
-[0.5.6]: https://github.com/Textualize/textual/compare/v0.5.5...v0.5.6
-[0.5.5]: https://github.com/Textualize/textual/compare/v0.5.0...v0.5.5
+[0.5.20]: https://github.com/batrachianai/toad/compare/v0.5.19...v0.5.20
+[0.5.19]: https://github.com/batrachianai/toad/compare/v0.5.18...v0.5.19
+[0.5.18]: https://github.com/batrachianai/toad/compare/v0.5.17...v0.5.18
+[0.5.17]: https://github.com/batrachianai/toad/compare/v0.5.16...v0.5.17
+[0.5.16]: https://github.com/batrachianai/toad/compare/v0.5.15...v0.5.16
+[0.5.15]: https://github.com/batrachianai/toad/compare/v0.5.14...v0.5.15
+[0.5.14]: https://github.com/batrachianai/toad/compare/v0.5.13...v0.5.14
+[0.5.13]: https://github.com/batrachianai/toad/compare/v0.5.12...v0.5.13
+[0.5.12]: https://github.com/batrachianai/toad/compare/v0.5.11...v0.5.12
+[0.5.11]: https://github.com/batrachianai/toad/compare/v0.5.10...v0.5.11
+[0.5.10]: https://github.com/batrachianai/toad/compare/v0.5.9...v0.5.10
+[0.5.9]: https://github.com/batrachianai/toad/compare/v0.5.8...v0.5.9
+[0.5.8]: https://github.com/batrachianai/toad/compare/v0.5.7...v0.5.8
+[0.5.7]: https://github.com/batrachianai/toad/compare/v0.5.6...v0.5.7
+[0.5.6]: https://github.com/batrachianai/toad/compare/v0.5.5...v0.5.6
+[0.5.5]: https://github.com/batrachianai/toad/compare/v0.5.0...v0.5.5
 [0.5.0]: https://github.com/batrachianai/toad/releases/tag/v0.5.0
