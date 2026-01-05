@@ -1,4 +1,7 @@
-from typing import TypedDict, Literal, NotRequired
+from pathlib import Path
+from typing import Any, TypedDict, Literal, NotRequired, cast
+
+from typeguard import check_type, TypeCheckError
 
 type Tag = str
 """A tag used for categorizing the agent. For example: 'open-source', 'reasoning'."""
@@ -68,3 +71,40 @@ class Agent(TypedDict):
     """Command to run the agent, by OS or wildcard."""
     actions: dict[OS, dict[Action, Command]]
     """Scripts to perform actions, typically at least to install the agent."""
+
+
+AGENT_KEYS = frozenset(Agent.__annotations__.keys())
+REQUIRED_KEYS = frozenset(Agent.__required_keys__)
+
+
+class ValidationError(Exception):
+    """Agent configuration validation failed."""
+
+
+def validate_agent(agent: dict[str, Any], file_path: Path | None = None) -> "Agent":
+    """Validate that a dict conforms to the Agent TypedDict schema.
+
+    Args:
+        agent: The dictionary to validate.
+        file_path: Optional path to the source file (for error messages).
+
+    Raises:
+        ValidationError: If validation fails.
+
+    Returns:
+        The validated Agent.
+    """
+    missing = REQUIRED_KEYS - agent.keys()
+    if missing:
+        fields = ", ".join(sorted(missing))
+        raise ValidationError(f"missing required field(s): {fields}")
+
+    filtered = {k: v for k, v in agent.items() if k in AGENT_KEYS}
+    try:
+        check_type(filtered, Agent)
+    except TypeCheckError as e:
+        msg = str(e)
+        if "is not an instance of" in msg:
+            raise ValidationError(msg.replace("value of key", "field"))
+        raise ValidationError(msg)
+    return cast(Agent, agent)
