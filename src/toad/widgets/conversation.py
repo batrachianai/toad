@@ -417,6 +417,9 @@ class Conversation(containers.Vertical):
         )
 
     def update_node_styles(self, animate: bool = True) -> None:
+        if not self.contents.children:
+            super().update_node_styles(animate=animate)
+            return
         self.prompt.update_node_styles(animate=animate)
 
     @property
