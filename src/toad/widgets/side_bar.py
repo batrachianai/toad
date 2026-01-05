@@ -9,33 +9,6 @@ from textual.message import Message
 
 class SideBar(containers.Vertical):
     BINDINGS = [("escape", "dismiss", "Dismiss sidebar")]
-    DEFAULT_CSS = """
-    SideBar {
-        height: 1fr;         
-        layout: vertical;
-        overflow: hidden scroll;
-        scrollbar-size: 0 0;
-
-        Collapsible {                   
-            height: 1fr;              
-            min-height: 3;
-
-            &.-collapsed {
-                height: auto;
-            }
-
-            &.-fixed {                
-                height: auto;
-            }
-                                
-            Contents {
-                height: auto;
-                padding: 0;
-                margin: 1 0 0 0;                
-            }
-        }
-    }
-    """
 
     class Dismiss(Message):
         pass

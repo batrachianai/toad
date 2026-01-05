@@ -165,15 +165,6 @@ Plan {
     }        
 }
 
-SideBar Plan {
-    border: none;
-    margin: 0 !important;
-    padding: 0 1 0 0;    
-    .plan {
-        color: $text-secondary;    
-    }
-}
-
 
 Conversation {    
     Window {                      
@@ -588,11 +579,12 @@ MainScreen {
 
     SideBar {        
         border-right: tall black 10%;
-        background: transparent;
-        # border-left: heavy $background;
+        background: transparent;        
         dock: left;
-        
-        box-sizing: border-box;
+
+        overflow: hidden scroll;
+        scrollbar-size: 0 0;
+        box-sizing: border-box;        
         
         padding: 0 0;
         margin: 0;
@@ -600,22 +592,30 @@ MainScreen {
         max-width: 45%;
         min-width: 40;
         height: 1fr;        
-                
-                        
+                         
         DirectoryTree {            
             background: transparent;
             &:focus {
                 background-tint: transparent;
-            }                
-            
+            }                            
         }
 
-        
-        Collapsible {   
 
+        Plan {
+            border: none;
+            margin: 0 !important;
+            padding: 0 1 0 0;    
+            .plan {
+                color: $text-secondary;    
+            }
+        }
+
+
+        Collapsible {   
+            
             CollapsibleTitle {
-                height: 1;
-                # box-sizing: content-box;
+                height: 1;   
+                margin:0;             
             }
             
             width: 1fr;                  
@@ -635,7 +635,7 @@ MainScreen {
                 height: auto;
                 max-height: 100%;
                 margin: 0;
-                padding: 1 0 0 0;                
+                padding: 1 0 0 0;                                
             }
         }
 
