@@ -121,6 +121,7 @@ class MainScreen(Screen, can_focus=False):
     def update_node_styles(self, animate: bool = True) -> None:
         self.conversation.update_node_styles(animate=animate)
         self.query_one(Footer).update_node_styles(animate=animate)
+        self.query_one(SideBar).update_node_styles(animate=animate)
 
     @on(messages.ProjectDirectoryUpdated)
     async def on_project_directory_update(self) -> None:
