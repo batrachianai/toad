@@ -12,7 +12,7 @@ publisher_name = "Hugging Face"
 publisher_url = "https://huffingface.co"
 type = "chat"
 description = """
-Chat with the latest open weight models from Hugging Face inference Providers. Create an account at HuggingFace account and register with [b]toad-hf-inference-explorers[/] for [bold $success]$10[/] of free credit!"""
+Chat with the latest open weight models from Hugging Face inference Providers. Create an account at HuggingFace and register with [b]toad-hf-inference-explorers[/] for [bold $success]$10[/] of free credit!"""
 tags = []
 run_command."*" = "hf-inference-acp -x"
 
