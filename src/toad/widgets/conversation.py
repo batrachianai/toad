@@ -336,7 +336,7 @@ class Conversation(containers.Vertical):
         return clamp(index, -self.shell_history.size, 0)
 
     def validate_prompt_history_index(self, index: int) -> int:
-        return clamp(index, -self.shell_history.size, 0)
+        return clamp(index, -self.prompt_history.size, 0)
 
     def shell_complete(self, prefix: str) -> list[str]:
         return self.shell_history.complete(prefix)
@@ -1008,7 +1008,7 @@ class Conversation(containers.Vertical):
     @on(messages.HistoryMove)
     async def on_history_move(self, message: messages.HistoryMove) -> None:
         message.stop()
-        if message.shell or not message.body.strip():
+        if message.shell:
             await self.shell_history.open()
 
             if self.shell_history_index == 0:
@@ -1029,6 +1029,9 @@ class Conversation(containers.Vertical):
                     and self.shell_history_index <= -self.shell_history.size
                 ):
                     break
+        else:
+            await self.prompt_history.open()
+            self.prompt_history_index += message.direction
 
     @work
     async def request_permissions(
