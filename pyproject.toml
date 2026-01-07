@@ -1,6 +1,6 @@
 [project]
 name = "batrachian-toad"
-version = "0.5.22"
+version = "0.5.23"
 description = "A unified experience for AI in your terminal."
 readme = "README.md"
 requires-python = ">=3.14"
