@@ -66,7 +66,7 @@ class MainScreen(Screen, can_focus=False):
 
     COMMANDS = {ModeProvider}
     BINDINGS = [
-        Binding("f3", "show_sidebar", "Sidebar"),
+        Binding("ctrl+b,f20", "show_sidebar", "Sidebar"),
     ]
 
     BINDING_GROUP_TITLE = "Screen"

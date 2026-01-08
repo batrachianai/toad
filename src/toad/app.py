@@ -230,6 +230,7 @@ class ToadApp(App, inherit_bindings=False):
             priority=True,
         ),
         Binding("ctrl+c", "help_quit", show=False, system=True),
+        Binding("f1", "toggle_help_panel", "Help", priority=True),
         Binding(
             "f2,ctrl+comma",
             "settings",
@@ -612,3 +613,9 @@ class ToadApp(App, inherit_bindings=False):
         self.notify(
             "Press [b]ctrl+c[/b] again to quit the app", title="Do you want to quit?"
         )
+
+    def action_toggle_help_panel(self):
+        if self.screen.query("HelpPanel"):
+            self.action_hide_help_panel()
+        else:
+            self.action_show_help_panel()

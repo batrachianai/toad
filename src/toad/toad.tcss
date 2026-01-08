@@ -10,6 +10,8 @@ LoadingIndicator {
     background: transparent;
 }
 
+
+
 Throbber {
     width: 100%;
     height: 1;    
@@ -264,7 +266,8 @@ Conversation {
         color: $text-primary;        
         min-height: 1;        
         margin: 1 1 1 0;              
-        padding: 1 1 1 1;
+        padding:  0 1 0 1;
+        border: blank transparent;
         overflow-x: auto;
         scrollbar-size-horizontal: 0;
         layout: stream;
@@ -288,6 +291,9 @@ Conversation {
             &>* {                
                 padding-right: 1;
             }
+        }
+        &:focus {
+            border: tall $primary;
         }
     }
 
@@ -737,17 +743,40 @@ Footer {
 }
 
 HelpPanel {    
+    
+    border-left: solid white 7%;
     padding-right: 0;
+    color: $text-secondary;
+    
+    #widget-help {
+        color: $text-secondary;
+        border: round $secondary;
+        background: transparent;
+        margin-top: 0;
+        padding: 0 0;        
+        MarkdownBlock {
+            padding: 0 1;
+        }
+        MarkdownH2 {
+            margin: 0 0 1 0;
+        }
+        MarkdownBlock:last-child {
+            margin: 0 0 0 0;
+        }
+    }
+
     KeyPanel {
+        color: $text-secondary;
         scrollbar-gutter: stable;        
-        &> BindingsTable > .bindings-table--description {
-            color: $text-muted;
+        &> BindingsTable > .bindings-table--description {            
+            color: $text-secondary;
+            text-opacity:90%;
         }
         .bindings-table--key {
-            color: $text;            
+            color: $text-secondary;  
         }
         &> BindingsTable > .bindings-table--header {        
-            color: $text-warning;
+            color: $primary;
             text-style: underline;
         }
     }

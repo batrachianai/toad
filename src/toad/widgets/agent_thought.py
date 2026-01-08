@@ -10,6 +10,12 @@ from textual.widgets.markdown import MarkdownStream
 class AgentThought(Markdown, can_focus=True):
     """The agent's 'thoughts'."""
 
+    HELP = """
+## Agent thoughts
+
+- **cursor keys** Scroll text
+"""
+
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("up", "scroll_up", "Scroll Up", show=False),
         Binding("down", "scroll_down", "Scroll Down", show=False),
@@ -28,6 +34,9 @@ class AgentThought(Markdown, can_focus=True):
 
     def watch_loading(self, loading: bool) -> None:
         self.set_class(loading, "-loading")
+
+    def on_mount(self) -> None:
+        self.scroll_end()
 
     @property
     def stream(self) -> MarkdownStream:

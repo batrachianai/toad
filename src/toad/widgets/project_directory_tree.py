@@ -12,6 +12,14 @@ from toad.path_filter import PathFilter
 
 
 class ProjectDirectoryTree(DirectoryTree):
+    HELP = """\
+## Project files
+
+This shows the files in your project directory.
+
+- **cursor keys** navigation
+- **Enter** expand folder
+"""
     BINDINGS = [
         Binding(
             "ctrl+c",

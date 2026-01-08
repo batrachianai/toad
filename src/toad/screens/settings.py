@@ -21,6 +21,7 @@ class SettingsInput(Input):
 
 
 class SettingsScreen(ModalScreen):
+    HELP = """Hello"""
     BINDINGS = [
         ("escape", "dismiss", "Dismiss settings"),
         ("ctrl+s", "screen.focus('#search')", "Focus search"),

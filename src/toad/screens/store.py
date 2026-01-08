@@ -63,13 +63,25 @@ class AgentItem(containers.VerticalGroup):
         agent = self._agent
         with containers.Grid():
             yield widgets.Label(agent["name"], id="name")
-            tag = pill(agent["type"], "$secondary-muted", "$text-primary")
+            tag = pill(agent["type"], "$primary-muted 50%", "$text-primary")
             yield widgets.Label(tag, id="type")
         yield widgets.Label(agent["author_name"], id="author")
         yield widgets.Static(agent["description"], id="description")
 
 
 class LauncherGridSelect(GridSelect):
+
+    HELP = """\
+## Launcher
+
+Your favorite agents.
+
+- **1-9 a-f** Select agent
+- **cursor keys** navigate agents
+- **tab / shift+tab** Move to next / previous section
+- **space** Launch highlighted agent
+- **enter** Open agent details
+"""
     BINDING_GROUP_TITLE = "Launcher"
 
     app = getters.app(ToadApp)
@@ -194,6 +206,14 @@ class LauncherItem(containers.VerticalGroup):
 
 
 class AgentGridSelect(GridSelect):
+    HELP = """\
+## Agent select
+
+- **cursor keys** Navigate agents
+- **tab / shift+tab** Move to next / previous section
+- **enter** Open agent details
+- **space** Launch the agent (if installed)
+"""
     BINDINGS = [
         Binding("enter", "select", "Details", tooltip="Open agent details"),
         Binding("space", "launch", "Launch", tooltip="Launch highlighted agent"),

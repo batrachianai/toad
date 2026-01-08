@@ -83,6 +83,14 @@ class FuzzyInput(Input):
     TODO: Add this ability to Textual.
     """
 
+    HELP = """\
+## Fuzzy search
+
+Type a few characters from the file you are searching for.
+
+The search is *fuzzy*, and will match characters that aren't neccesarily next to each other—only the order matters.
+"""
+
     def render_line(self, y: int) -> Strip:
         if y == 0 and not self.value:
             placeholder = Content.from_markup(self.placeholder).expand_tabs()
@@ -106,6 +114,9 @@ class FuzzyInput(Input):
 
 
 class PathSearch(containers.VerticalGroup):
+
+    BINDING_GROUP_TITLE = "Path search"
+
     CURSOR_BINDING_GROUP = Binding.Group(description="Move selection")
     BINDINGS = [
         Binding(

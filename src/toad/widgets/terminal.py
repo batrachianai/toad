@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from time import monotonic
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable
 
 from textual.cache import LRUCache
 
@@ -17,7 +17,6 @@ from textual.scroll_view import ScrollView
 from textual.strip import Strip
 from textual.timer import Timer
 
-
 from toad import ansi
 
 
@@ -26,6 +25,17 @@ ESCAPE_TAP_DURATION = 400 / 1000
 
 
 class Terminal(ScrollView, can_focus=True):
+    BINDING_GROUP_TITLE = "Terminal"
+    HELP = """\
+## Terminal
+
+An embedded terminal running within Toad.
+When the terminal has focus, it will take over the handling of keys.
+
+Tap escape *twice* to exit.
+
+"""
+
     CURSOR_STYLE = Style.parse("reverse")
 
     hide_cursor = reactive(False)
@@ -213,7 +223,7 @@ class Terminal(ScrollView, can_focus=True):
             width, height = self._get_terminal_dimensions()
         self.update_size(width, height)
 
-    async def write(self, text: str, hide_output: bool=False) -> bool:
+    async def write(self, text: str, hide_output: bool = False) -> bool:
         """Write sequences to the terminal.
 
         Args:

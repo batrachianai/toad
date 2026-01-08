@@ -82,6 +82,17 @@ class PromptContainer(containers.HorizontalGroup):
 
 
 class PromptTextArea(HighlightedTextArea):
+    HELP = """\
+## Prompt
+
+This is your prompt, where you can talk to your AI.
+See on-screen instructions for details.
+
+- Be simple
+- Be direct
+- Nothing fancy
+"""
+
     BINDING_GROUP_TITLE = "Prompt"
 
     BINDINGS = [
@@ -389,6 +400,7 @@ class PromptTextArea(HighlightedTextArea):
 
 
 class Prompt(containers.VerticalGroup):
+
     BINDINGS = [
         Binding("escape", "dismiss", "Dismiss"),
     ]

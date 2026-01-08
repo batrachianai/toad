@@ -205,6 +205,15 @@ class ContentsGrid(containers.Grid):
 
 
 class Window(containers.VerticalScroll):
+    HELP = """\
+## Conversation
+
+This is a view of your conversation with the agent.
+
+- **cursor keys** Scroll
+- **alt+up / alt+down** Navigate content
+- **start typing** Focus the prompt
+"""
     BINDING_GROUP_TITLE = "View"
     BINDINGS = [Binding("end", "screen.focus_prompt", "Prompt")]
 
