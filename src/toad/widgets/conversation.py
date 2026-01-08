@@ -657,19 +657,7 @@ class Conversation(containers.Vertical):
     @work
     @on(messages.ChangeMode)
     async def on_change_mode(self, event: messages.ChangeMode) -> None:
-        if (agent := self.agent) is None:
-            return
-        if event.mode_id is None:
-            self.current_mode = None
-        else:
-            if (error := await agent.set_mode(event.mode_id)) is not None:
-                self.notify(error, title="Set Mode", severity="error")
-            elif (new_mode := self.modes.get(event.mode_id)) is not None:
-                self.current_mode = new_mode
-                self.flash(
-                    Content.from_markup("Mode changed to [b]$mode", mode=new_mode.name),
-                    style="success",
-                )
+        await self.set_mode(event.mode_id)
 
     @on(acp_messages.ModeUpdate)
     def on_mode_update(self, event: acp_messages.ModeUpdate) -> None:
@@ -981,7 +969,7 @@ class Conversation(containers.Vertical):
             return_code, signal = await terminal.wait_for_exit()
             message.result_future.set_result((return_code or 0, signal))
 
-    def set_mode(self, mode_id: str) -> bool:
+    async def set_mode(self, mode_id: str | None) -> None:
         """Set the mode give its id (if it exists).
 
         Args:
@@ -990,15 +978,19 @@ class Conversation(containers.Vertical):
         Returns:
             `True` if the mode was changed, `False` if it didn't exist.
         """
-        if (mode := self.modes.get(mode_id)) is not None:
-            self.current_mode = mode
-            return True
-        self.notify(
-            f"Node mode called '{mode_id}'",
-            title="Error setting mode",
-            severity="error",
-        )
-        return False
+        if (agent := self.agent) is None:
+            return
+        if mode_id is None:
+            self.current_mode = None
+        else:
+            if (error := await agent.set_mode(mode_id)) is not None:
+                self.notify(error, title="Set Mode", severity="error")
+            elif (new_mode := self.modes.get(mode_id)) is not None:
+                self.current_mode = new_mode
+                self.flash(
+                    Content.from_markup("Mode changed to [b]$mode", mode=new_mode.name),
+                    style="success",
+                )
 
     @on(acp_messages.SetModes)
     async def on_acp_set_modes(self, message: acp_messages.SetModes):

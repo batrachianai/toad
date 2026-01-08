@@ -3,6 +3,7 @@ from typing import Iterable
 
 import asyncio
 
+from textual import work
 from textual.binding import Binding
 from textual.widgets import DirectoryTree
 from textual.widgets.directory_tree import DirEntry
@@ -19,6 +20,7 @@ class ProjectDirectoryTree(DirectoryTree):
             tooltip="Interrupt running command",
             show=False,
         ),
+        Binding("ctrl+r", "refresh", "Refresh", tooltip="Refresh file view", show=True),
     ]
 
     def __init__(
@@ -72,3 +74,8 @@ class ProjectDirectoryTree(DirectoryTree):
                     yield path
         else:
             yield from paths
+
+    @work
+    async def action_refresh(self) -> None:
+        await self.reload()
+        self.notify("Project directory has been refreshed", title="Directory Tree")
