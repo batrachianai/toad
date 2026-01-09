@@ -1,11 +1,11 @@
 [project]
 name = "batrachian-toad"
-version = "0.5.24"
+version = "0.5.25"
 description = "A unified experience for AI in your terminal."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "textual[syntax]>=7.0.0",
+    "textual[syntax]>=7.0.1",
     "click>=8.2.1",
     "gitpython>=3.1.44",
     "tree-sitter>=0.24.0",
