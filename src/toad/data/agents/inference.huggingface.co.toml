@@ -12,7 +12,7 @@ publisher_name = "Hugging Face"
 publisher_url = "https://huffingface.co"
 type = "chat"
 description = """
-Chat with the latest open weight models from Hugging Face inference Providers. Create an account at HuggingFace and register with [b]toad-hf-inference-explorers[/] for [bold $success]$10[/] of free credit!"""
+Use the latest open weight models and skills with HF Inference Providers. Create an account at Hugging Face and register with [b]toad-hf-inference-explorers[/] for [bold $success]$20[/] of free credit!"""
 tags = []
 run_command."*" = "hf-inference-acp -x"
 
@@ -23,7 +23,18 @@ Chat with the latest open weight models using Hugging Face inference providers.
 
 --- 
 
-Create an account at huggingface.co/join and register with [Toad Explorers](https://huggingface.co/toad-hf-inference-explorers) for **$10** of free credit!
+Create an account at huggingface.co/join and register with [Toad Explorers](https://huggingface.co/toad-hf-inference-explorers) for **$20** of free credit!
+'''
+
+
+welcome = '''
+# Hugging Face 🤗
+
+Use `ctrl+o` to enter Setup mode and type `go` to change settings.
+
+Use `/skills` to manage and install skills.
+
+Join the community at [Toad Hf Inference Explorers](https://huggingface.co/toad-hf-inference-explorers)
 '''
 
 recommended = true
