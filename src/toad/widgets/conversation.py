@@ -399,7 +399,6 @@ class Conversation(containers.Vertical):
 
     def shell_complete(self, prefix: str) -> list[str]:
         completes = self.shell_history.complete(prefix)
-        self.log(completes)
         return completes
 
     def insert_path_into_prompt(self, path: Path) -> None:
