@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.28] - 2026-01-11
 
-###
+### Fixed
 
 - Fixed crash when running commands that clash with Content markup
 
