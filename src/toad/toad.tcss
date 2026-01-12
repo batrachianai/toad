@@ -2,9 +2,6 @@
     margin: 1 1 1 0;  
 }
 
-.-first {
-    margin-top: 0 !important;
-}
 
 Markdown {
     layout: stream;

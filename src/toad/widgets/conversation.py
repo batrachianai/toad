@@ -997,7 +997,6 @@ class Conversation(containers.Vertical):
             raise SkipAction()
 
     def action_focus_block(self, block_id: str) -> None:
-        self.notify(repr(block_id))
         with suppress(NoMatches):
             self.query_one(f"#{block_id}").focus()
 
@@ -1371,13 +1370,20 @@ class Conversation(containers.Vertical):
     async def post[WidgetType: Widget](
         self, widget: WidgetType, *, anchor: bool = True, loading: bool = False
     ) -> WidgetType:
+        """Post a widget to the converstaion.
+
+        Args:
+            widget: Widget to post.
+            anchor: Anchor to bottom of view?
+            loading: Set the widget to an initial loading state?
+
+        Returns:
+            The widget that was mounted.
+        """
         if self._loading is not None:
             await self._loading.remove()
         if not self.contents.is_attached:
             return widget
-
-        # if not any(child.display for child in self.contents.children):
-        #     widget.add_class("-first")
         await self.contents.mount(widget)
 
         widget.loading = loading
@@ -1390,10 +1396,10 @@ class Conversation(containers.Vertical):
     async def check_prune(self) -> None:
         """Check if a prune is required."""
         if self._require_check_prune:
+            self._require_check_prune = False
             low_mark = self.app.settings.get("ui.prune_low_mark", int)
             high_mark = low_mark + self.app.settings.get("ui.prune_excess", int)
             await self.prune_window(low_mark, high_mark)
-            self._require_check_prune = False
 
     async def prune_window(self, low_mark: int, high_mark: int) -> None:
         """Remove older children to keep within a certain range.
