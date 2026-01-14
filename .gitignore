@@ -14,9 +14,8 @@ __pycache__
 .zed
 .git
 .mypy_cache
-.github
-toad.log
-log.txt
+*.github
+*.log
 
 uv.lock
 agent.jsonl

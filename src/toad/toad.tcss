@@ -90,7 +90,7 @@ Checkbox {
 }
 
 
-MarkdownNote {
+Note,MarkdownNote {
     padding: 0 1 0 0;
     &.about MarkdownTable {
         # Make the tables compact in /about
@@ -399,6 +399,17 @@ Welcome {
 }
 
 
+ACPToolCallContent {
+    Markdown {
+        margin: 0;
+        padding-left: 0;
+        MarkdownBlock:last-of-type {
+            margin-bottom: 0;
+        }
+    }
+}
+
+
 Prompt {            
     padding: 0 0 0 0;    
     height: auto;  
@@ -481,10 +492,12 @@ Prompt {
                 }
             }
             & > * {                
+                # height: 0;
                 margin: 1 0 0 0;
-            }
+            } 
+                     
             &:empty {
-                display: none;
+                height: 1;                
             }
         }
         #option-container {

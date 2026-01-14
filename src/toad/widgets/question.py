@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 from textual.app import ComposeResult
 from textual import events, on
@@ -11,7 +11,8 @@ from textual.content import Content
 from textual.reactive import var, reactive
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Label
+
+from textual import widgets
 
 from toad.answer import Answer
 
@@ -28,7 +29,7 @@ class Ask:
     callback: Callable[[Answer], Any] | None = None
 
 
-class NonSelectableLabel(Label):
+class NonSelectableLabel(widgets.Label):
     ALLOW_SELECT = False
 
 
@@ -244,10 +245,10 @@ class Question(containers.VerticalGroup, can_focus=True):
 
     def compose(self) -> ComposeResult:
         if self.title:
-            yield Label(self.title, id="title", markup=False)
+            yield widgets.Label(self.title, id="title", markup=False)
 
-        if self._get_content is not None:
-            with containers.VerticalGroup(id="contents"):
+        with containers.VerticalGroup(id="contents"):
+            if self._get_content is not None:
                 yield self._get_content()
 
         with containers.VerticalGroup(id="option-container"):

@@ -723,7 +723,7 @@ class Conversation(containers.Vertical):
         if message.message:
             error = Content.assemble(
                 Content.from_markup(message.message).stylize("$text-error"),
-                " - ",
+                " — ",
                 Content.from_markup(message.details.strip()).stylize("dim"),
             )
         else:
@@ -1138,10 +1138,13 @@ class Conversation(containers.Vertical):
         kind = tool_call_update.get("kind", None)
         title = tool_call_update.get("title", "") or ""
 
-        print("request_permission")
-        from textual import log
-
-        print(tool_call_update)
+        contents = tool_call_update.get("content", []) or []
+        # If all the content is diffs, we will set kind to "edit" to show the permisisons screen
+        for content in contents:
+            if content.get("type") != "diff":
+                break
+        else:
+            kind = "edit"
 
         if kind == "edit":
             diffs: list[tuple[str, str, str | None, str]] = []

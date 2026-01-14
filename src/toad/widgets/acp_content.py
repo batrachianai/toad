@@ -21,8 +21,14 @@ class ACPToolCallContent(containers.VerticalGroup):
     def compose(self) -> ComposeResult:
         for content in self._content:
             match content:
-                case {"type": "content", "content": {"text": text}}:
-                    yield widgets.Label(text)
+                case {
+                    "type": "content",
+                    "content": {
+                        "type": "text",
+                        "text": text,
+                    },
+                }:
+                    yield widgets.Markdown(text)
                 case {
                     "type": "diff",
                     "oldText": old_text,

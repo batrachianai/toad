@@ -285,11 +285,10 @@ class DiffView(containers.VerticalGroup):
             text_lines_a = self.code_before.splitlines()
             text_lines_b = self.code_after.splitlines()
             sequence_matcher = difflib.SequenceMatcher(
-                # lambda character: character in " \t",
-                None,
+                lambda character: character in " \t",
                 text_lines_a,
                 text_lines_b,
-                # autojunk=True,
+                autojunk=True,
             )
             self._grouped_opcodes = list(sequence_matcher.get_grouped_opcodes())
 
@@ -339,6 +338,7 @@ class DiffView(containers.VerticalGroup):
             )
             code_a_spans: list[Span] = []
             code_b_spans: list[Span] = []
+
             for tag, i1, i2, j1, j2 in sequence_matcher.get_opcodes():
                 if (
                     tag
