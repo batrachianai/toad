@@ -89,6 +89,14 @@ class Shell:
         return self._finished
 
     def _is_busy(self) -> bool:
+        """Check if the shell is busy.
+
+        Called from a thread by `is_busy`.
+
+        Returns:
+            `True` if a command is running, or `False` if the shell is waiting for input.
+
+        """
         if self._pid is None:
             return False
         import psutil
@@ -96,11 +104,17 @@ class Shell:
         try:
             shell_process = psutil.Process(self._pid)
             children = shell_process.children(recursive=True)
-            return len(children) > 0
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             return False
+        else:
+            return bool(children)
 
     async def is_busy(self) -> bool:
+        """Is there a process running in the shell?
+
+        Returns:
+            `True` if a command is running, or `False` if the shell is waiting for input.
+        """
         return await asyncio.to_thread(self._is_busy)
 
     async def wait_for_ready(self) -> None:
