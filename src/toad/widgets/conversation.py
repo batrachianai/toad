@@ -75,7 +75,7 @@ Check that the agent is installed and up-to-date.
 
 Note that some agents require an ACP adapter to be installed to work with Toad.
 
-- Exit the app, and run `toad` agin
+- Exit the app, and run `toad` again
 - Select the agent and hit ENTER
 - Click the dropdown, select "Install"
 - Click the GO button
