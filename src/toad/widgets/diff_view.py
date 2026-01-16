@@ -314,6 +314,15 @@ class DiffView(containers.VerticalGroup):
     def _highlight_diff_lines(
         cls, lines_a: list[Content], lines_b: list[Content]
     ) -> tuple[list[Content], list[Content]]:
+        """Diff two groups of lines.
+
+        Args:
+            lines_a: Lines before.
+            lines_b: Lines after
+
+        Returns:
+            A pair of highlighted lists of lines.
+        """
         code_a = Content("\n").join(content for content in lines_a)
         code_b = Content("\n").join(content for content in lines_b)
         sequence_matcher = difflib.SequenceMatcher(
@@ -326,13 +335,11 @@ class DiffView(containers.VerticalGroup):
         spans_b: list[Span] = []
         for tag, i1, i2, j1, j2 in sequence_matcher.get_opcodes():
             if tag in {"delete", "replace"}:
-                spans_a.append(Span(i1, i2, "on $error 30%"))
+                spans_a.append(Span(i1, i2, "on $error 40%"))
             if tag in {"insert", "replace"}:
-                spans_b.append(Span(j1, j2, "on $success 30%"))
-        code_a = code_a.add_spans(spans_a)
-        code_b = code_b.add_spans(spans_b)
-        diffed_lines_a = code_a.split("\n")
-        diffed_lines_b = code_b.split("\n")
+                spans_b.append(Span(j1, j2, "on $success 40%"))
+        diffed_lines_a = code_a.add_spans(spans_a).split("\n")
+        diffed_lines_b = code_b.add_spans(spans_b).split("\n")
         return diffed_lines_a, diffed_lines_b
 
     @property
