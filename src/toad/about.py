@@ -37,6 +37,7 @@ $CONFIG
 | --- | --- |
 | Python | $PYTHON |
 | OS | $PLATFORM |
+| Terminal | $TERMINAL |
 
 ## Dependencies
 
@@ -86,5 +87,6 @@ def render(app: ToadApp) -> str:
         "TERM": os.environ.get("TERM", ""),
         "TEXTUAL_VERSION": version("textual"),
         "TOAD_VERSION": get_version(),
+        "TERMINAL": app.term_program,
     }
     return ABOUT_TEMPLATE.safe_substitute(template_data)
