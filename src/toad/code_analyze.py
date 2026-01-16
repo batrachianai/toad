@@ -1,6 +1,5 @@
-from textual.highlight import highlight, guess_language
 from pygments.util import ClassNotFound
-from pygments.lexers import get_lexer_by_name, guess_lexer_for_filename
+from pygments.lexers import get_lexer_by_name
 from pygments.token import Token
 
 SPECIAL = {Token.Name.Function.Magic, Token.Name.Function, Token.Name.Class}

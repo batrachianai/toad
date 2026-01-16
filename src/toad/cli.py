@@ -57,6 +57,8 @@ class DefaultCommandGroup(click.Group):
     def parse_args(self, ctx, args):
         if "--help" in args or "-h" in args:
             return super().parse_args(ctx, args)
+        if "--version" in args or "-v" in args:
+            return super().parse_args(ctx, args)
         # Check if first arg is a known subcommand
         if not args or args[0] not in self.commands:
             # If not a subcommand, prepend the default command name
@@ -67,9 +69,18 @@ class DefaultCommandGroup(click.Group):
         formatter.write_usage(ctx.command_path, "[OPTIONS] PATH OR COMMAND [ARGS]...")
 
 
-@click.group(cls=DefaultCommandGroup)
-def main():
+@click.group(cls=DefaultCommandGroup, invoke_without_command=True)
+@click.option("-v", "--version", is_flag=True, help="Show version and exit.")
+@click.pass_context
+def main(ctx, version):
     """🐸 Toad — AI for your terminal."""
+    if version:
+        from toad import get_version
+        click.echo(get_version())
+        ctx.exit()
+    # If no command and no version flag, let the default command handling proceed
+    if ctx.invoked_subcommand is None and not version:
+        pass
 
 
 # @click.group(invoke_without_command=True)
