@@ -393,6 +393,34 @@ class ToadApp(App, inherit_bindings=False):
         else:
             self.terminal_title_flash -= 1
 
+    @cached_property
+    def term_program(self) -> str:
+        """An identifier for the terminal software."""
+        if term_program := os.environ.get("TERM_PROGRAM"):
+            return term_program
+
+        # Windows Terminal
+        if "WT_SESSION" in os.environ:
+            return "Windows Terminal"
+
+        # Kitty
+        if "KITTY_WINDOW_ID" in os.environ:
+            return "Kitty"
+
+        # Alacritty
+        if "ALACRITTY_SOCKET" in os.environ or "ALACRITTY_LOG" in os.environ:
+            return "Alacritty"
+
+        # VTE-based terminals (GNOME Terminal, Tilix, etc.)
+        if "VTE_VERSION" in os.environ:
+            return "VTE-based (GNOME Terminal/Tilix/etc.)"
+
+        # Konsole
+        if "KONSOLE_VERSION" in os.environ:
+            return "Konsole"
+
+        return "Unknown"
+
     @work(exit_on_error=False)
     async def capture_event(self, event_name: str, **properties: Any) -> None:
         """Capture an event.
@@ -406,12 +434,11 @@ class ToadApp(App, inherit_bindings=False):
         POSTHOG_HOST = "https://us.i.posthog.com"
         POSTHOG_EVENT_URL = f"{POSTHOG_HOST}/i/v0/e/"
         timestamp = datetime.now(timezone.utc).isoformat()
-        term_program = os.environ.get("TERM_PROGRAM", "unknown")
         width, height = self.size
 
         event_properties = {
             "toad_version": self.version,
-            "term_program": term_program,
+            "term_program": self.term_program,
             "term_width": width,
             "term_height": height,
         } | properties
