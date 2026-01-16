@@ -310,6 +310,31 @@ class DiffView(containers.VerticalGroup):
                     additions += 1
         return additions, removals
 
+    @classmethod
+    def _highlight_diff_lines(
+        cls, lines_a: list[Content], lines_b: list[Content]
+    ) -> tuple[list[Content], list[Content]]:
+        code_a = Content("\n").join(content for content in lines_a)
+        code_b = Content("\n").join(content for content in lines_b)
+        sequence_matcher = difflib.SequenceMatcher(
+            lambda character: character in " \t",
+            code_a.plain,
+            code_b.plain,
+            autojunk=True,
+        )
+        spans_a: list[Span] = []
+        spans_b: list[Span] = []
+        for tag, i1, i2, j1, j2 in sequence_matcher.get_opcodes():
+            if tag in {"delete", "replace"}:
+                spans_a.append(Span(i1, i2, "on $error 30%"))
+            if tag in {"insert", "replace"}:
+                spans_b.append(Span(j1, j2, "on $success 30%"))
+        code_a = code_a.add_spans(spans_a)
+        code_b = code_b.add_spans(spans_b)
+        diffed_lines_a = code_a.split("\n")
+        diffed_lines_b = code_b.split("\n")
+        return diffed_lines_a, diffed_lines_b
+
     @property
     def highlighted_code_lines(self) -> tuple[list[Content], list[Content]]:
         """Get syntax highlighted code for both files, as a list of lines.
@@ -331,35 +356,21 @@ class DiffView(containers.VerticalGroup):
                 "\n".join(text_lines_b), language=language2, path=self.path2
             )
 
-            if self.code_before:
-
-                sequence_matcher = difflib.SequenceMatcher(
-                    lambda character: character in " \t",
-                    code_a.plain,
-                    code_b.plain,
-                    autojunk=True,
-                )
-                code_a_spans: list[Span] = []
-                code_b_spans: list[Span] = []
-
-                for tag, i1, i2, j1, j2 in sequence_matcher.get_opcodes():
-                    if (
-                        tag in {"delete", "replace"}
-                        and "\n" not in code_a.plain[i1 : i2 + 1]
-                    ):
-                        code_a_spans.append(Span(i1, i2, "on $error 40%"))
-                    if (
-                        tag in {"insert", "replace"}
-                        and "\n" not in code_b.plain[j1 : j2 + 1]
-                    ):
-                        code_b_spans.append(Span(j1, j2, "on $success 40%"))
-
-                code_a = code_a.add_spans(code_a_spans)
-                code_b = code_b.add_spans(code_b_spans)
-
             lines_a = code_a.split("\n")
             lines_b = code_b.split("\n")
+
+            if self.code_before:
+                for group in self.grouped_opcodes:
+                    for tag, i1, i2, j1, j2 in group:
+                        if tag == "replace":
+                            diff_lines_a, diff_lines_b = self._highlight_diff_lines(
+                                lines_a[i1:i2], lines_b[j1:j2]
+                            )
+                            lines_a[i1:i2] = diff_lines_a
+                            lines_b[j1:j2] = diff_lines_b
+
             self._highlighted_code_lines = (lines_a, lines_b)
+
         return self._highlighted_code_lines
 
     def get_title(self) -> Content:

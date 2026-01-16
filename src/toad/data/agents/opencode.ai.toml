@@ -18,8 +18,6 @@ run_command."*" = "opencode acp"
 help = '''
 # OpenCode
 
-**The AI coding agent built for the terminal**
-
 OpenCode is an open source agent that helps you write and run code directly from the terminal with a flexible client/server architecture.
 
 ## Key Features
@@ -29,31 +27,11 @@ OpenCode is an open source agent that helps you write and run code directly from
 - **Multi-LLM Support**: Works with various AI providers
 - **GitHub Integration**: Deep integration with GitHub workflows
 
-## ACP Integration
-
-OpenCode supports the Agent Client Protocol via the **opencode-acp** adapter by josephschmitt. This adapter:
-- Launches a per-session MCP HTTP server
-- Proxies file and terminal actions back to ACP
-- Translates OpenCode streaming updates to ACP notifications
-- Enables OpenCode to work with ACP-compatible editors
-
-The ACP adapter allows standardized communication between OpenCode and various development tools.
-
-## Installation
-
-Install OpenCode globally:
-```bash
-npm install -g opencode
-```
-
-For ACP support, install the adapter from:
-https://github.com/josephschmitt/opencode-acp
-
 ---
 
 **Website**: https://opencode.ai/  
 **GitHub**: https://github.com/sst/opencode  
-**ACP Adapter**: https://github.com/josephschmitt/opencode-acp
+
 '''
 
 [actions."*".install]
