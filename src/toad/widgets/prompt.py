@@ -690,7 +690,7 @@ class Prompt(containers.VerticalGroup):
             self.show_slash_complete = False
             self.prompt_text_area.suggestion = ""
             self.focus()
-        if event.widget is self.path_search and self.show_path_search:
+        elif event.widget is self.path_search and self.show_path_search:
             self.show_path_search = False
             self.focus()
 
