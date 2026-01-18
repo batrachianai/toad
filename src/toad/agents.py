@@ -31,7 +31,8 @@ async def read_agents() -> dict[str, Agent]:
         try:
             for file in files("toad.data").joinpath("agents").iterdir():
                 agent: Agent = tomllib.load(file.open("rb"))
-                if agent.get("active", True):
+                # Only load Gemini CLI agent
+                if agent.get("active", True) and agent.get("identity") == "geminicli.com":
                     agents.append(agent)
 
         except Exception as error:
