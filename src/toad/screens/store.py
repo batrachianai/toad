@@ -177,7 +177,8 @@ class Launcher(containers.VerticalGroup):
                 for digit, identity in zip_longest(self.DIGITS, launcher_agents):
                     if identity is None:
                         break
-                    yield LauncherItem(digit or "", agents[identity])
+                    if identity in agents:
+                        yield LauncherItem(digit or "", agents[identity])
 
         if not launcher_agents:
             yield widgets.Label("Choose your fighter below!", classes="no-agents")
