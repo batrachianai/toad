@@ -58,6 +58,12 @@ The easiest way to install Toad is by pasting the following in to your terminal:
 curl -fsSL batrachian.ai/install | sh
 ```
 
+If that doesn't work for any reason, then you can paste the following in to your terminal:
+
+```bash
+curl -LsSf uvx.sh/batrachian-toad/install.sh | sh
+```
+
 You should now have `toad` installed.
 
 If that doesn't work for any reason, then you can install with the following steps:
@@ -72,6 +78,12 @@ Then use UV to install toad:
 
 ```bash
 uv tool install -U batrachian-toad --python 3.14
+```
+
+Or run without installing:
+
+```bash
+uvx batrachian-toad --python 3.14
 ```
 
 ## Using Toad
