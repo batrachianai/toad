@@ -3,15 +3,13 @@ from __future__ import annotations
 import asyncio
 from asyncio.subprocess import Process
 import codecs
-import fcntl
 import os
-import pty
+import platform
 import shlex
 from collections import deque
 from dataclasses import dataclass
 import struct
-import termios
-from typing import Iterable, Mapping
+from typing import Any, Mapping
 
 from textual.content import Content
 from textual.reactive import var
@@ -19,6 +17,23 @@ from textual.reactive import var
 from toad.shell_read import shell_read
 from toad.widgets.terminal import Terminal
 from toad.menus import MenuItem
+
+IS_WINDOWS = platform.system() == "Windows"
+
+# Platform-specific imports
+WINPTY_AVAILABLE = False
+PtyProcess = None
+
+if IS_WINDOWS:
+    try:
+        from winpty import PtyProcess
+        WINPTY_AVAILABLE = True
+    except (ImportError, OSError):
+        WINPTY_AVAILABLE = False
+else:
+    import fcntl
+    import pty
+    import termios
 
 
 @dataclass
@@ -83,6 +98,7 @@ class TerminalTool(Terminal):
         self._output: deque[bytes] = deque()
 
         self._process: Process | None = None
+        self._pty_process: Any = None
         self._bytes_read = 0
         self._output_bytes_count = 0
         self._shell_fd: int | None = None
@@ -111,22 +127,31 @@ class TerminalTool(Terminal):
         )
 
     @staticmethod
-    def resize_pty(fd: int, columns: int, rows: int) -> None:
-        """Resize the pseudo terminal.
+    def resize_pty(fd: Any, columns: int, rows: int) -> None:
+        """Resize the pseudo terminal (Unix only).
 
         Args:
             fd: File descriptor.
             columns: Columns (width).
             rows: Rows (height).
         """
+        if IS_WINDOWS:
+            return
         # Pack the dimensions into the format expected by TIOCSWINSZ
         size = struct.pack("HHHH", rows, columns, 0, 0)
         fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
 
     async def wait_for_exit(self) -> tuple[int | None, str | None]:
         """Wait for the terminal process to exit."""
-        if self._process is None or self._command_task is None:
-            return None, None
+        if IS_WINDOWS and WINPTY_AVAILABLE:
+            if self._pty_process is None or self._command_task is None:
+                return None, None
+        elif IS_WINDOWS:
+            if self._process is None or self._command_task is None:
+                return None, None
+        else:
+            if self._process is None or self._command_task is None:
+                return None, None
         # await self._task
         await self._exit_event.wait()
         return (self.return_code or 0, None)
@@ -140,12 +165,27 @@ class TerminalTool(Terminal):
         """
         if self.return_code is not None:
             return False
-        if self._process is None:
-            return False
-        try:
-            self._process.kill()
-        except Exception:
-            return False
+        if IS_WINDOWS and WINPTY_AVAILABLE:
+            if self._pty_process is None:
+                return False
+            try:
+                self._pty_process.terminate()
+            except Exception:
+                return False
+        elif IS_WINDOWS:
+            if self._process is None:
+                return False
+            try:
+                self._process.kill()
+            except Exception:
+                return False
+        else:
+            if self._process is None:
+                return False
+            try:
+                self._process.kill()
+            except Exception:
+                return False
         return True
 
     def release(self) -> None:
@@ -166,7 +206,12 @@ class TerminalTool(Terminal):
 
     async def run(self) -> None:
         try:
-            await self._run()
+            if IS_WINDOWS and WINPTY_AVAILABLE:
+                await self._run_windows()
+            elif IS_WINDOWS:
+                await self._run_windows_subprocess()
+            else:
+                await self._run_unix()
         except Exception:
             from traceback import print_exc
 
@@ -174,7 +219,151 @@ class TerminalTool(Terminal):
         finally:
             self._exit_event.set()
 
-    async def _run(self) -> None:
+    async def _run_windows_subprocess(self) -> None:
+        """Windows fallback using subprocess (no PTY) when pywinpty is unavailable."""
+        self._command_task = asyncio.current_task()
+
+        assert self._command is not None
+        command = self._command
+        environment = os.environ | command.env
+
+        if " " in command.command:
+            run_command = command.command
+        else:
+            run_command = f"{command.command} {' '.join(command.args)}"
+
+        try:
+            self._process = await asyncio.create_subprocess_shell(
+                run_command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=environment,
+                cwd=command.cwd,
+            )
+        except Exception as error:
+            self._ready_event.set()
+            print(error)
+            raise
+
+        self._ready_event.set()
+        self.set_write_to_stdin(self.write_stdin)
+
+        BUFFER_SIZE = 64 * 1024 * 2
+        unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+
+        try:
+            while True:
+                if self._process.stdout is None:
+                    break
+                try:
+                    data = await self._process.stdout.read(BUFFER_SIZE)
+                except Exception:
+                    data = b""
+
+                if process_data := unicode_decoder.decode(data, final=not data):
+                    self._record_output(data)
+                    if await self.write(process_data):
+                        self.display = True
+                if not data:
+                    break
+        finally:
+            pass
+
+        self.finalize()
+        try:
+            return_code = self._return_code = await self._process.wait()
+        except Exception:
+            return_code = self._return_code = -1
+
+        if return_code == 0:
+            self.add_class("-success")
+        else:
+            self.add_class("-error")
+            self.border_title = Content.assemble(
+                f"{command} [{return_code}]",
+            )
+
+    async def _run_windows(self) -> None:
+        """Windows-specific PTY run loop using pywinpty."""
+        self._command_task = asyncio.current_task()
+
+        assert self._command is not None
+        command = self._command
+        environment = os.environ | command.env
+
+        if " " in command.command:
+            run_command = command.command
+        else:
+            run_command = f"{command.command} {' '.join(command.args)}"
+
+        try:
+            self._pty_process = await asyncio.to_thread(
+                PtyProcess.spawn,
+                run_command,
+                cwd=command.cwd,
+                env=environment,
+            )
+        except Exception as error:
+            self._ready_event.set()
+            print(error)
+            raise
+
+        self._ready_event.set()
+
+        try:
+            await asyncio.to_thread(
+                self._pty_process.setwinsize,
+                self._height or 24,
+                self._width or 80,
+            )
+        except Exception:
+            pass
+
+        self.set_write_to_stdin(self.write_stdin)
+
+        BUFFER_SIZE = 64 * 1024 * 2
+        unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+
+        try:
+            while True:
+                try:
+                    data = await asyncio.to_thread(self._pty_process.read, BUFFER_SIZE)
+                    if isinstance(data, str):
+                        data = data.encode("utf-8", "ignore")
+                except EOFError:
+                    data = b""
+                except Exception:
+                    data = b""
+
+                if process_data := unicode_decoder.decode(data, final=not data):
+                    self._record_output(data)
+                    if await self.write(process_data):
+                        self.display = True
+                if not data:
+                    break
+        finally:
+            pass
+
+        self.finalize()
+        # Get exit status
+        try:
+            return_code = self._return_code = await asyncio.to_thread(
+                self._pty_process.wait
+            )
+        except Exception:
+            return_code = self._return_code = -1
+
+        if return_code == 0:
+            self.add_class("-success")
+        else:
+            self.add_class("-error")
+            self.border_title = Content.assemble(
+                f"{command} [{return_code}]",
+            )
+
+    async def _run_unix(self) -> None:
+        """Unix-specific PTY run loop."""
         self._command_task = asyncio.current_task()
 
         assert self._command is not None
@@ -262,13 +451,33 @@ class TerminalTool(Terminal):
             )
 
     async def write_stdin(self, text: str | bytes, hide_echo: bool = False) -> int:
-        if self._shell_fd is None:
-            return 0
-        text_bytes = text.encode("utf-8", "ignore") if isinstance(text, str) else text
-        try:
-            return await asyncio.to_thread(os.write, self._shell_fd, text_bytes)
-        except OSError:
-            return 0
+        if IS_WINDOWS and WINPTY_AVAILABLE:
+            if self._pty_process is None:
+                return 0
+            text_str = text.decode("utf-8", "ignore") if isinstance(text, bytes) else text
+            try:
+                await asyncio.to_thread(self._pty_process.write, text_str)
+                return len(text_str)
+            except Exception:
+                return 0
+        elif IS_WINDOWS:
+            if self._process is None or self._process.stdin is None:
+                return 0
+            text_bytes = text.encode("utf-8", "ignore") if isinstance(text, str) else text
+            try:
+                self._process.stdin.write(text_bytes)
+                await self._process.stdin.drain()
+                return len(text_bytes)
+            except Exception:
+                return 0
+        else:
+            if self._shell_fd is None:
+                return 0
+            text_bytes = text.encode("utf-8", "ignore") if isinstance(text, str) else text
+            try:
+                return await asyncio.to_thread(os.write, self._shell_fd, text_bytes)
+            except OSError:
+                return 0
 
     def _record_output(self, data: bytes) -> None:
         """Keep a record of the bytes left.
