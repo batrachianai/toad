@@ -83,7 +83,7 @@ uv tool install -U batrachian-toad --python 3.14
 Or run without installing:
 
 ```bash
-uvx batrachian-toad --python 3.14
+uvx --python 3.14 --from batrachian-toad toad
 ```
 
 ## Using Toad
