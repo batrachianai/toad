@@ -26,7 +26,7 @@ A unified interface for AI in your terminal ([release announcement](https://will
 
 Toad is an interface to coding agents, such as Claude, Gemini, Codex, OpenHand, and many more. 
 
-Toad blends a traditional shell based workflow with powerful agentic AI, with an intuitive and attractive Terminal User Interface.
+Toad blends a traditional shell based workflow and powerful agentic AI, with an intuitive and attractive Terminal User Interface.
 
 <table>
   <tbody>
@@ -59,7 +59,7 @@ Toad blends a traditional shell based workflow with powerful agentic AI, with an
       <p>
       At time of writing Toad is the only terminal UI which does this.
       </td>
-      <td width="40%"><img src="https://github.com/user-attachments/assets/ac9247bb-3daa-4bb7-b3fd-e0bbd22475fa"/></td>        
+      <td><img src="https://github.com/user-attachments/assets/ac9247bb-3daa-4bb7-b3fd-e0bbd22475fa"/></td>        
     </tr>
     <tr>
       <td>
@@ -84,7 +84,7 @@ Toad blends a traditional shell based workflow with powerful agentic AI, with an
         The fuzzy picker is great when you know the file you want to mention.
         If you want to explore your files, you can press <kbd>tab</kbd> to switch to an interactive tree control.                
       </td>
-      <td width="40%">
+      <td>
         <img src="https://github.com/user-attachments/assets/ab25c389-1d2f-4006-a1d8-159edbd3ed00"/>        
       </td>
     </tr>
@@ -244,6 +244,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
