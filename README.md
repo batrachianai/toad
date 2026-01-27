@@ -22,11 +22,86 @@ Run coding agents seamlessly under a single beautiful terminal UI, thanks to the
   
 </table>
 
+
+
+## What is Toad?
+
+Toad is an interface to coding agents, such as Claude, Gemini, Codex, OpenHand, and many more. 
+
+It blends a traditional shell based workflow with powerful agentic AI, with an intuitive and attractive terminal User Interface.
+
+
+### Toad features
+
+
+<table>
+  <tbody>
+    <tr>
+      <td>
+        <h3>AI "App store"</h3>
+        <p>
+        Find, install, and run dozens of agents directly from the Toad UI.
+        <p>
+        There is a large and growing list of AI agents that work with Toad.
+        Discover agents from big tech and smaller Open Source projects.
+        <p>
+        Developers can add support for there own agents, via the <a href="https://agentclientprotocol.com/overview/introduction">Agent Client Protocol</a>.
+      </td>
+      <td>
+        <img alt="Screenshot 2026-01-27 at 12 48 30" src="https://github.com/user-attachments/assets/f7bd3776-6405-47e5-9d1f-11a12a4ce3b2" />
+      </td>
+    </tr>
+    <tr>
+      <td>
+      <h3>Toad Shell</h3>
+      <p>
+      While most terminal agent interfaces can run commands (with the <kbd>!</kbd> syntax), they aren't running a shell.
+      If you change directory or set environment variables, they won't persist from one command to the next.
+      <p>
+      Output that contains more than simple text will typically be garbled, and anything interactive will fail or even break the TUI entirely.
+      <p>
+      Toad integrates a fully working shell which supports rich output and interactive commands and tab completion, allowing you to interleave shell commands with AI prompts.      
+      <p>
+      At time of writing Toad is the only terminal UI which does this.
+      </td>
+      <td width="40%"><img src="https://github.com/user-attachments/assets/ac9247bb-3daa-4bb7-b3fd-e0bbd22475fa"/></td>        
+    </tr>
+    <tr>
+      <td>
+        <h3>File Picker</h3>
+        <p>
+        Add a file to your prompt with <kbd>@</kbd>, and toad will show a fuzzy file picker.
+        <p>
+        Type a few characters from the filename or folder and Toad will refine the search as you type.
+        Hit <kbd>enter</kbd> to add the file to the prompt.
+        <p>
+        The fuzzy picker is great when you know the file you want to mention.
+        If you want to explore your files, you can press <kbd>tab</kbd> to switch to an interactive tree control.                
+      </td>
+      <td width="40%">
+        <img src="https://github.com/user-attachments/assets/ab25c389-1d2f-4006-a1d8-159edbd3ed00"/>        
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <h3>Beautiful Diffs</h3>
+        <p>
+        Side-by-side or unified diffs, with syntax highlighting for most languages.      
+      </td>
+      <td>
+        <img alt="Screenshot 2026-01-27 at 12 44 22" src="https://github.com/user-attachments/assets/b3d6c29c-d6ec-4253-a9dc-2df0ff21e293" />
+      </td>      
+    </tr>    
+  </tbody>
+</table>
+
+
 ## Video
 
 Watch a preview of the Toad User Interface:
 
 https://github.com/user-attachments/assets/ced36f4b-db02-4d29-8a0a-14ec64b22881
+
 
 ## Compatibility
 
@@ -43,12 +118,6 @@ On Linux, you may need to install `xclip` to enable clipboard support.
 ```
 sudo apt install xclip
 ```
-
-### Alternative shells
-
-I'd like Toad to run multiple shells, but there are some compatibility issues I need to work out first, so for the moment the default is to use `/bin/sh`.
-
-You can change the shell in settings. If you have any success, let me know.
 
 ## Getting Started
 
@@ -155,6 +224,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
