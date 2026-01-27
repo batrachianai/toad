@@ -127,9 +127,6 @@ Toad blends a traditional shell based workflow and powerful agentic AI, with an 
 </table>
 
 
-<img width="908" height="978" alt="Screenshot 2026-01-27 at 18 04 50" src="https://github.com/user-attachments/assets/b650b407-f4ab-4cb9-8920-55c15073598e" />
-
-
 ## Video
 
 Watch a preview of the Toad User Interface:
@@ -258,6 +255,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
