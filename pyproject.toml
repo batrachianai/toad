@@ -25,6 +25,7 @@ dependencies = [
     "watchdog>=6.0.0",
     "setproctitle>=1.3.7",
     "psutil>=7.2.1",
+    "pywinpty>=2.0.14; sys_platform == 'win32'",
 ]
 
 [tool.uv.workspace]
