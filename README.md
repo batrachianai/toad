@@ -174,6 +174,12 @@ Then use UV to install toad:
 uv tool install -U batrachian-toad --python 3.14
 ```
 
+Toad is also available on [conda-forge](https://conda-forge.org), and can be installed using [pixi](https://pixi.prefix.dev/latest/#installation):
+
+```bash
+pixi global install batrachian-toad
+```
+
 ## Using Toad
 
 Launch Toad with the following:
