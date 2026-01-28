@@ -627,13 +627,13 @@ class Agent(AgentBase):
         self.session_id = response["sessionId"]
 
         db = DB()
-        try:
-            await db.new_session(
-                "New Session", self._agent_data["identity"], self.session_id
-            )
-        except Exception as error:
-            print("!!")
-            print(error)
+        await db.session_new(
+            "New Session",
+            self._agent_data["name"],
+            self._agent_data["identity"],
+            self.session_id,
+            protocol="acp",
+        )
 
         if (modes := response.get("modes", None)) is not None:
             current_mode = modes["currentModeId"]

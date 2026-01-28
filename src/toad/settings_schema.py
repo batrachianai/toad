@@ -156,6 +156,12 @@ SCHEMA: list[SchemaDict] = [
                 ],
             },
             {
+                "key": "blink_title",
+                "title": "Blink terminal title when input is required?",
+                "type": "boolean",
+                "default": True,
+            },
+            {
                 "key": "enable_sounds",
                 "title": "Allow sound in notifications?",
                 "type": "boolean",

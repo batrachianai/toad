@@ -382,7 +382,11 @@ class ToadApp(App, inherit_bindings=False):
 
     def watch_terminal_title_flash(self, terminal_title_flash: int) -> None:
 
-        def toggle_blink():
+        if not self.settings.get("notifications.blink_title", bool):
+            # Ignore if blink title is disabled
+            return
+
+        def toggle_blink() -> None:
             self.terminal_title_blink = not self.terminal_title_blink
 
         if terminal_title_flash:

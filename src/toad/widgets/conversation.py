@@ -1171,8 +1171,15 @@ class Conversation(containers.Vertical):
             if diffs:
                 from toad.screens.permissions import PermissionsScreen
 
+                self.app.terminal_alert()
+                self.app.system_notify(
+                    f"{self.agent_title} would like to write files",
+                    title="Permissions request",
+                    sound="question",
+                )
                 permissions_screen = PermissionsScreen(options, diffs)
                 result = await self.app.push_screen_wait(permissions_screen)
+                self.app.terminal_alert(False)
                 result_future.set_result(result)
                 return
 
