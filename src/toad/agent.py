@@ -55,6 +55,13 @@ class AgentBase(ABC):
         """
         return False
 
+    async def set_session_name(self, name: str) -> None:
+        """Set the session name.
+
+        Args:
+            name: New name for the session.
+        """
+
     def get_info(self) -> Content:
         return Content("")
 

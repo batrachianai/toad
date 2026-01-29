@@ -369,6 +369,12 @@ class NewSessionResponse(SchemaDict, total=False):
     modes: SessionModeState | None
 
 
+# https://agentclientprotocol.com/protocol/schema#loadsessionresponse
+class LoadSessionResponse(SchemaDict, total=False):
+    _meta: object
+    modes: SessionModeState | None
+
+
 class SessionPromptResponse(SchemaDict, total=False):
     stopReason: Required[
         Literal[

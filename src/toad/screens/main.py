@@ -19,6 +19,7 @@ from toad.app import ToadApp
 from toad import messages
 from toad.agent_schema import Agent
 from toad.acp import messages as acp_messages
+
 from toad.widgets.plan import Plan
 from toad.widgets.throbber import Throbber
 from toad.widgets.conversation import Conversation
@@ -83,10 +84,18 @@ class MainScreen(Screen, can_focus=False):
 
     app = getters.app(ToadApp)
 
-    def __init__(self, project_path: Path, agent: Agent | None = None) -> None:
+    def __init__(
+        self,
+        project_path: Path,
+        agent: Agent | None = None,
+        agent_session_id: str | None = None,
+        agent_session_title: str | None = None,
+    ) -> None:
         super().__init__()
         self.set_reactive(MainScreen.project_path, project_path)
         self._agent = agent
+        self._agent_session_id = agent_session_id
+        self._agent_session_title = agent_session_title
 
     def watch_title(self, title: str) -> None:
         self.app.update_terminal_title()
@@ -115,7 +124,9 @@ class MainScreen(Screen, can_focus=False):
                     flex=True,
                 ),
             )
-            yield Conversation(self.project_path, self._agent).data_bind(
+            yield Conversation(
+                self.project_path, self._agent, self._agent_session_id
+            ).data_bind(
                 project_path=MainScreen.project_path,
                 column=MainScreen.column,
             )
@@ -148,11 +159,16 @@ class MainScreen(Screen, can_focus=False):
         ]
         self.query_one("SideBar Plan", Plan).entries = entries
 
+    @on(Conversation.SessionUpdate)
+    async def on_session_update(self, event: Conversation.SessionUpdate) -> None:
+        # TODO: May not be required
+        if event.name is not None:
+            self._agent_session_title = event.name
+
     def on_mount(self) -> None:
         for tree in self.query("#project_directory_tree").results(DirectoryTree):
             tree.data_bind(path=MainScreen.project_path)
         for tree in self.query(DirectoryTree):
-            #     tree.show_guides = False
             tree.guide_depth = 3
 
     @on(OptionList.OptionHighlighted)

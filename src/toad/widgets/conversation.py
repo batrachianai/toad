@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from asyncio import Future
 import asyncio
+from dataclasses import dataclass
 from contextlib import suppress
 from functools import partial
 from itertools import filterfalse
 from operator import attrgetter
-from typing import TYPE_CHECKING, Iterable, Literal
+from typing import TYPE_CHECKING, Literal
 from pathlib import Path
 from time import monotonic
 
@@ -24,6 +25,7 @@ from textual.binding import Binding
 from textual.content import Content
 from textual.geometry import clamp
 from textual.css.query import NoMatches
+from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 from textual.widgets.markdown import MarkdownBlock, MarkdownFence
@@ -39,7 +41,6 @@ from toad import paths
 from toad.agent_schema import Agent as AgentData
 from toad.acp import messages as acp_messages
 from toad.app import ToadApp
-from toad.acp.protocol import ToolCallContent
 from toad.acp import protocol as acp_protocol
 from toad.acp.agent import Mode
 from toad.answer import Answer
@@ -339,7 +340,17 @@ class Conversation(containers.Vertical):
 
     title = var("")
 
-    def __init__(self, project_path: Path, agent: AgentData | None = None) -> None:
+    @dataclass
+    class SessionUpdate(Message):
+        name: str | None
+        """Name of the session, or `None` for no change."""
+
+    def __init__(
+        self,
+        project_path: Path,
+        agent: AgentData | None = None,
+        agent_session_id: str | None = None,
+    ) -> None:
         super().__init__()
 
         project_path = project_path.resolve().absolute()
@@ -353,6 +364,7 @@ class Conversation(containers.Vertical):
         self._agent_thought: AgentThought | None = None
         self._last_escape_time: float = monotonic()
         self._agent_data = agent
+        self._agent_session_id = agent_session_id
         self._agent_fail = False
         self._mouse_down_offset: Offset | None = None
 
@@ -1272,6 +1284,11 @@ class Conversation(containers.Vertical):
                 "Clear conversation window",
                 "<optional number of lines to preserve>",
             ),
+            SlashCommand(
+                "/toad:rename",
+                "Give the current session a friendly name",
+                "<session name>",
+            ),
         ]
 
         slash_commands.extend(self.agent_slash_commands)
@@ -1305,7 +1322,11 @@ class Conversation(containers.Vertical):
                 assert self._agent_data is not None
                 from toad.acp.agent import Agent
 
-                self.agent = Agent(self.project_path, self._agent_data)
+                self.agent = Agent(
+                    self.project_path,
+                    self._agent_data,
+                    self._agent_session_id,
+                )
                 self.agent.start(self)
 
             self.call_after_refresh(start_agent)
@@ -1788,6 +1809,21 @@ class Conversation(containers.Vertical):
                 )
                 return True
             await self.prune_window(line_count, line_count)
+            return True
+        elif command == "toad:rename":
+            name = parameters.strip()
+            if not name:
+                self.notify(
+                    "Expected a name for the session.\n"
+                    'For example: "add comments to blog"',
+                    title="/toad:rename",
+                    severity="error",
+                )
+                return True
+            if self.agent is not None:
+                await self.agent.set_session_name(name)
+                self.post_message(self.SessionUpdate(name=name))
+                self.flash(f"Renamed session to [b]'{name}'", style="success")
             return True
 
         return False

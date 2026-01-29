@@ -27,6 +27,14 @@ def session_new(
     ...
 
 
+@API.method(name="session/load")
+def session_load(
+    cmd: str, mcpServers: list[protocol.McpServer], sessionId: str
+) -> protocol.LoadSessionResponse:
+    """https://agentclientprotocol.com/protocol/session-setup#loading-a-session"""
+    ...
+
+
 @API.notification(name="session/cancel")
 def session_cancel(sessionId: str, _meta: dict):
     """https://agentclientprotocol.com/protocol/prompt-turn#cancellation"""

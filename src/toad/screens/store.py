@@ -47,6 +47,7 @@ QR = """\
 @dataclass
 class LaunchAgent(Message):
     identity: str
+    session_id: str | None = None
 
 
 class AgentItem(containers.VerticalGroup):
@@ -264,6 +265,7 @@ class StoreScreen(Screen):
             "Quick launch",
             key_display="1-9 a-f",
         ),
+        Binding("ctrl+r", "resume", "Resume", tooltip="Resume a previous session"),
     ]
 
     agents_view = getters.query_one("#agents-view", AgentGridSelect)
@@ -427,12 +429,14 @@ class StoreScreen(Screen):
             self.post_message(LaunchAgent(launcher_item.agent["identity"]))
 
     @work
-    async def launch_agent(self, agent_identity: str) -> None:
+    async def launch_agent(
+        self, agent_identity: str, agent_session_id: str | None
+    ) -> None:
         from toad.screens.main import MainScreen
 
         agent = self.agents[agent_identity]
         project_path = Path(self.app.project_dir or os.getcwd())
-        screen = MainScreen(project_path, agent).data_bind(
+        screen = MainScreen(project_path, agent, agent_session_id).data_bind(
             column=ToadApp.column,
             column_width=ToadApp.column_width,
         )
@@ -440,7 +444,7 @@ class StoreScreen(Screen):
 
     @on(LaunchAgent)
     def on_launch_agent(self, message: LaunchAgent) -> None:
-        self.launch_agent(message.identity)
+        self.launch_agent(message.identity, message.session_id)
 
     @work
     async def on_mount(self) -> None:
@@ -494,6 +498,16 @@ class StoreScreen(Screen):
 
     def action_quick_launch(self) -> None:
         self.launcher.focus()
+
+    @work
+    async def action_resume(self) -> None:
+        from toad.screens.session_resume_modal import SessionResumeModal
+
+        session = await self.app.push_screen_wait(SessionResumeModal())
+        if session is not None:
+            self.post_message(
+                LaunchAgent(session["agent_identity"], session["agent_session_id"])
+            )
 
 
 if __name__ == "__main__":

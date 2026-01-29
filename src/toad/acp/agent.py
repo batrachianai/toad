@@ -68,7 +68,9 @@ def generate_datetime_filename(
 class Agent(AgentBase):
     """An agent that speaks the APC (https://agentclientprotocol.com/overview/introduction) protocol."""
 
-    def __init__(self, project_root: Path, agent: AgentData) -> None:
+    def __init__(
+        self, project_root: Path, agent: AgentData, session_id: str | None
+    ) -> None:
         """
 
         Args:
@@ -78,6 +80,7 @@ class Agent(AgentBase):
         super().__init__(project_root)
 
         self._agent_data = agent
+        self.session_id = session_id
 
         self.server = jsonrpc.Server()
         self.server.expose_instance(self)
@@ -96,7 +99,8 @@ class Agent(AgentBase):
             },
         }
         self.auth_methods: list[protocol.AuthMethod] = []
-        self.session_id: str = ""
+
+        self.session_pk: int | None = None
         self.tool_calls: dict[str, protocol.ToolCall] = {}
         self._message_target: MessagePump | None = None
 
@@ -627,7 +631,7 @@ class Agent(AgentBase):
         self.session_id = response["sessionId"]
 
         db = DB()
-        await db.session_new(
+        self.session_pk = await db.session_new(
             "New Session",
             self._agent_data["name"],
             self._agent_data["identity"],
@@ -645,6 +649,15 @@ class Agent(AgentBase):
                 for mode in available_modes
             }
             self.post_message(messages.SetModes(current_mode, modes_update))
+
+    async def acp_load_session(self) -> None:
+        assert self.session_id is not None, "Session id must be set"
+        with self.request():
+            session_load_response = api.session_load(
+                str(self.project_root_path), [], self.session_id
+            )
+        response = await session_load_response.wait()
+        self.log(response)
 
     async def acp_session_prompt(
         self, prompt: list[protocol.ContentBlock]
@@ -677,6 +690,12 @@ class Agent(AgentBase):
 
     async def set_mode(self, mode_id: str) -> str | None:
         return await self.acp_session_set_mode(mode_id)
+
+    async def set_session_name(self, name: str) -> None:
+        if self.session_pk is None:
+            return
+        db = DB()
+        await db.session_update_title(self.session_pk, name)
 
     async def acp_session_cancel(self) -> bool:
         with self.request():

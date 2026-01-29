@@ -67,10 +67,10 @@ class DB:
         agent_identity: str,
         agent_session_id: str,
         protocol: str = "acp",
-    ) -> bool:
+    ) -> int | None:
         try:
             async with self.open() as db:
-                await db.execute(
+                cursor = await db.execute(
                     """
                     INSERT INTO sessions (title, agent, agent_identity, agent_session_id, protocol) VALUES (?, ?, ?, ?, ?)    
                     """,
@@ -83,9 +83,9 @@ class DB:
                     ),
                 )
                 await db.commit()
+                return cursor.lastrowid
         except aiosqlite.Error:
-            return False
-        return True
+            return None
 
     async def session_update_last_used(self, agent_session_id: str) -> bool:
         """Update the last used timestamp.
@@ -116,6 +116,7 @@ class DB:
 
         Args:
             id: Session ID.
+            title: New title.
 
         Returns:
             Boolenan that indicates success.
@@ -146,10 +147,7 @@ class DB:
         try:
             async with self.open() as db:
                 db.row_factory = aiosqlite.Row
-                cursor = await db.execute(
-                    "SELECT * from session WHERE id = ?",
-                    (id,),
-                )
+                cursor = await db.execute("SELECT * from sessions WHERE id = ?", (id,))
                 row = await cursor.fetchone()
         except aiosqlite.Error:
             return None
@@ -164,13 +162,14 @@ class DB:
             async with self.open() as db:
                 db.row_factory = aiosqlite.Row
                 cursor = await db.execute(
-                    """SELECT * from session
+                    """SELECT * from sessions
                     ORDER BY last_used DESC
                     LIMIT ?""",
                     (max_results,),
                 )
                 rows = await cursor.fetchall()
-        except aiosqlite.Error:
+        except aiosqlite.Error as error:
+            print(error)
             return None
         sessions = [cast(Session, dict(row)) for row in rows]
         return sessions
