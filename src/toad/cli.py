@@ -104,8 +104,14 @@ def main(ctx, version):
     type=str,
     help="Host to use in conjunction with --serve",
 )
+@click.option(
+    "--public-url",
+    metavar="URL",
+    default=None,
+    help="Public URL to use in conjunction with --serve",
+)
 @click.option("-s", "--serve", is_flag=True, help="Serve Toad as a web application")
-def run(port: int, host: str, serve: bool, project_dir: str = ".", agent: str = "1"):
+def run(port: int, host: str, serve: bool, project_dir: str = ".", agent: str = "1", public_url: str | None = None):
     """Run an installed agent (same as `toad PATH`)."""
 
     check_directory(project_dir)
@@ -140,6 +146,7 @@ def run(port: int, host: str, serve: bool, project_dir: str = ".", agent: str = 
             host=host,
             port=port,
             title=serve_command,
+            public_url=public_url,
         )
         set_process_title("toad --serve")
         server.serve()
@@ -274,11 +281,16 @@ def replay(path: str) -> None:
 @main.command("serve")
 @click.option("-p", "--port", metavar="PORT", default=8000, type=int)
 @click.option("-H", "--host", metavar="HOST", default="localhost")
-def serve(port: int, host: str) -> None:
+@click.option(
+    "--public-url",
+    metavar="URL",
+    default=None,
+    help="Public URL for textual_serve Server (e.g. https://example.com)",
+)
+def serve(port: int, host: str, public_url: str | None = None) -> None:
     """Serve Toad as a web application."""
     from textual_serve.server import Server
-
-    server = Server(sys.argv[0], host=host, port=port, title="Toad")
+    server = Server(sys.argv[0], host=host, port=port, title="Toad", public_url=public_url)
     set_process_title("toad serve")
     server.serve()
 
