@@ -23,6 +23,7 @@ from toad.acp import api
 from toad.acp.api import API
 from toad.acp import messages
 from toad.acp.prompt import build as build_prompt
+from toad.db import DB
 from toad import paths
 from toad import constants
 from toad.answer import Answer
@@ -624,6 +625,16 @@ class Agent(AgentBase):
         response = await session_new_response.wait()
         assert response is not None
         self.session_id = response["sessionId"]
+
+        db = DB()
+        await db.session_new(
+            "New Session",
+            self._agent_data["name"],
+            self._agent_data["identity"],
+            self.session_id,
+            protocol="acp",
+        )
+
         if (modes := response.get("modes", None)) is not None:
             current_mode = modes["currentModeId"]
             available_modes = modes["availableModes"]

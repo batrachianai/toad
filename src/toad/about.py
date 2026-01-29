@@ -29,7 +29,9 @@ $CONFIG
 | Name | Path |
 | --- | --- |
 | App data | `$DATA_PATH` |
+| App state | `$STATE_PATH` |
 | App logs | `$LOG_PATH` |
+
                           
 ## System
 
@@ -77,6 +79,7 @@ def render(app: ToadApp) -> str:
         "CONFIG": config,
         "DATA_PATH": paths.get_data(),
         "LOG_PATH": paths.get_log(),
+        "STATE_PATH": paths.get_state(),
         "PLATFORM": platform.platform(),
         "PYTHON": f"{platform.python_implementation()} {platform.python_version()}",
         "RICH_VERSION": version("rich"),

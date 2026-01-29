@@ -321,7 +321,8 @@ Conversation {
             }
         }
 
-        ToolCallHeader {            
+        ToolCallHeader {     
+            pointer: pointer;       
             width: auto;
             max-width: 1fr;            
         }        
