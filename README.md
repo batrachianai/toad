@@ -8,7 +8,7 @@ A unified interface for AI in your terminal ([release announcement](https://will
 
   <tr>
     <td><img width="1100" height="863" alt="Screenshot 2026-01-30 at 19 23 54" src="https://github.com/user-attachments/assets/aca51988-359a-466d-bdd1-050dc3d678ac" /></td> 
-    <td><img width="1100" height="863" alt="Screenshot 2026-01-30 at 19 21 00" src="https://github.com/user-attachments/assets/b9b0a6bb-e084-4976-86c2-cccdb42041ae" />></td>    
+    <td><img width="1100" height="863" alt="Screenshot 2026-01-30 at 19 21 00" src="https://github.com/user-attachments/assets/b9b0a6bb-e084-4976-86c2-cccdb42041ae" /></td>    
   </tr>
 
   <tr>
@@ -260,6 +260,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
