@@ -7,19 +7,18 @@ A unified interface for AI in your terminal ([release announcement](https://will
   <tbody>
 
   <tr>
-    <td><img  alt="Screenshot 2025-10-23 at 08 58 58" src="https://github.com/user-attachments/assets/98387559-2e10-485a-8a7d-82cb00ed7622" /></td> 
-    <td><img alt="Screenshot 2025-10-23 at 08 59 04" src="https://github.com/user-attachments/assets/d4231320-b678-47ba-99ce-02746ca2622b" /></td>    
+    <td><img width="1100" height="863" alt="Screenshot 2026-01-30 at 19 23 54" src="https://github.com/user-attachments/assets/aca51988-359a-466d-bdd1-050dc3d678ac" /></td> 
+    <td><img width="1100" height="863" alt="Screenshot 2026-01-30 at 19 21 00" src="https://github.com/user-attachments/assets/b9b0a6bb-e084-4976-86c2-cccdb42041ae" />></td>    
   </tr>
 
   <tr>
-    <td><img  alt="Screenshot 2025-10-23 at 08 59 22" src="https://github.com/user-attachments/assets/ddba550d-ff33-45ad-9f93-281187f5c974" /></td>
-    <td><img  alt="Screenshot 2025-10-23 at 08 59 37" src="https://github.com/user-attachments/assets/e7943272-39a5-40a1-bedf-e440002e1290" /></td>
+    <td><img width="1100" height="863" alt="Screenshot 2026-01-30 at 19 29 47" src="https://github.com/user-attachments/assets/3fe4060f-d468-4635-b80f-03c24625c6c0" /></td>
+    <td><img width="1100" height="863" alt="Screenshot 2026-01-30 at 19 30 08" src="https://github.com/user-attachments/assets/03659d64-02fc-4936-a90d-e202bc4b70a1" /></td>
   </tr>
     
   </tbody>
   
 </table>
-
 
 
 ## What is Toad?
@@ -261,6 +260,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
