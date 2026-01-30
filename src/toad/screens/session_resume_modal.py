@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from textual import on
 from textual.app import ComposeResult
 from textual import getters
@@ -27,7 +29,7 @@ class SessionResumeModal(ModalScreen[Session]):
         with containers.VerticalGroup(id="container"):
             yield widgets.Markdown(HELP)
             yield widgets.Static(
-                "⚠ Most ACP agents currently do not support session resume — this feature is untested",
+                "⚠ Most ACP agents currently do not support session resume — this feature is experimental",
                 classes="warning",
             )
             with containers.Center(id="table-container"):
@@ -38,18 +40,82 @@ class SessionResumeModal(ModalScreen[Session]):
                 )
                 yield widgets.Button("Cancel", id="cancel")
 
+    @classmethod
+    def friendly_time_ago(cls, iso_timestamp: str) -> str:
+        """
+        Convert ISO timestamp to friendly time description.
+
+        Args:
+            iso_timestamp: ISO format timestamp string (e.g., '2024-01-30T15:30:00+00:00')
+
+        Returns:
+            - "just now" if < 1 minute ago
+            - "X minute(s) ago" if < 1 hour ago
+            - "X hour(s) ago" if < 24 hours ago
+            - Local datetime string if >= 24 hours ago (format: 'YYYY-MM-DD HH:MM AM/PM')
+
+        Examples:
+            >>> friendly_time_ago('2024-01-30T15:30:00+00:00')  # 30 seconds ago
+            'just now'
+            >>> friendly_time_ago('2024-01-30T15:00:00+00:00')  # 5 minutes ago
+            '5 minutes ago'
+            >>> friendly_time_ago('2024-01-30T13:00:00+00:00')  # 3 hours ago
+            '3 hours ago'
+            >>> friendly_time_ago('2024-01-28T15:30:00+00:00')  # 2 days ago
+            '2024-01-28 10:30 AM'  # (in local time)
+        """
+        # Parse the timestamp
+        past_dt = datetime.fromisoformat(iso_timestamp)
+
+        # Get current time in appropriate timezone
+        if past_dt.tzinfo is not None:
+            # Timezone-aware: use UTC for comparison
+            now = datetime.now(timezone.utc)
+        else:
+            # Naive datetime: use naive now
+            now = datetime.now()
+
+        # Calculate time difference
+        diff = now - past_dt
+        total_seconds = diff.total_seconds()
+
+        # Less than 1 minute
+        if total_seconds < 60:
+            return "just now"
+
+        # Less than 1 hour (3600 seconds)
+        if total_seconds < 3600:
+            minutes = int(total_seconds // 60)
+            return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+
+        # Less than 24 hours (86400 seconds)
+        if total_seconds < 86400:
+            hours = int(total_seconds // 3600)
+            return f"{hours} hour{'s' if hours != 1 else ''} ago"
+
+        # 24 hours or more - return as local time
+        if past_dt.tzinfo is not None:
+            local_dt = past_dt.astimezone()  # Convert to local timezone
+        else:
+            local_dt = past_dt  # Already naive, assume local
+
+        return local_dt.strftime("%Y-%m-%d %I:%M %p")
+
     async def on_mount(self) -> None:
         table = self.session_table
-        table.add_columns("Agent", "Session", "Last Used")
+        table.add_columns("Agent", "Session", "Created", "Last Used")
         db = DB()
         sessions = await db.session_get_recent()
         if sessions is None:
             return
+        self.log(sessions)
         for session in sessions:
+
             table.add_row(
                 session["agent"],
                 session["title"],
-                session["created_at"],
+                self.friendly_time_ago(session["created_at"]),
+                self.friendly_time_ago(session["last_used"]),
                 key=str(session["id"]),
             )
 

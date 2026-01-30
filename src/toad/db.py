@@ -22,9 +22,9 @@ class Session(TypedDict):
     """Protocol used."""
     promot_count: int
     """Number of prompts sent."""
-    created_at: datetime
+    created_at: str
     """Time session was created."""
-    last_used: datetime
+    last_used: str
     """Time sesison was last used."""
     meta_json: str
     """Text field containing JSON meta."""
