@@ -564,14 +564,12 @@ class Agent(AgentBase):
             try:
                 # Boilerplate to initialize comms
                 await self.acp_initialize()
-                print("SESION_ID", self.session_id)
 
-                print(self.agent_capabilities)
                 if self.session_id is None:
                     # Create a new session
-                    print("NEW SESSION")
                     await self.acp_new_session()
                 else:
+                    # Load existing session
                     if not self.agent_capabilities.get("loadSession", False):
                         self.post_message(
                             AgentFail(
@@ -581,7 +579,6 @@ class Agent(AgentBase):
                             )
                         )
                         return
-
                     await self.acp_load_session()
             except jsonrpc.APIError as error:
                 if isinstance(error.data, dict):
@@ -678,7 +675,17 @@ class Agent(AgentBase):
                 str(self.project_root_path), [], self.session_id
             )
         response = await session_load_response.wait()
-        self.log(response)
+
+        if (modes := response.get("modes", None)) is not None:
+            current_mode = modes["currentModeId"]
+            available_modes = modes["availableModes"]
+            modes_update = {
+                mode["id"]: Mode(
+                    mode["id"], mode["name"], mode.get("description", None)
+                )
+                for mode in available_modes
+            }
+            self.post_message(messages.SetModes(current_mode, modes_update))
 
     async def acp_session_prompt(
         self, prompt: list[protocol.ContentBlock]
