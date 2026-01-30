@@ -16,6 +16,7 @@ class AgentFail(Message):
 
     message: str
     details: str = ""
+    help: str = "fail"
 
 
 class AgentBase(ABC):

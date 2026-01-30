@@ -20,6 +20,8 @@ class Session(TypedDict):
     """Title of session."""
     protocol: str
     """Protocol used."""
+    promot_count: int
+    """Number of prompts sent."""
     created_at: datetime
     """Time session was created."""
     last_used: datetime
@@ -49,7 +51,8 @@ class DB:
                         agent_identity TEXT NOT NULL,
                         agent_session_id TEXT NOT NULL,                                
                         title TEXT NOT NULL,      
-                        protocol TEXT NOT NULL,                  
+                        protocol TEXT NOT NULL, 
+                        prompt_count INTEGER DEFAULT 0,                
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         meta_json TEXT DEFAULT '{}'
@@ -87,7 +90,7 @@ class DB:
         except aiosqlite.Error:
             return None
 
-    async def session_update_last_used(self, agent_session_id: str) -> bool:
+    async def session_update_last_used(self, id: int) -> bool:
         """Update the last used timestamp.
 
         Args:
@@ -100,10 +103,10 @@ class DB:
         try:
             async with self.open() as db:
                 await db.execute(
-                    "UPDATE sessions SET last_used = ? WHERE agent_session_id = ?",
+                    "UPDATE sessions SET last_used = ? WHERE id = ?",
                     (
                         now_utc.isoformat(),
-                        agent_session_id,
+                        id,
                     ),
                 )
                 await db.commit()

@@ -1,0 +1,35 @@
+SessionResumeModal {
+    align: center middle;
+    .warning {
+        border: round $warning;
+        padding: 0 1;
+        color: $text-warning;
+        margin: 0 0 1 1;
+    }
+    #container {        
+        margin: 2 4 1 4;
+        padding: 0 1 0 0;
+        max-width: 100;
+        height: auto;
+        border: thick $primary 20%;
+
+        Markdown {
+            MarkdownH1 {
+                margin: 1 0;
+            }            
+        }
+
+        #table-container {
+            height: auto;
+            padding: 0 0 0 1;
+            DataTable {
+                width: 1fr;
+                height: 12;
+            }
+        }
+        #buttons {
+            margin-top: 1;
+            align: right top;
+        }
+    }
+}

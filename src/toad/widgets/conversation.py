@@ -67,7 +67,8 @@ if TYPE_CHECKING:
     from toad.widgets.terminal_tool import TerminalTool
 
 
-AGENT_FAIL_HELP = """\
+AGENT_FAIL_HELP = {
+    "fail": """\
 ## Agent failed to run
 
 **The agent failed to start.**
@@ -86,8 +87,21 @@ Some agents may require you to restart your shell (open a new terminal) after in
 
 If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!
 
-https://github.com/batrachianai/toad/discussions
-"""
+https://github.com/batrachianai/toad/discussions""",
+    "no_resume": """\
+## Agent does not support resume
+
+The agent or ACP adapter does not support resuming sessions.
+
+Try updating to see if support has been added.
+
+- Exit the app, and run `toad` again
+- Select the agent and hit ENTER
+- Click the dropdown, select "Update" or "Install" again
+- Repeat the process to update the ACP adapter (if required)
+
+If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!""",
+}
 
 HELP_URL = "https://github.com/batrachianai/toad/discussions"
 
@@ -747,7 +761,12 @@ class Conversation(containers.Vertical):
 
         from toad.widgets.markdown_note import MarkdownNote
 
-        await self.post(MarkdownNote(AGENT_FAIL_HELP))
+        if message.help in AGENT_FAIL_HELP:
+            help = AGENT_FAIL_HELP[message.help]
+        else:
+            help = AGENT_FAIL_HELP["fail"]
+
+        await self.post(MarkdownNote(help))
 
     @on(messages.WorkStarted)
     def on_work_started(self) -> None:

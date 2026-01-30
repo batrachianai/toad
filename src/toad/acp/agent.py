@@ -551,6 +551,10 @@ class Agent(AgentBase):
 
     async def stop(self) -> None:
         """Gracefully stop the process."""
+        if self.session_pk is not None:
+            db = DB()
+            await db.session_update_last_used(self.session_pk)
+
         if self._process is not None:
             self._process.terminate()
 
@@ -560,8 +564,25 @@ class Agent(AgentBase):
             try:
                 # Boilerplate to initialize comms
                 await self.acp_initialize()
-                # Create a new session
-                await self.acp_new_session()
+                print("SESION_ID", self.session_id)
+
+                print(self.agent_capabilities)
+                if self.session_id is None:
+                    # Create a new session
+                    print("NEW SESSION")
+                    await self.acp_new_session()
+                else:
+                    if not self.agent_capabilities.get("loadSession", False):
+                        self.post_message(
+                            AgentFail(
+                                "Resume not supported",
+                                f"{self._agent_data['name']} does not currently support resuming sessions.",
+                                help="no_resume",
+                            )
+                        )
+                        return
+
+                    await self.acp_load_session()
             except jsonrpc.APIError as error:
                 if isinstance(error.data, dict):
                     reason = str(
