@@ -434,7 +434,11 @@ class StoreScreen(Screen):
     ) -> None:
         from toad.screens.main import MainScreen
 
-        agent = self.agents[agent_identity]
+        try:
+            agent = self.agents[agent_identity]
+        except KeyError:
+            self.notify("Agent not found", title="Launch agent", severity="error")
+            return
         project_path = Path(self.app.project_dir or os.getcwd())
         screen = MainScreen(project_path, agent, agent_session_id).data_bind(
             column=ToadApp.column,
