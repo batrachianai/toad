@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 
 from textual import on
 from textual.app import ComposeResult
@@ -99,21 +100,30 @@ class SessionResumeModal(ModalScreen[Session]):
         else:
             local_dt = past_dt  # Already naive, assume local
 
-        return local_dt.strftime("%Y-%m-%d %I:%M %p")
+        return local_dt.strftime("%c")
 
     async def on_mount(self) -> None:
         table = self.session_table
-        table.add_columns("Agent", "Session", "Created", "Last Used")
+        table.add_columns("Agent", "Session", "Created", "Last Used", "Path")
         db = DB()
         sessions = await db.session_get_recent()
         if sessions is None:
             return
+
         for session in sessions:
+            cwd = ""
+            if meta_json := session["meta_json"]:
+                try:
+                    cwd = json.loads(meta_json).get("cwd", None)
+                except Exception:
+                    pass
+
             table.add_row(
                 session["agent"],
                 session["title"],
                 self.friendly_time_ago(session["created_at"]),
                 self.friendly_time_ago(session["last_used"]),
+                cwd,
                 key=str(session["id"]),
             )
 
@@ -145,7 +155,6 @@ class SessionResumeModal(ModalScreen[Session]):
     ) -> None:
         if event.row_key is None:
             return
-        self.log(event.row_key)
         try:
             session_id = int(event.row_key.value)
         except ValueError:

@@ -673,6 +673,7 @@ class Agent(AgentBase):
                 self._agent_data["identity"],
                 self.session_id,
                 protocol="acp",
+                project_path=str(self.project_root_path),
             )
 
         if (modes := response.get("modes", None)) is not None:
