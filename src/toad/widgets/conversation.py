@@ -86,8 +86,7 @@ Note that some agents require an ACP adapter to be installed to work with Toad.
 Some agents may require you to restart your shell (open a new terminal) after installing.
 
 If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!
-
-https://github.com/batrachianai/toad/discussions""",
+""",
     "no_resume": """\
 ## Agent does not support resume
 
@@ -100,7 +99,8 @@ Try updating to see if support has been added.
 - Click the dropdown, select "Update" or "Install" again
 - Repeat the process to update the ACP adapter (if required)
 
-If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!""",
+If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!
+""",
 }
 
 HELP_URL = "https://github.com/batrachianai/toad/discussions"
@@ -142,7 +142,7 @@ $AGENT has exceeded the maximum number of model requests in a single turn.
 Need help? Ask on {HELP_URL}
 """
 
-STOP_REASON_REFUSAL = """\
+STOP_REASON_REFUSAL = f"""\
 ## Agent refusal
  
 $AGENT has refused to continue. 
