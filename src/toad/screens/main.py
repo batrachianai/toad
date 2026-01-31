@@ -90,12 +90,14 @@ class MainScreen(Screen, can_focus=False):
         agent: Agent | None = None,
         agent_session_id: str | None = None,
         agent_session_title: str | None = None,
+        session_pk: int | None = None,
     ) -> None:
         super().__init__()
         self.set_reactive(MainScreen.project_path, project_path)
         self._agent = agent
         self._agent_session_id = agent_session_id
         self._agent_session_title = agent_session_title
+        self._session_pk = session_pk
 
     def watch_title(self, title: str) -> None:
         self.app.update_terminal_title()
@@ -125,7 +127,7 @@ class MainScreen(Screen, can_focus=False):
                 ),
             )
             yield Conversation(
-                self.project_path, self._agent, self._agent_session_id
+                self.project_path, self._agent, self._agent_session_id, self._session_pk
             ).data_bind(
                 project_path=MainScreen.project_path,
                 column=MainScreen.column,

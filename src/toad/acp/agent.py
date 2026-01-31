@@ -69,7 +69,11 @@ class Agent(AgentBase):
     """An agent that speaks the APC (https://agentclientprotocol.com/overview/introduction) protocol."""
 
     def __init__(
-        self, project_root: Path, agent: AgentData, session_id: str | None
+        self,
+        project_root: Path,
+        agent: AgentData,
+        session_id: str | None,
+        session_pk: int | None = None,
     ) -> None:
         """
 
@@ -99,8 +103,7 @@ class Agent(AgentBase):
             },
         }
         self.auth_methods: list[protocol.AuthMethod] = []
-
-        self.session_pk: int | None = None
+        self.session_pk: int | None = session_pk
         self.tool_calls: dict[str, protocol.ToolCall] = {}
         self._message_target: MessagePump | None = None
 
@@ -586,6 +589,9 @@ class Agent(AgentBase):
                         )
                         return
                     await self.acp_load_session()
+                    if self.session_pk is not None:
+                        db = DB()
+                        await db.session_update_last_used(self.session_pk)
             except jsonrpc.APIError as error:
                 if isinstance(error.data, dict):
                     reason = str(
