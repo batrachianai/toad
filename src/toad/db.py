@@ -71,10 +71,9 @@ class DB:
         agent_identity: str,
         agent_session_id: str,
         protocol: str = "acp",
-        project_path: str | None = None,
+        meta: dict[str, object] | None = None,
     ) -> int | None:
-        meta = {"cwd": project_path}
-        meta_json = json.dumps(meta)
+        meta_json = json.dumps(meta or {})
         try:
             async with self.open() as db:
                 cursor = await db.execute(
