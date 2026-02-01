@@ -692,10 +692,19 @@ class Agent(AgentBase):
 
     async def acp_load_session(self) -> None:
         assert self.session_id is not None, "Session id must be set"
+        cwd = str(self.project_root_path)
+        if self.session_pk is not None:
+            db = DB()
+            if (session := await db.session_get(self.session_pk)) is not None:
+                if session["meta_json"]:
+                    meta = json.loads(session["meta_json"])
+                    if session_cwd := meta.get("cwd", None):
+                        cwd = session_cwd
+                    if agent_data := meta.get("agent_data"):
+                        self._agent_data = agent_data
+
         with self.request():
-            session_load_response = api.session_load(
-                str(self.project_root_path), [], self.session_id
-            )
+            session_load_response = api.session_load(cwd, [], self.session_id)
         response = await session_load_response.wait()
 
         if (modes := response.get("modes", None)) is not None:

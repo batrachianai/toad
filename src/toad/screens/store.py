@@ -1,6 +1,7 @@
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import zip_longest
+import json
 import os
 from pathlib import Path
 from random import shuffle
@@ -21,6 +22,7 @@ from textual import widgets
 
 import toad
 from toad.app import ToadApp
+from toad.db import DB
 from toad.pill import pill
 from toad.widgets.mandelbrot import Mandelbrot
 from toad.widgets.grid_select import GridSelect
@@ -438,11 +440,21 @@ class StoreScreen(Screen):
     ) -> None:
         from toad.screens.main import MainScreen
 
-        try:
-            agent = self.agents[agent_identity]
-        except KeyError:
-            self.notify("Agent not found", title="Launch agent", severity="error")
-            return
+        agent: Agent | None = None
+        if session_pk is not None:
+            db = DB()
+            session = await db.session_get(session_pk)
+            if session is not None:
+                meta = json.loads(session["meta_json"])
+                if agent_data := meta.get("agent_data"):
+                    agent = agent_data
+
+        if agent is None:
+            try:
+                agent = self.agents[agent_identity]
+            except KeyError:
+                self.notify("Agent not found", title="Launch agent", severity="error")
+                return
         project_path = Path(self.app.project_dir or os.getcwd())
         screen = MainScreen(
             project_path, agent, agent_session_id, session_pk=session_pk

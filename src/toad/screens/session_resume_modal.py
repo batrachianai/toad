@@ -127,19 +127,22 @@ class SessionResumeModal(ModalScreen[Session]):
                 key=str(session["id"]),
             )
 
-    @on(widgets.Button.Pressed, "#resume")
-    async def on_resume_button(self) -> None:
-        table = self.session_table
-        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
-        if row_key is None:
-            return
+    async def dissmiss_with_session(self, row_key_value: str) -> Session | None:
         try:
-            session_id = int(row_key.value)
+            session_id = int(row_key_value)
         except ValueError:
             return
         db = DB()
         session = await db.session_get(session_id)
         self.dismiss(session)
+
+    @on(widgets.Button.Pressed, "#resume")
+    async def on_resume_button(self) -> None:
+        table = self.session_table
+        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+        if row_key is None or row_key.value is None:
+            return
+        await self.dissmiss_with_session(row_key.value)
 
     @on(widgets.Button.Pressed, "#cancel")
     def on_cancel_button(self) -> None:
@@ -153,15 +156,9 @@ class SessionResumeModal(ModalScreen[Session]):
     async def on_data_table_row_selected(
         self, event: widgets.DataTable.RowSelected
     ) -> None:
-        if event.row_key is None:
+        if event.row_key is None or event.row_key.value is None:
             return
-        try:
-            session_id = int(event.row_key.value)
-        except ValueError:
-            return
-        db = DB()
-        session = await db.session_get(session_id)
-        self.dismiss(session)
+        await self.dissmiss_with_session(event.row_key.value)
 
 
 if __name__ == "__main__":
