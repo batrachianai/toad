@@ -425,6 +425,8 @@ Prompt {
 
     PathSearch, SlashComplete {
         display: none;
+        overlay: screen;
+        offset-y: -16;
         height: 16;
         Input {
             margin: 0 1;
