@@ -122,9 +122,20 @@ Toad blends a traditional shell based workflow and powerful agentic AI, with an 
         <img src="https://github.com/user-attachments/assets/2ff0de12-c2e1-455b-954a-21e66c070dd8"/>      
       </td>    
     </tr>
+    <tr>
+      <td>
+        <h3>Session Resume</h3>
+        <p>
+        Resume previous sessions with your agent.    
+        <p>
+        Hit <kbd>ctrl+r</kbd> to pick a previous session to resume.
+      </td>
+      <td>
+        <img width="1172" height="925" alt="Screenshot 2026-02-01 at 16 57 46" src="https://github.com/user-attachments/assets/7c1ad59e-027c-4542-a216-9a32ef573936" />
+      </td>    
+    </tr>
   </tbody>
 </table>
-
 
 ## Video
 
@@ -260,6 +271,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
