@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 from typing import cast, TypedDict
 from toad import paths
 
@@ -70,12 +71,14 @@ class DB:
         agent_identity: str,
         agent_session_id: str,
         protocol: str = "acp",
+        meta: dict[str, object] | None = None,
     ) -> int | None:
+        meta_json = json.dumps(meta or {})
         try:
             async with self.open() as db:
                 cursor = await db.execute(
                     """
-                    INSERT INTO sessions (title, agent, agent_identity, agent_session_id, protocol) VALUES (?, ?, ?, ?, ?)    
+                    INSERT INTO sessions (title, agent, agent_identity, agent_session_id, protocol, meta_json) VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         title,
@@ -83,6 +86,7 @@ class DB:
                         agent_identity,
                         agent_session_id,
                         protocol,
+                        meta_json,
                     ),
                 )
                 await db.commit()

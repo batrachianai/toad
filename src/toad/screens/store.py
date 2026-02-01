@@ -1,6 +1,7 @@
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import zip_longest
+import json
 import os
 from pathlib import Path
 from random import shuffle
@@ -21,6 +22,7 @@ from textual import widgets
 
 import toad
 from toad.app import ToadApp
+from toad.db import DB
 from toad.pill import pill
 from toad.widgets.mandelbrot import Mandelbrot
 from toad.widgets.grid_select import GridSelect
@@ -48,6 +50,7 @@ QR = """\
 class LaunchAgent(Message):
     identity: str
     session_id: str | None = None
+    pk: int | None = None
 
 
 class AgentItem(containers.VerticalGroup):
@@ -430,17 +433,32 @@ class StoreScreen(Screen):
 
     @work
     async def launch_agent(
-        self, agent_identity: str, agent_session_id: str | None
+        self,
+        agent_identity: str,
+        agent_session_id: str | None,
+        session_pk: int | None = None,
     ) -> None:
         from toad.screens.main import MainScreen
 
-        try:
-            agent = self.agents[agent_identity]
-        except KeyError:
-            self.notify("Agent not found", title="Launch agent", severity="error")
-            return
+        agent: Agent | None = None
+        if session_pk is not None:
+            db = DB()
+            session = await db.session_get(session_pk)
+            if session is not None:
+                meta = json.loads(session["meta_json"])
+                if agent_data := meta.get("agent_data"):
+                    agent = agent_data
+
+        if agent is None:
+            try:
+                agent = self.agents[agent_identity]
+            except KeyError:
+                self.notify("Agent not found", title="Launch agent", severity="error")
+                return
         project_path = Path(self.app.project_dir or os.getcwd())
-        screen = MainScreen(project_path, agent, agent_session_id).data_bind(
+        screen = MainScreen(
+            project_path, agent, agent_session_id, session_pk=session_pk
+        ).data_bind(
             column=ToadApp.column,
             column_width=ToadApp.column_width,
         )
@@ -448,7 +466,7 @@ class StoreScreen(Screen):
 
     @on(LaunchAgent)
     def on_launch_agent(self, message: LaunchAgent) -> None:
-        self.launch_agent(message.identity, message.session_id)
+        self.launch_agent(message.identity, message.session_id, message.pk)
 
     @work
     async def on_mount(self) -> None:
@@ -510,7 +528,11 @@ class StoreScreen(Screen):
         session = await self.app.push_screen_wait(SessionResumeModal())
         if session is not None:
             self.post_message(
-                LaunchAgent(session["agent_identity"], session["agent_session_id"])
+                LaunchAgent(
+                    session["agent_identity"],
+                    session["agent_session_id"],
+                    pk=session["id"],
+                )
             )
 
 

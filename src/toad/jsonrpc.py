@@ -134,7 +134,10 @@ class Server:
     def expose_instance(self, instance: object) -> None:
         """Add methods from the given instance."""
         for method_name in dir(instance):
-            method = getattr(instance, method_name)
+            try:
+                method = getattr(instance, method_name)
+            except AttributeError:
+                continue
             if (jsonrpc_expose := getattr(method, "_jsonrpc_expose", None)) is not None:
                 self.method(jsonrpc_expose)(method)
 

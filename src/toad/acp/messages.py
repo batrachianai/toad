@@ -39,6 +39,12 @@ class Update(AgentMessage):
 
 
 @dataclass
+class UserMessage(Message):
+    type: str
+    text: str
+
+
+@dataclass
 @rich.repr.auto
 class RequestPermission(AgentMessage):
     options: list[protocol.PermissionOption]

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 
 from textual import on
 from textual.app import ComposeResult
@@ -29,7 +30,7 @@ class SessionResumeModal(ModalScreen[Session]):
         with containers.VerticalGroup(id="container"):
             yield widgets.Markdown(HELP)
             yield widgets.Static(
-                "⚠ Most ACP agents currently do not support session resume — this feature is experimental",
+                "⚠ Not all ACP agents currently support resume",
                 classes="warning",
             )
             with containers.Center(id="table-container"):
@@ -99,37 +100,49 @@ class SessionResumeModal(ModalScreen[Session]):
         else:
             local_dt = past_dt  # Already naive, assume local
 
-        return local_dt.strftime("%Y-%m-%d %I:%M %p")
+        return local_dt.strftime("%c")
 
     async def on_mount(self) -> None:
         table = self.session_table
-        table.add_columns("Agent", "Session", "Created", "Last Used")
+        table.add_columns("Agent", "Session", "Created", "Last Used", "Path")
         db = DB()
         sessions = await db.session_get_recent()
         if sessions is None:
             return
+
         for session in sessions:
+            cwd = ""
+            if meta_json := session["meta_json"]:
+                try:
+                    cwd = json.loads(meta_json).get("cwd", None)
+                except Exception:
+                    pass
+
             table.add_row(
                 session["agent"],
                 session["title"],
                 self.friendly_time_ago(session["created_at"]),
                 self.friendly_time_ago(session["last_used"]),
+                cwd,
                 key=str(session["id"]),
             )
 
-    @on(widgets.Button.Pressed, "#resume")
-    async def on_resume_button(self) -> None:
-        table = self.session_table
-        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
-        if row_key is None:
-            return
+    async def dissmiss_with_session(self, row_key_value: str) -> Session | None:
         try:
-            session_id = int(row_key.value)
+            session_id = int(row_key_value)
         except ValueError:
             return
         db = DB()
         session = await db.session_get(session_id)
         self.dismiss(session)
+
+    @on(widgets.Button.Pressed, "#resume")
+    async def on_resume_button(self) -> None:
+        table = self.session_table
+        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+        if row_key is None or row_key.value is None:
+            return
+        await self.dissmiss_with_session(row_key.value)
 
     @on(widgets.Button.Pressed, "#cancel")
     def on_cancel_button(self) -> None:
@@ -143,16 +156,9 @@ class SessionResumeModal(ModalScreen[Session]):
     async def on_data_table_row_selected(
         self, event: widgets.DataTable.RowSelected
     ) -> None:
-        if event.row_key is None:
+        if event.row_key is None or event.row_key.value is None:
             return
-        self.log(event.row_key)
-        try:
-            session_id = int(event.row_key.value)
-        except ValueError:
-            return
-        db = DB()
-        session = await db.session_get(session_id)
-        self.dismiss(session)
+        await self.dissmiss_with_session(event.row_key.value)
 
 
 if __name__ == "__main__":

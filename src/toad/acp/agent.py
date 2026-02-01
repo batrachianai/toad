@@ -69,7 +69,11 @@ class Agent(AgentBase):
     """An agent that speaks the APC (https://agentclientprotocol.com/overview/introduction) protocol."""
 
     def __init__(
-        self, project_root: Path, agent: AgentData, session_id: str | None
+        self,
+        project_root: Path,
+        agent: AgentData,
+        session_id: str | None,
+        session_pk: int | None = None,
     ) -> None:
         """
 
@@ -99,8 +103,7 @@ class Agent(AgentBase):
             },
         }
         self.auth_methods: list[protocol.AuthMethod] = []
-
-        self.session_pk: int | None = None
+        self.session_pk: int | None = session_pk
         self.tool_calls: dict[str, protocol.ToolCall] = {}
         self._message_target: MessagePump | None = None
 
@@ -119,6 +122,11 @@ class Agent(AgentBase):
         """The command used to launch the agent, or `None` if there isn't one."""
         acp_command = toad.get_os_matrix(self._agent_data["run_command"])
         return acp_command
+
+    @property
+    def supports_load_session(self) -> bool:
+        """Does the agent support loading sessions?"""
+        return self.agent_capabilities.get("loadSession", False)
 
     def __rich_repr__(self) -> rich.repr.Result:
         yield self.project_root_path
@@ -220,6 +228,12 @@ class Agent(AgentBase):
                 status_line = open_hands_metrics.get("status_line")
 
         match update:
+            case {
+                "sessionUpdate": "user_message_chunk",
+                "content": {"type": type, "text": text},
+            }:
+                self.post_message(messages.UserMessage(type, text))
+
             case {
                 "sessionUpdate": "agent_message_chunk",
                 "content": {"type": type, "text": text},
@@ -580,6 +594,9 @@ class Agent(AgentBase):
                         )
                         return
                     await self.acp_load_session()
+                    if self.session_pk is not None:
+                        db = DB()
+                        await db.session_update_last_used(self.session_pk)
             except jsonrpc.APIError as error:
                 if isinstance(error.data, dict):
                     reason = str(
@@ -648,14 +665,19 @@ class Agent(AgentBase):
         assert response is not None
         self.session_id = response["sessionId"]
 
-        db = DB()
-        self.session_pk = await db.session_new(
-            "New Session",
-            self._agent_data["name"],
-            self._agent_data["identity"],
-            self.session_id,
-            protocol="acp",
-        )
+        if self.supports_load_session:
+            db = DB()
+            self.session_pk = await db.session_new(
+                "New Session",
+                self._agent_data["name"],
+                self._agent_data["identity"],
+                self.session_id,
+                protocol="acp",
+                meta={
+                    "cwd": str(self.project_root_path),
+                    "agent_data": self._agent_data,
+                },
+            )
 
         if (modes := response.get("modes", None)) is not None:
             current_mode = modes["currentModeId"]
@@ -670,10 +692,19 @@ class Agent(AgentBase):
 
     async def acp_load_session(self) -> None:
         assert self.session_id is not None, "Session id must be set"
+        cwd = str(self.project_root_path)
+        if self.session_pk is not None:
+            db = DB()
+            if (session := await db.session_get(self.session_pk)) is not None:
+                if session["meta_json"]:
+                    meta = json.loads(session["meta_json"])
+                    if session_cwd := meta.get("cwd", None):
+                        cwd = session_cwd
+                    if agent_data := meta.get("agent_data"):
+                        self._agent_data = agent_data
+
         with self.request():
-            session_load_response = api.session_load(
-                str(self.project_root_path), [], self.session_id
-            )
+            session_load_response = api.session_load(cwd, [], self.session_id)
         response = await session_load_response.wait()
 
         if (modes := response.get("modes", None)) is not None:

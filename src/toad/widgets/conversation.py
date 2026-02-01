@@ -364,6 +364,7 @@ class Conversation(containers.Vertical):
         project_path: Path,
         agent: AgentData | None = None,
         agent_session_id: str | None = None,
+        session_pk: int | None = None,
     ) -> None:
         super().__init__()
 
@@ -379,6 +380,7 @@ class Conversation(containers.Vertical):
         self._last_escape_time: float = monotonic()
         self._agent_data = agent
         self._agent_session_id = agent_session_id
+        self._session_pk = session_pk
         self._agent_fail = False
         self._mouse_down_offset: Offset | None = None
 
@@ -930,6 +932,13 @@ class Conversation(containers.Vertical):
         self._agent_thought = None
         await self.post_agent_response(message.text)
 
+    @on(acp_messages.UserMessage)
+    async def on_acp_user_message(self, message: acp_messages.UserMessage):
+        self._agent_thought = None
+        self._agent_response = None
+        message.stop()
+        await self.post(UserInput(message.text))
+
     @on(acp_messages.Thinking)
     async def on_acp_agent_thinking(self, message: acp_messages.Thinking):
         message.stop()
@@ -1345,6 +1354,7 @@ class Conversation(containers.Vertical):
                     self.project_path,
                     self._agent_data,
                     self._agent_session_id,
+                    self._session_pk,
                 )
                 self.agent.start(self)
 
