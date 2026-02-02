@@ -6,6 +6,8 @@ from textual.content import Content
 from textual.widget import Widget
 from textual.message import Message
 
+from toad.session_monitor import SessionState
+
 
 class WorkStarted(Message):
     """Work has started."""
@@ -72,3 +74,13 @@ class Flash(Message):
 
 class ProjectDirectoryUpdated(Message):
     """The project directory may may changed."""
+
+
+@dataclass
+class SessionStateChange(Message):
+    """Report a change to the session."""
+
+    mode_name: str
+    state: SessionState | None = None
+    title: str | None = None
+    subtitle: str | None = None

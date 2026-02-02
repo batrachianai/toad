@@ -1,16 +1,7 @@
 from dataclasses import dataclass
-from enum import auto, Enum
+from typing import Literal
 
-
-class SessionState(Enum):
-    """Possible session state."""
-
-    BUSY = auto()
-    """Session is busy working."""
-    ASKING = auto()
-    """Session is asking user for permission."""
-    IDLE = auto()
-    """Session is idle, waiting for a prompt."""
+type SessionState = Literal["busy", "asking", "idle"]
 
 
 @dataclass
@@ -36,7 +27,7 @@ class SessionTracker:
         self.sessions: dict[str, SessionMeta] = {}
         self._session_index = 0
 
-    def add_session(self, title: str, subtitle: str):
+    def add_session(self, title: str, subtitle: str) -> SessionMeta:
         self._session_index += 1
         mode_name = f"session-{self._session_index}"
         session_meta = SessionMeta(
@@ -44,6 +35,23 @@ class SessionTracker:
             mode_name=mode_name,
             title=title,
             subtitle=subtitle,
-            state=SessionState.IDLE,
+            state="idle",
         )
         self.sessions[mode_name] = session_meta
+        return session_meta
+
+    def update_session(
+        self,
+        mode_name: str,
+        title: str | None,
+        subtitle: str | None,
+        state: SessionState | None,
+    ) -> SessionMeta:
+        session_meta = self.sessions[mode_name]
+        if title is not None:
+            session_meta.title = title
+        if subtitle is not None:
+            session_meta.subtitle = subtitle
+        if state is not None:
+            session_meta.state = state
+        return session_meta
