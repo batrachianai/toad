@@ -6,7 +6,7 @@ from textual.content import Content
 from textual.widget import Widget
 from textual.message import Message
 
-from toad.session_monitor import SessionState
+from toad.session_tracker import SessionState
 
 
 class WorkStarted(Message):

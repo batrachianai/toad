@@ -1,22 +1,22 @@
 from dataclasses import dataclass
 from typing import Literal
 
-type SessionState = Literal["busy", "asking", "idle"]
+type SessionState = Literal["notready", "busy", "asking", "idle"]
 
 
 @dataclass
-class SessionMeta:
+class SessionDetails:
     """Tracks a concurrent session."""
 
     index: int
     """Index of session, used in sorting."""
     mode_name: str
     """The screen mode name."""
-    title: str
+    title: str = ""
     """The title of the conversation."""
-    subtitle: str
+    subtitle: str = ""
     """The subtitle of the conversation."""
-    state: SessionState
+    state: SessionState = "notready"
     """The current state of the session."""
 
 
@@ -24,20 +24,16 @@ class SessionTracker:
     """Tracks concurrent agent settings"""
 
     def __init__(self) -> None:
-        self.sessions: dict[str, SessionMeta] = {}
+        self.sessions: dict[str, SessionDetails] = {}
         self._session_index = 0
 
-    def add_session(self, title: str, subtitle: str) -> SessionMeta:
+    def new_session(self) -> SessionDetails:
         self._session_index += 1
         mode_name = f"session-{self._session_index}"
-        session_meta = SessionMeta(
+        session_meta = SessionDetails(
             index=self._session_index,
             mode_name=mode_name,
-            title=title,
-            subtitle=subtitle,
-            state="idle",
         )
-        self.sessions[mode_name] = session_meta
         return session_meta
 
     def update_session(
@@ -46,7 +42,7 @@ class SessionTracker:
         title: str | None,
         subtitle: str | None,
         state: SessionState | None,
-    ) -> SessionMeta:
+    ) -> SessionDetails:
         session_meta = self.sessions[mode_name]
         if title is not None:
             session_meta.title = title

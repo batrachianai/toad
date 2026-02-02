@@ -6,7 +6,7 @@ from pathlib import Path
 import platform
 import json
 from time import monotonic
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import Any, Callable, ClassVar, TYPE_CHECKING
 
 from rich import terminal_theme
 
@@ -19,6 +19,7 @@ from textual import events
 from textual.signal import Signal
 from textual.timer import Timer
 from textual.notifications import Notify
+from textual.screen import Screen
 
 import toad
 from toad.db import DB
@@ -28,6 +29,7 @@ from toad.settings_schema import SCHEMA
 from toad.version import VersionMeta
 from toad import paths
 from toad import atomic
+from toad.session_tracker import SessionTracker, SessionDetails
 
 if TYPE_CHECKING:
     from toad.screens.main import MainScreen
@@ -241,7 +243,6 @@ class ToadApp(App, inherit_bindings=False):
             tooltip="Settings screen",
         ),
     ]
-    CSS_PATH = "toad.tcss"
     ALLOW_IN_MAXIMIZED_VIEW = ""
 
     _settings = var(dict)
@@ -280,6 +281,7 @@ class ToadApp(App, inherit_bindings=False):
         self.version_meta: VersionMeta | None = None
         self._supports_pyperclip: bool | None = None
         self._terminal_title_flash_timer: Timer | None = None
+        self._session_tracker = SessionTracker()
 
         super().__init__()
 
@@ -585,14 +587,31 @@ class ToadApp(App, inherit_bindings=False):
         self._settings = settings
         self.settings.set_all()
 
+    async def new_session_screen(
+        self, get_screen: Callable[[], Screen]
+    ) -> SessionDetails:
+        session_details = self._session_tracker.new_session()
+
+        def make_screen() -> Screen:
+            screen = get_screen()
+            screen.id = session_details.mode_name
+            return screen
+
+        self.add_mode(session_details.mode_name, make_screen)
+        await self.switch_mode(session_details.mode_name)
+        return session_details
+
     async def on_mount(self) -> None:
         self.capture_event("toad-run")
-        self.anon_id
-
+        self.anon_id  # Created on frst reference
         if mode := self._initial_mode:
             self.switch_mode(mode)
         else:
-            self.push_screen(self.get_main_screen())
+            self.notify("new_screen")
+            await self.new_session_screen(self.get_main_screen)
+            # session_details = self._session_tracker.new_session()
+            # self.add_mode(session_details.mode_name, self.get_main_screen)
+            # self.switch_mode(session_details.mode_name)
 
         self.update_terminal_title()
         self.set_timer(1, self.run_version_check)

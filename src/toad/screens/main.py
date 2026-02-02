@@ -65,9 +65,12 @@ class ModeProvider(Provider):
 class MainScreen(Screen, can_focus=False):
     AUTO_FOCUS = "Conversation Prompt TextArea"
 
+    CSS_PATH = "toad.tcss"
+
     COMMANDS = {ModeProvider}
     BINDINGS = [
         Binding("ctrl+b,f20", "show_sidebar", "Sidebar"),
+        Binding("ctrl+h", "go_home", "Home"),
     ]
 
     BINDING_GROUP_TITLE = "Screen"
@@ -190,6 +193,9 @@ class MainScreen(Screen, can_focus=False):
 
     def action_focus_prompt(self) -> None:
         self.conversation.focus_prompt()
+
+    async def action_go_home(self) -> None:
+        await self.app.switch_mode("store")
 
     @on(SideBar.Dismiss)
     def on_side_bar_dismiss(self, message: SideBar.Dismiss):
