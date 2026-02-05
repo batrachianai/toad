@@ -1,7 +1,8 @@
 StoreScreen {    
 
     #container {
-        hatch: right $primary 15%;
+        hatch: right $primary 15%;   
+        overflow: hidden auto;
     }
 
     .instruction-text {
@@ -25,8 +26,7 @@ StoreScreen {
 
     #title-container {
         align: center top;
-        dock: top;
-        
+        dock: top;        
         #title-grid {
             margin: 0 1;
             border: block black 20%;
@@ -36,12 +36,7 @@ StoreScreen {
             grid-columns: 24 1fr;
             grid-rows: auto;
             grid-gutter: 1 2;
-            min-width: 40;
-
-            #info {
-                
-            }
-
+            min-width: 40;       
             Mandelbrot {   
                 border: none;             
                 height: 100%;                                                                
@@ -72,8 +67,7 @@ StoreScreen {
 
     }
 
-    #sponsored-agents { 
-        
+    #sponsored-agents {         
         GridSelect {
             margin:0 1;
             grid-gutter: 1;
@@ -81,7 +75,6 @@ StoreScreen {
         }
     }
    
-
     AgentItem {
         height: auto;             
         border: tall transparent;
@@ -107,6 +100,7 @@ StoreScreen {
             color: $text-secondary;
         }
     }
+
     Launcher {
         GridSelect {
             width: 1fr;            
@@ -119,8 +113,7 @@ StoreScreen {
         .no-agents {
             text-style: dim italic;
             padding: 1 2;
-        }
-            
+        }            
     }
 
     LauncherItem {
@@ -152,10 +145,8 @@ StoreScreen {
 
 AgentModal {    
     align: center middle;
-    # background: $surface 80%;
-
-    .acp-warning {
-        # background: $success-muted 50%;
+    
+    .acp-warning {    
         color: $text-success;
         margin-left: 1;
         padding: 0 1;
@@ -208,34 +199,34 @@ AgentModal {
 }
 
 CommandEditModal {    
-        align: center middle;
+    align: center middle;
 
-        #container {
-            padding: 1 1 0 1;
-            border: thick $primary 20%;
-            border-title-color: $text;            
-            margin: 3 6;
-            height: 1fr;
-            height: auto;
-            max-width: 80;
+    #container {
+        padding: 1 1 0 1;
+        border: thick $primary 20%;
+        border-title-color: $text;            
+        margin: 3 6;
+        height: 1fr;
+        height: auto;
+        max-width: 80;
 
-            .instructions {                
-                color: $text-primary;
-                padding: 0 1 1 1;                            
-            }
-
-            TextArea {
-                height: 6
-            }
-
-            #button-container {
-                padding: 1 1 0 1;
-                width: 1fr;
-                align: right top;
-            }
+        .instructions {                
+            color: $text-primary;
+            padding: 0 1 1 1;                            
         }
 
+        TextArea {
+            height: 6
+        }
+
+        #button-container {
+            padding: 1 1 0 1;
+            width: 1fr;
+            align: right top;
+        }
     }
+
+}
 
 
 ActionModal {

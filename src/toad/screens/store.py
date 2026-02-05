@@ -456,13 +456,17 @@ class StoreScreen(Screen):
                 self.notify("Agent not found", title="Launch agent", severity="error")
                 return
         project_path = Path(self.app.project_dir or os.getcwd())
-        screen = MainScreen(
-            project_path, agent, agent_session_id, session_pk=session_pk
-        ).data_bind(
-            column=ToadApp.column,
-            column_width=ToadApp.column_width,
-        )
-        await self.app.push_screen_wait(screen)
+
+        def get_screen():
+            screen = MainScreen(
+                project_path, agent, agent_session_id, session_pk=session_pk
+            ).data_bind(
+                column=ToadApp.column,
+                column_width=ToadApp.column_width,
+            )
+            return screen
+
+        await self.app.new_session_screen(get_screen)
 
     @on(LaunchAgent)
     def on_launch_agent(self, message: LaunchAgent) -> None:
