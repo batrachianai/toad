@@ -186,6 +186,7 @@ SessionGridSelect {
 
 SessionSummary {
    
+    background: black 10%;
     width: 32;
     border: tall transparent;
     
@@ -206,7 +207,7 @@ SessionSummary {
     }
     
 
-    &.-blink {
+    &.-state-asking.-blink {
         .icon {
             opacity: 0.2;
         }
@@ -218,7 +219,8 @@ SessionSummary {
     
 
     .busy-indicator {
-        display: None;        
+        display: None;   
+        text-opacity: 0.7;     
     }
 
     &.-state-busy {
