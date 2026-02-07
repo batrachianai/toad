@@ -61,6 +61,7 @@ from toad.menus import MenuItem
 from toad.widgets.shell_terminal import ShellTerminal
 
 if TYPE_CHECKING:
+    from toad.session_tracker import SessionState
     from toad.widgets.terminal import Terminal
     from toad.widgets.agent_response import AgentResponse
     from toad.widgets.agent_thought import AgentThought
@@ -371,6 +372,10 @@ class Conversation(containers.Vertical):
     class SessionUpdate(Message):
         name: str | None
         """Name of the session, or `None` for no change."""
+        subtitle: str | None = None
+        """Session subtitle (name of agent)."""
+        state: SessionState | None = None
+        """New session state."""
 
     def __init__(
         self,
@@ -1369,6 +1374,7 @@ class Conversation(containers.Vertical):
                     self._session_pk,
                 )
                 self.agent.start(self)
+                self.post_message(self.SessionUpdate("Hello", self.agent_title))
 
             self.call_after_refresh(start_agent)
 

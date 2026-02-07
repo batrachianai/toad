@@ -38,15 +38,22 @@ class ThrobberVisual(Visual):
 
     """
 
+    def __init__(
+        self, character: str = "━", get_time: Callable[[], float] = monotonic
+    ) -> None:
+        self.character = character
+        self.get_time = get_time
+
     gradient = Gradient.from_colors(*[Color.parse(color) for color in COLORS])
 
     @lru_cache(maxsize=8)
     def make_segments(self, style: Style, width: int) -> list[Segment]:
         gradient = self.gradient
         background = style.rich_style.bgcolor
+        character = self.character
         segments = [
             Segment(
-                "━",
+                character,
                 RichStyle.from_color(
                     gradient.get_rich_color((offset / width) % 1),
                     background,
@@ -72,7 +79,7 @@ class ThrobberVisual(Visual):
             An list of Strips.
         """
 
-        time = monotonic()
+        time = self.get_time()
         segments = self.make_segments(style, width)
         offset = width - int((time % 1.0) * width)
         segments = segments[offset : offset + width]

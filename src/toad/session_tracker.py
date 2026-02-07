@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from operator import attrgetter
 from typing import Iterable, Literal, Sequence
 
+from textual.signal import Signal
+
 type SessionState = Literal["notready", "busy", "asking", "idle"]
 
 
@@ -19,14 +21,20 @@ class SessionDetails:
     """The subtitle of the conversation."""
     state: SessionState = "notready"
     """The current state of the session."""
+    summary: str = ""
+    """Suplimentary information about the session."""
+
+    updates: int = 0
+    """Track updates to the session details."""
 
 
 class SessionTracker:
     """Tracks concurrent agent settings"""
 
-    def __init__(self) -> None:
+    def __init__(self, signal: Signal[tuple[str, SessionDetails | None]]) -> None:
         self.sessions: dict[str, SessionDetails] = {}
         self._session_index = 0
+        self.signal = signal
 
     def new_session(self) -> SessionDetails:
         self._session_index += 1
@@ -44,9 +52,9 @@ class SessionTracker:
     def update_session(
         self,
         mode_name: str,
-        title: str | None,
-        subtitle: str | None,
-        state: SessionState | None,
+        title: str | None = None,
+        subtitle: str | None = None,
+        state: SessionState | None = None,
     ) -> SessionDetails:
         session_meta = self.sessions[mode_name]
         if title is not None:
@@ -55,6 +63,7 @@ class SessionTracker:
             session_meta.subtitle = subtitle
         if state is not None:
             session_meta.state = state
+        self.signal.publish((mode_name, session_meta))
         return session_meta
 
     @property

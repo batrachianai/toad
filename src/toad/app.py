@@ -274,7 +274,9 @@ class ToadApp(App, inherit_bindings=False):
             mode: Initial mode.
             agent: Agent identity or shor name.
         """
-        self.settings_changed_signal = Signal(self, "settings_changed")
+        self.settings_changed_signal: Signal[tuple[int, object]] = Signal(
+            self, "settings_changed"
+        )
         self.agent_data = agent_data
         self.project_dir = (
             None if project_dir is None else Path(project_dir).expanduser().resolve()
@@ -283,7 +285,11 @@ class ToadApp(App, inherit_bindings=False):
         self.version_meta: VersionMeta | None = None
         self._supports_pyperclip: bool | None = None
         self._terminal_title_flash_timer: Timer | None = None
-        self._session_tracker = SessionTracker()
+
+        self.session_update_signal: Signal[tuple[str, SessionDetails | None]] = Signal(
+            self, "session_update"
+        )
+        self._session_tracker = SessionTracker(self.session_update_signal)
 
         super().__init__()
 
@@ -597,13 +603,11 @@ class ToadApp(App, inherit_bindings=False):
         self, get_screen: Callable[[], Screen]
     ) -> SessionDetails:
         session_details = self._session_tracker.new_session()
-        self.log(session_details)
+        self.session_update_signal.publish((session_details.mode_name, session_details))
 
         def make_screen() -> Screen:
             screen = get_screen()
-            print(screen)
             screen.id = session_details.mode_name
-            print(repr(screen.id))
             return screen
 
         self.add_mode(session_details.mode_name, make_screen)
@@ -618,9 +622,6 @@ class ToadApp(App, inherit_bindings=False):
         else:
             self.notify("new_screen")
             await self.new_session_screen(self.get_main_screen)
-            # session_details = self._session_tracker.new_session()
-            # self.add_mode(session_details.mode_name, self.get_main_screen)
-            # self.switch_mode(session_details.mode_name)
 
         self.update_terminal_title()
         self.set_timer(1, self.run_version_check)

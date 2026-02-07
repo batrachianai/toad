@@ -670,8 +670,9 @@ class Agent(AgentBase):
 
         if self.supports_load_session:
             db = DB()
+            session_name = "New Session"
             self.session_pk = await db.session_new(
-                "New Session",
+                session_name,
                 self._agent_data["name"],
                 self._agent_data["identity"],
                 self.session_id,

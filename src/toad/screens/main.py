@@ -170,6 +170,13 @@ class MainScreen(Screen, can_focus=False):
         # TODO: May not be required
         if event.name is not None:
             self._agent_session_title = event.name
+            if self.id is not None:
+                self.app.session_tracker.update_session(
+                    self.id,
+                    title=event.name,
+                    subtitle=event.subtitle,
+                    state=event.state,
+                )
 
     def on_mount(self) -> None:
         for tree in self.query("#project_directory_tree").results(DirectoryTree):

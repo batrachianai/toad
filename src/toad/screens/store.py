@@ -26,6 +26,7 @@ from toad.db import DB
 from toad.pill import pill
 from toad.widgets.mandelbrot import Mandelbrot
 from toad.widgets.grid_select import GridSelect
+from toad.widgets.session_grid_select import SessionGridSelect
 from toad.agent_schema import Agent
 from toad.agents import read_agents
 
@@ -334,6 +335,8 @@ class StoreScreen(Screen):
 
     def compose_agents(self) -> ComposeResult:
         agents = self._agents
+
+        yield SessionGridSelect(self.app.session_tracker)
 
         yield Launcher(agents, id="launcher")
 
