@@ -65,6 +65,7 @@ class DirectoryWatcher(threading.Thread, FileSystemEventHandler):
             return
         if isinstance(observer, PollingObserver):
             return
+        return
         try:
             observer.schedule(
                 self,

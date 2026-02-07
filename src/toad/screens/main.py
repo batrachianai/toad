@@ -65,9 +65,10 @@ class ModeProvider(Provider):
 class MainScreen(Screen, can_focus=False):
     AUTO_FOCUS = "Conversation Prompt TextArea"
 
-    CSS_PATH = "toad.tcss"
+    CSS_PATH = "main.tcss"
 
     COMMANDS = {ModeProvider}
+
     BINDINGS = [
         Binding("ctrl+b,f20", "show_sidebar", "Sidebar"),
         Binding("ctrl+h", "go_home", "Home"),

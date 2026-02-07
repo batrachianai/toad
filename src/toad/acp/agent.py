@@ -570,7 +570,10 @@ class Agent(AgentBase):
             await db.session_update_last_used(self.session_pk)
 
         if self._process is not None:
-            self._process.terminate()
+            try:
+                self._process.terminate()
+            except OSError:
+                pass
 
     async def run(self) -> None:
         """The main logic of the Agent."""

@@ -25,6 +25,7 @@ import toad
 from toad.db import DB
 from toad.settings import Schema, Settings
 from toad.agent_schema import Agent as AgentData
+from toad import messages
 from toad.settings_schema import SCHEMA
 from toad.version import VersionMeta
 from toad import paths
@@ -222,6 +223,7 @@ def get_store_screen() -> StoreScreen:
 class ToadApp(App, inherit_bindings=False):
     """The top level app."""
 
+    CSS_PATH = "toad.tcss"
     SCREENS = {"settings": get_settings_screen}
     MODES = {"store": get_store_screen}
     BINDING_GROUP_TITLE = "System"
@@ -332,6 +334,10 @@ class ToadApp(App, inherit_bindings=False):
             self.save_settings()
             self.call_later(self.capture_event, "toad-install")
         return anon_id
+
+    @property
+    def session_tracker(self) -> SessionTracker:
+        return self._session_tracker
 
     def copy_to_clipboard(self, text: str) -> None:
         """Override copy to clipboard to use pyperclip first, then OSC 52.
@@ -591,10 +597,13 @@ class ToadApp(App, inherit_bindings=False):
         self, get_screen: Callable[[], Screen]
     ) -> SessionDetails:
         session_details = self._session_tracker.new_session()
+        self.log(session_details)
 
         def make_screen() -> Screen:
             screen = get_screen()
+            print(screen)
             screen.id = session_details.mode_name
+            print(repr(screen.id))
             return screen
 
         self.add_mode(session_details.mode_name, make_screen)
@@ -701,3 +710,11 @@ class ToadApp(App, inherit_bindings=False):
             self.action_hide_help_panel()
         else:
             self.action_show_help_panel()
+
+    @on(messages.SessionNavigate)
+    def on_session_navigate(self, event: messages.SessionNavigate) -> None:
+        new_mode = self._session_tracker.session_cursor_move(
+            event.mode_name, event.direction
+        )
+        if new_mode is not None:
+            self.switch_mode(new_mode)

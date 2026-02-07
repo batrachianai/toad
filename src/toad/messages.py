@@ -84,3 +84,11 @@ class SessionStateChange(Message):
     state: SessionState | None = None
     title: str | None = None
     subtitle: str | None = None
+
+
+@dataclass
+class SessionNavigate(Message):
+    """Request to switch session."""
+
+    mode_name: str
+    direction: Literal[-1, +1]

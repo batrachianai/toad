@@ -1,0 +1,174 @@
+.block {
+    margin: 1 1 1 0;  
+}
+
+
+Markdown {
+    layout: stream;    
+}
+
+LoadingIndicator {
+    background: transparent;
+}
+
+Throbber {
+    width: 100%;
+    height: 1;    
+    overlay: screen;
+    visibility: hidden;
+    &.-busy {
+        visibility: visible;
+    }    
+} 
+
+.-hidden {
+    display: none;
+}
+
+App.-hide-footer {
+    #info-container {
+        margin: 0 !important;        
+    }
+    Footer {
+        display: none;        
+    }
+}
+
+App.-hide-footer.-compact-input {
+    #prompt-container {
+        margin: 0 0;
+    }
+}
+
+
+App.-hide-thoughts AgentThought {
+    display: none;
+}
+
+App.-hide-sidebar SideBar {    
+    layer: sidebar;    
+    offset-x: -100%;
+    &:focus-within {
+        offset-x: 0;                    
+    }
+}
+
+App.-hide-status-line StatusLine {
+    display: none;        
+}
+
+App.-hide-agent-title AgentInfo {
+    display: none;
+}
+
+App.-hide-info-bar #info-container {
+    height: 1;    
+    display: none;
+}
+
+App.-compact-input {    
+    Prompt {        
+        #prompt-container {
+            border: none;
+            &:focus-within {
+                border: none;
+            }   
+            margin: 0 0 0 0;
+            
+        }        
+        #info-container {
+            margin: 0 0;        
+        }
+    }
+}
+
+Checkbox {
+    # TODO: Bug in Textual?
+    text-overflow: clip;    
+}
+
+
+Footer {    
+    background: transparent;
+    .footer-key--key {
+        color: $text;
+        background: transparent;
+        # text-style: not bold;
+        padding: 0 1;        
+    }
+
+    .footer-key--description {
+        padding: 0 1 0 0;
+        color: $text-muted;
+        background: $footer-description-background;
+    }
+
+    &:hover {
+        color: transparent;
+        background: transparent;
+    }
+
+    &.-disabled {
+        text-style: dim;
+    }
+
+    &.-compact {
+        .footer-key--key {
+            padding: 0;
+        }
+        .footer-key--description {
+            padding: 0 0 0 1;
+        }
+    }
+    FooterLabel {
+        color: $text-muted;
+        background: $footer-description-background;
+    }
+
+    FooterKey.-disabled {
+        .footer-key--key {
+            text-opacity: 0.6;       
+        }
+    }
+}
+
+HelpPanel {    
+    
+    border-left: solid white 7%;
+    padding-right: 0;
+    # color: $text-secondary;
+    
+    #widget-help {
+        # color: $text-secondary;
+        border: round $secondary;
+        background: transparent;
+        margin-top: 0;
+        padding: 0 0;        
+        MarkdownBlock {
+            padding: 0 1;
+        }
+        MarkdownH2 {
+            margin: 0 0 1 0;
+        }
+        MarkdownBlock:last-child {
+            margin: 0 0 0 0;
+        }
+    }
+
+    KeyPanel {
+        # color: $text-secondary;
+        scrollbar-gutter: stable;        
+        &> BindingsTable > .bindings-table--description {            
+            # color: $text-secondary;
+            text-opacity:90%;
+        }
+        .bindings-table--key {
+            # color: $text-secondary;  
+            color: $text;
+        }
+        &> BindingsTable > .bindings-table--header {        
+            color: $primary;
+            text-style: underline;
+        }
+    }
+}
