@@ -257,6 +257,7 @@ class ToadApp(App, inherit_bindings=False):
     terminal_title_icon: var[str] = var("🐸")
     terminal_title_flash = var(0)
     terminal_title_blink = var(False)
+    project_dir = var(Path)
 
     HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (100, "-wide")]
 
@@ -278,9 +279,7 @@ class ToadApp(App, inherit_bindings=False):
             self, "settings_changed"
         )
         self.agent_data = agent_data
-        self.project_dir = (
-            None if project_dir is None else Path(project_dir).expanduser().resolve()
-        )
+
         self._initial_mode = mode
         self.version_meta: VersionMeta | None = None
         self._supports_pyperclip: bool | None = None
@@ -292,6 +291,9 @@ class ToadApp(App, inherit_bindings=False):
         self._session_tracker = SessionTracker(self.session_update_signal)
 
         super().__init__()
+        self.project_dir = (
+            None if project_dir is None else Path(project_dir).expanduser().resolve()
+        )
 
     @property
     def config_path(self) -> Path:

@@ -68,6 +68,18 @@ class CondensedPath(Widget):
     path = reactive("")
     display_path = reactive("")
 
+    DEFAULT_CSS = """
+    CondensedPath {
+        height: 1;
+    }
+    """
+
+    def __init__(
+        self, path: str, id: str | None = None, classes: str | None = None
+    ) -> None:
+        super().__init__(id=id, classes=classes)
+        self.path = path
+
     def on_resize(self) -> None:
         self.watch_path(self.path)
 

@@ -24,6 +24,22 @@ StoreScreen {
         }
     }
 
+    DirectoryDisplay {
+        padding: 0 1 0 2;
+        border-bottom: solid $foreground 10%;
+
+        
+        CondensedPath {
+            pointer:pointer;
+            width: 100%;
+            color: $text-warning;
+            &:hover {
+                background: $foreground 4%;
+                text-style: underline;                
+            }
+        }
+    }
+
     #title-container {
         align: center top;
         dock: top;        
