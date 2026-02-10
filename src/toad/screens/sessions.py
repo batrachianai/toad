@@ -24,7 +24,7 @@ from toad.widgets.session_grid_select import SessionGridSelect
 from toad.widgets.session_summary import SessionSummary
 
 
-class SessionsScreen(ModalScreen):
+class SessionsScreen(ModalScreen[str]):
     CSS_PATH = "sessions.tcss"
     BINDINGS = [Binding("escape", "dismiss", "Dismiss")]
 
@@ -62,3 +62,11 @@ class SessionsScreen(ModalScreen):
             and event.widget.session_details is not None
         ):
             self.background_mode = event.widget.session_details.mode_name
+
+    @on(GridSelect.Selected)
+    def on_selected(self, event: GridSelect.Selected) -> None:
+        if (
+            isinstance(event.widget, SessionSummary)
+            and event.widget.session_details is not None
+        ):
+            self.dismiss(event.widget.session_details.mode_name)

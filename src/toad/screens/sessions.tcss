@@ -94,7 +94,7 @@ SessionsScreen {
         }
 
         .title {
-            
+            width: 1fr;
         }
         .subtitle {
             color: $text-secondary;

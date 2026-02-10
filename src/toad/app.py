@@ -733,5 +733,10 @@ class ToadApp(App, inherit_bindings=False):
         if new_mode is not None:
             self.switch_mode(new_mode)
 
-    def action_sessions(self) -> None:
-        self.push_screen("sessions")
+    @work
+    async def action_sessions(self) -> None:
+        if (session_screen_name := await self.push_screen_wait("sessions")) is not None:
+            try:
+                self.app.switch_mode(session_screen_name)
+            except KeyError:
+                pass

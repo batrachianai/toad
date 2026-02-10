@@ -26,7 +26,7 @@ class GridSelect(containers.ItemGrid, can_focus=True):
     @dataclass
     class Selected(Message):
         grid_select: "GridSelect"
-        selected_widget: Widget
+        widget: Widget
 
         @property
         def control(self) -> Widget:

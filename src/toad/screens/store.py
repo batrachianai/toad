@@ -485,15 +485,13 @@ class StoreScreen(Screen):
     @on(GridSelect.Selected, ".agents-picker")
     @work
     async def on_grid_select_selected(self, event: GridSelect.Selected):
-        assert isinstance(event.selected_widget, AgentItem)
+        assert isinstance(event.widget, AgentItem)
         from toad.screens.agent_modal import AgentModal
 
-        modal_response = await self.app.push_screen_wait(
-            AgentModal(event.selected_widget.agent)
-        )
+        modal_response = await self.app.push_screen_wait(AgentModal(event.widget.agent))
         self.app.save_settings()
         if modal_response == "launch":
-            self.post_message(LaunchAgent(event.selected_widget.agent["identity"]))
+            self.post_message(LaunchAgent(event.widget.agent["identity"]))
 
     @on(OpenAgentDetails)
     @work
@@ -512,7 +510,7 @@ class StoreScreen(Screen):
     @on(GridSelect.Selected, "#launcher GridSelect")
     @work
     async def on_launcher_selected(self, event: GridSelect.Selected):
-        launcher_item = event.selected_widget
+        launcher_item = event.widget
         assert isinstance(launcher_item, LauncherItem)
 
         from toad.screens.agent_modal import AgentModal
