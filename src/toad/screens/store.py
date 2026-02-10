@@ -525,7 +525,7 @@ class StoreScreen(Screen):
     @on(ChangeDirectory)
     def on_change_directory(self, event: ChangeDirectory) -> None:
         self.project_dir = Path(event.path)
-        print(self.project_dir)
+        self.app.project_dir = self.project_dir
 
     @work
     async def launch_agent(
