@@ -111,7 +111,7 @@ class DirectoryDisplay(containers.HorizontalGroup):
         path = Path(event.value)
         if not path.is_dir():
             self.notify(
-                f"Unable to change directory to {path!r}",
+                f"Unable to change directory to {str(path)!r}",
                 title="Change directory",
                 severity="error",
             )
@@ -123,10 +123,14 @@ class DirectoryDisplay(containers.HorizontalGroup):
         self.edit = False
         self.directory_input.value = self.path
 
+    def watch_edit(self, edit: bool) -> None:
+        if not edit and self.directory_input.has_focus:
+            self.directory_input.blur()
+
     def compose(self) -> ComposeResult:
         yield widgets.Label("📁 ")
         yield CondensedPath(self.path).data_bind(path=DirectoryDisplay.path)
-        yield DirectoryInput(self.path, compact=True).data_bind(
+        yield DirectoryInput(self.path, select_on_focus=False, compact=True).data_bind(
             value=DirectoryDisplay.path
         )
 
@@ -352,7 +356,6 @@ class StoreScreen(Screen):
             "directory",
             "Directory",
             tooltip="Change project directory",
-            priority=True,
         ),
     ]
 

@@ -18,34 +18,12 @@ Note,MarkdownNote {
 }
 
 
-Toast {    
-    margin: 0 0;
-    padding: 0 1;
-    background: $background;
-    color: $text-muted;
-    .toast--title {        
-        color: $text;            
-    }    
-    &.-information {
-        border: round $primary;                          
-    }
-    &.-warning {
-        border: round $warning;                        
-    }
-    &.-error {
-        border: round $error;                  
-    }    
-}
-
 Menu {
     border: round $accent;
     background: transparent;
 }
 
 
-Loading {
-    color: $text-primary;        
-}
 
 
 Plan {        
@@ -618,35 +596,3 @@ MainScreen {
     }
 
 }
-
-
-Version {
-    layer: float;
-    offset-x: 0;
-    overlay: screen;
-    width: auto;
-    color: $text-success 50%;
-    text-style: bold;
-}
-
-Explain {
-    layer: float;    
-    padding: 0;    
-    & > Markdown {        
-        margin: 1;
-        height: auto;
-        min-height: 1fr;
-        width: 100%;        
-
-    }
-    scrollbar-gutter: stable;
-    margin: 0;
-    dock: bottom;
-    border: panel $primary;
-    height: 50%;    
-    margin: 1 0;
-    display: none;  
-    overflow: auto;
-    width: 100%;    
-}
-

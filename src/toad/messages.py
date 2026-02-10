@@ -77,16 +77,6 @@ class ProjectDirectoryUpdated(Message):
 
 
 @dataclass
-class SessionStateChange(Message):
-    """Report a change to the session."""
-
-    mode_name: str
-    state: SessionState | None = None
-    title: str | None = None
-    subtitle: str | None = None
-
-
-@dataclass
 class SessionNavigate(Message):
     """Request to switch session."""
 

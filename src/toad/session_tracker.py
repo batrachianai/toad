@@ -19,6 +19,8 @@ class SessionDetails:
     """The title of the conversation."""
     subtitle: str = ""
     """The subtitle of the conversation."""
+    path: str = ""
+    """The project directory path."""
     state: SessionState = "notready"
     """The current state of the session."""
     summary: str = ""
@@ -54,17 +56,20 @@ class SessionTracker:
         mode_name: str,
         title: str | None = None,
         subtitle: str | None = None,
+        path: str | None = None,
         state: SessionState | None = None,
     ) -> SessionDetails:
-        session_meta = self.sessions[mode_name]
+        session_details = self.sessions[mode_name]
         if title is not None:
-            session_meta.title = title
+            session_details.title = title
         if subtitle is not None:
-            session_meta.subtitle = subtitle
+            session_details.subtitle = subtitle
+        if path is not None:
+            session_details.path = path
         if state is not None:
-            session_meta.state = state
-        self.signal.publish((mode_name, session_meta))
-        return session_meta
+            session_details.state = state
+        self.signal.publish((mode_name, session_details))
+        return session_details
 
     @property
     def ordered_sessions(self) -> Sequence[SessionDetails]:

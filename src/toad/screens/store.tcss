@@ -19,7 +19,7 @@ StoreScreen {
 
     Footer {    
         .footer-key--key {            
-            background: transparent;            
+        background: transparent;            
             padding: 0 1;        
         }
     }

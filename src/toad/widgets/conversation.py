@@ -45,6 +45,7 @@ from toad.acp import protocol as acp_protocol
 from toad.acp.agent import Mode
 from toad.answer import Answer
 from toad.agent import AgentBase, AgentReady, AgentFail
+from toad.format_path import format_path
 from toad.directory_watcher import DirectoryWatcher, DirectoryChanged
 from toad.history import History
 from toad.widgets.flash import Flash
@@ -370,10 +371,12 @@ class Conversation(containers.Vertical):
 
     @dataclass
     class SessionUpdate(Message):
-        name: str | None
+        name: str | None = None
         """Name of the session, or `None` for no change."""
         subtitle: str | None = None
         """Session subtitle (name of agent)."""
+        path: str | None = None
+        """Project directory path."""
         state: SessionState | None = None
         """New session state."""
 
@@ -421,20 +424,8 @@ class Conversation(containers.Vertical):
     def update_title(self) -> None:
         """Update the screen title."""
 
-        def path_with_tilde(path: Path) -> str:
-            """Convert path to use ~ for home directory if applicable."""
-            path = Path(path).expanduser().resolve()
-            home = Path.home()
-
-            try:
-                relative = path.relative_to(home)
-                return f"~/{relative}"
-            except ValueError:
-                # Path is not relative to home
-                return str(path)
-
         if agent_title := self.agent_title:
-            project_path = path_with_tilde(self.project_path)
+            project_path = format_path(self.project_path)
             self.screen.title = f"{agent_title} {project_path}"
         else:
             self.screen.title = ""
@@ -477,6 +468,9 @@ class Conversation(containers.Vertical):
         self.prompt.prompt_text_area.insert(insert_text)
         self.prompt.prompt_text_area.insert(" ")
 
+    def watch_project_path(self, path: Path) -> None:
+        self.post_message(self.SessionUpdate(path=str(path)))
+
     async def watch_shell_history_index(self, previous_index: int, index: int) -> None:
         if previous_index == 0:
             self.shell_history.current = self.prompt.text
@@ -497,6 +491,12 @@ class Conversation(containers.Vertical):
             pass
         else:
             self.prompt.text = history_entry["input"]
+
+    def watch_turn(self, turn: str) -> None:
+        if turn == "client":
+            self.post_message(self.SessionUpdate(state="idle"))
+        elif turn == "agent":
+            self.post_message(self.SessionUpdate(state="busy"))
 
     @on(events.Key)
     async def on_key(self, event: events.Key):
@@ -878,6 +878,8 @@ class Conversation(containers.Vertical):
             self.prompt.project_directory_updated()
 
         self._turn_count += 1
+
+        self.post_message(self.SessionUpdate(state="idle"))
 
         if stop_reason != "end_turn":
             from toad.widgets.markdown_note import MarkdownNote
@@ -1374,7 +1376,7 @@ class Conversation(containers.Vertical):
                     self._session_pk,
                 )
                 self.agent.start(self)
-                self.post_message(self.SessionUpdate("Hello", self.agent_title))
+                self.post_message(self.SessionUpdate("New Session", self.agent_title))
 
             self.call_after_refresh(start_agent)
 

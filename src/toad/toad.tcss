@@ -173,96 +173,28 @@ HelpPanel {
     }
 }
 
-SessionGridSelect {
-    padding: 1 0 !important;
-    
-    &:focus * {
-        &.-highlight {
-            # background: $panel;
-            border: none;
-        }
+
+
+Toast {    
+    margin: 0 0;
+    padding: 0 1;
+    background: $background;
+    color: $text-muted;
+    .toast--title {        
+        color: $text;            
+    }    
+    &.-information {
+        border: round $primary;                          
+    }
+    &.-warning {
+        border: round $warning;                        
+    }
+    &.-error {
+        border: round $error;                  
     }    
 }
 
-SessionSummary {
-   
-    background: black 10%;
-    width: 32;
-    border: tall transparent;
-    
-    margin: 0;
-    pointer: pointer;
-    height: auto;
-    padding: 0 1 0 0;
 
-    # background: $primary 7%;
-    # border: tall $success 10%;
-    
-    # border-right: tall $primary;
-    # border-left: tall $primary;
-    # border-bottom: tall $primary;
-
-    Rule {
-        margin: 0;
-    }
-    
-
-    &.-state-asking.-blink {
-        .icon {
-            opacity: 0.2;
-        }
-        Rule {
-            opacity: 0.2;
-        }
-    }
-
-    
-
-    .busy-indicator {
-        display: None;   
-        text-opacity: 0.7;     
-    }
-
-    &.-state-busy {
-        Rule {
-            display: none;
-        }
-        .busy-indicator {
-            display: block;
-        }
-    }
-    &.-state-asking {
-        .icon {
-            color: $text-accent;
-        }
-        Rule {
-            color: $text-accent;
-        }
-    }
-    # &.-state-idle {
-    #     Rule {
-    #         color: $warning 50%;
-    #     }
-    # }
-    
-
-    .icon {            
-        width: 3;
-        text-align: center;
-        color: $text-secondary;
-    }
-
-    .title {
-        
-    }
-    .subtitle {
-        color: $text-secondary;
-        text-style: italic; 
-    }
-    .busy-indicator {
-        opacity: 1;
-    }
-    &.-state-busy .busy-indicator{
-        opacity: 1;
-    }
+Loading {
+    color: $text-primary;        
 }

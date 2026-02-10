@@ -1,0 +1,110 @@
+SessionsScreen {
+    
+
+    #title-container {
+        padding: 1 1 0 1;      
+        
+        color: $text-success;
+    }
+
+
+    SessionGridSelect {     
+                 
+        width: 1fr;
+        margin: 0 1 1 1;
+        padding: 1 0 !important;        
+       
+    }
+
+    SessionSummary {       
+        
+        border: blank transparent;
+        background: black 10%;
+        width: auto;
+            
+        margin: 0;
+        pointer: pointer;
+        height: auto;
+        padding: 1 0 1 0;
+
+        Rule {
+            margin: 0;
+        }
+        
+        &.-highlight {               
+            background: $primary-background 20%;
+            .title {
+                text-style: bold;
+            }
+        }
+    
+        CondensedPath {
+            color: $text-warning;
+        }
+        
+        BusyIndicator {
+            display: None;   
+            text-opacity: 0.7;     
+        }
+
+        &.-state-busy {
+            padding: 0 0 1 0;
+            Rule {
+                display: none;
+            }
+            BusyIndicator {
+                display: block;
+            }
+        }
+        &.-state-idle {
+            .icon {
+                color: $text-secondary;
+            }
+            Rule {
+                display: block;
+                color: $text-secondary;
+            }
+            BusyIndicator {
+                display: none;
+            }
+        }
+        &.-state-asking {
+            .icon {
+                color: $text-accent;
+            }
+            Rule {
+                color: $text-accent;
+            }
+            &.-blink {
+                .icon {
+                    opacity: 0.2;
+                }
+                Rule {
+                    opacity: 0.2;
+                }
+            }
+        }
+        
+
+        .icon {            
+            width: 3;
+            text-align: center;
+            color: $text-secondary;
+        }
+
+        .title {
+            
+        }
+        .subtitle {
+            color: $text-secondary;
+            text-style: italic; 
+        }
+        BusyIndicator {
+            opacity: 1;
+        }
+        &.-state-busy BusyIndicator {
+            opacity: 1;
+        }
+    }
+
+}

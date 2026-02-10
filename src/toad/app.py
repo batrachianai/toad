@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from toad.screens.main import MainScreen
     from toad.screens.settings import SettingsScreen
     from toad.screens.store import StoreScreen
+    from toad.screens.sessions import SessionsScreen
     from toad.db import DB
 
 
@@ -220,11 +221,20 @@ def get_store_screen() -> StoreScreen:
     return StoreScreen()
 
 
+def get_sessions_screen() -> SessionsScreen:
+    from toad.screens.sessions import SessionsScreen
+
+    return SessionsScreen()
+
+
 class ToadApp(App, inherit_bindings=False):
     """The top level app."""
 
     CSS_PATH = "toad.tcss"
-    SCREENS = {"settings": get_settings_screen}
+    SCREENS = {
+        "settings": get_settings_screen,
+        "sessions": get_sessions_screen,
+    }
     MODES = {"store": get_store_screen}
     BINDING_GROUP_TITLE = "System"
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -237,6 +247,7 @@ class ToadApp(App, inherit_bindings=False):
             priority=True,
         ),
         Binding("ctrl+c", "help_quit", show=False, system=True),
+        Binding("ctrl+s", "sessions", "Sessions"),
         Binding("f1", "toggle_help_panel", "Help", priority=True),
         Binding(
             "f2,ctrl+comma",
@@ -721,3 +732,6 @@ class ToadApp(App, inherit_bindings=False):
         )
         if new_mode is not None:
             self.switch_mode(new_mode)
+
+    def action_sessions(self) -> None:
+        self.push_screen("sessions")
