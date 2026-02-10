@@ -343,7 +343,7 @@ class Conversation(containers.Vertical):
 
     busy_count = var(0)
     cursor_offset = var(-1, init=False)
-    project_path = var(Path("./").expanduser().absolute())
+    project_path = var("")
     working_directory: var[str] = var("")
     _blocks: var[list[MarkdownBlock] | None] = var(None)
 

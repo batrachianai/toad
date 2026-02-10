@@ -33,6 +33,15 @@ class GridSelect(containers.ItemGrid, can_focus=True):
             return self.grid_select
 
     @dataclass
+    class Highlighted(Message):
+        grid_select: "GridSelect"
+        widget: Widget
+
+        @property
+        def control(self) -> Widget:
+            return self.grid_select
+
+    @dataclass
     class LeaveUp(Message):
         grid_select: "GridSelect"
 
@@ -104,8 +113,10 @@ class GridSelect(containers.ItemGrid, can_focus=True):
             try:
                 highlighted_widget = self.children[highlighted]
                 highlighted_widget.add_class("-highlight")
+                self.post_message(self.Highlighted(self, highlighted_widget))
             except IndexError:
                 pass
+
         self.reveal_highlight()
 
     def validate_highlighted(self, highlighted: int | None) -> int | None:

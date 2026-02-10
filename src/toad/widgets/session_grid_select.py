@@ -25,6 +25,10 @@ class SessionGridSelect(GridSelect):
     def allow_focus(self) -> bool:
         return True
 
+    @property
+    def visible(self) -> bool:
+        return True
+
     def on_mount(self) -> None:
         self.app.session_update_signal.subscribe(
             self, self.handle_session_update_signal
