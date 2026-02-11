@@ -1,5 +1,4 @@
 from rich.console import RenderableType
-from rich.segment import Segment
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -9,12 +8,9 @@ from textual import getters
 from textual.widget import Widget
 from textual import widgets
 from textual import containers
-from textual.color import Color
 from textual.reactive import reactive
-from textual.renderables.background_screen import BackgroundScreen
-
 from textual.renderables.blank import Blank
-
+from textual.renderables.background_screen import BackgroundScreen
 from textual import on
 
 
@@ -32,12 +28,26 @@ class SessionsScreen(ModalScreen[str]):
     session_grid_select = getters.query_one(SessionGridSelect)
     background_mode = reactive("")
 
-    def render(self) -> RenderableType:
-        try:
-            screen = self.app.get_screen_stack(self.background_mode)[0]
-        except KeyError:
-            return Blank(self.background_colors[1])
+    def get_background_screen(self) -> Screen | None:
+        if self.app.current_mode == self.background_mode:
+            try:
+                screen = self.app.get_screen_stack(self.background_mode)[0]
+            except KeyError:
+                return None
+        else:
+            try:
+                screen = self.app.get_screen_stack(self.background_mode)[-1]
+            except KeyError:
+                return None
+        return screen
 
+    def watch_background_mode(self):
+        screen = self.get_background_screen()
+        self.app.temporary_background_screen = screen
+
+    def render(self) -> RenderableType:
+        if (screen := self.get_background_screen()) is None:
+            return Blank(self.background_colors[1])
         return BackgroundScreen(screen, self.styles.background)
 
     def compose(self) -> ComposeResult:
@@ -54,6 +64,9 @@ class SessionsScreen(ModalScreen[str]):
         current_mode = self.app.screen_stack[0].id
         if current_mode is not None:
             self.session_grid_select.update_current(current_mode)
+
+    def _on_screen_suspend(self) -> None:
+        self.app.temporary_background_screen = None
 
     @on(GridSelect.Highlighted)
     def on_highlighted(self, event: GridSelect.Highlighted) -> None:

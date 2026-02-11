@@ -300,6 +300,7 @@ class ToadApp(App, inherit_bindings=False):
             self, "session_update"
         )
         self._session_tracker = SessionTracker(self.session_update_signal)
+        self.temporary_background_screen: Screen | None = None
 
         super().__init__()
         self.project_dir = (
@@ -317,6 +318,13 @@ class ToadApp(App, inherit_bindings=False):
     @property
     def db_path(self) -> Path:
         return paths.get_state() / "toad.db"
+
+    @property
+    def _background_screens(self) -> list[Screen]:
+        background_screens = super()._background_screens
+        if self.temporary_background_screen:
+            background_screens.append(self.temporary_background_screen)
+        return background_screens
 
     async def get_db(self) -> DB:
         """Get an instance of the database."""
