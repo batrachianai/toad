@@ -741,6 +741,10 @@ class ToadApp(App, inherit_bindings=False):
         if new_mode is not None:
             self.switch_mode(new_mode)
 
+    @on(messages.SessionSwitch)
+    def on_session_switch(self, event: messages.SessionSwitch) -> None:
+        self.switch_mode(event.mode_name)
+
     @work
     async def action_sessions(self) -> None:
         if (session_screen_name := await self.push_screen_wait("sessions")) is not None:

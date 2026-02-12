@@ -52,6 +52,7 @@ from toad.widgets.flash import Flash
 from toad.widgets.menu import Menu
 from toad.widgets.note import Note
 from toad.widgets.prompt import Prompt
+from toad.widgets.session_tabs import SessionsTabs
 from toad.widgets.terminal import Terminal
 from toad.widgets.throbber import Throbber
 from toad.widgets.user_input import UserInput
@@ -511,6 +512,7 @@ class Conversation(containers.Vertical):
 
     def compose(self) -> ComposeResult:
         yield Throbber(id="throbber")
+        yield SessionsTabs()
         with Window():
             with ContentsGrid():
                 with CursorContainer(id="cursor-container"):

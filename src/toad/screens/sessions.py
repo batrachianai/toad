@@ -43,6 +43,8 @@ class SessionsScreen(ModalScreen[str]):
 
     def watch_background_mode(self):
         screen = self.get_background_screen()
+        if screen is not None:
+            screen.refresh()
         self.app.temporary_background_screen = screen
 
     def render(self) -> RenderableType:
@@ -66,7 +68,9 @@ class SessionsScreen(ModalScreen[str]):
             self.session_grid_select.update_current(current_mode)
 
     def _on_screen_suspend(self) -> None:
-        self.app.temporary_background_screen = None
+        current_mode = self.app.screen_stack[0].id
+        if current_mode is not None:
+            self.session_grid_select.update_current(current_mode)
 
     @on(GridSelect.Highlighted)
     def on_highlighted(self, event: GridSelect.Highlighted) -> None:

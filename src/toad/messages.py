@@ -82,3 +82,10 @@ class SessionNavigate(Message):
 
     mode_name: str
     direction: Literal[-1, +1]
+
+
+@dataclass
+class SessionSwitch(Message):
+    """Switch to specified session."""
+
+    mode_name: str

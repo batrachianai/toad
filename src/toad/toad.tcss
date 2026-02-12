@@ -198,3 +198,36 @@ Toast {
 Loading {
     color: $text-primary;        
 }
+
+SessionsTabs {
+    layout: grid;
+    grid-columns: auto auto;
+    grid-size: 1 ;
+    overflow: scroll scroll;
+    scrollbar-size: 0 0;
+    width: 1fr;
+    
+    padding-top: 1;    
+    height: 2;
+    box-sizing: content-box;
+    Underline {
+        width: 1fr;
+        height: 1;
+        & > .underline--bar {
+            color: $block-cursor-background;
+            background: $foreground 10%;
+        }        
+    }
+    #title-container {
+        width: auto;
+        Label {
+            text-opacity: 0.6;
+            pointer: pointer;
+            padding: 0 1;            
+            &.-current {
+                text-opacity: 0.95;
+                
+            }
+        }
+    }
+}

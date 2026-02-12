@@ -131,7 +131,10 @@ class MainScreen(Screen, can_focus=False):
                 ),
             )
             yield Conversation(
-                self.project_path, self._agent, self._agent_session_id, self._session_pk
+                self.project_path,
+                self._agent,
+                self._agent_session_id,
+                self._session_pk,
             ).data_bind(
                 project_path=MainScreen.project_path,
                 column=MainScreen.column,
