@@ -29,16 +29,19 @@ class SessionsScreen(ModalScreen[str]):
     background_mode = reactive("")
 
     def get_background_screen(self) -> Screen | None:
-        if self.app.current_mode == self.background_mode:
-            try:
-                screen = self.app.get_screen_stack(self.background_mode)[0]
-            except KeyError:
-                return None
-        else:
-            try:
-                screen = self.app.get_screen_stack(self.background_mode)[-1]
-            except KeyError:
-                return None
+        background_mode = self.background_mode or self.app.current_mode
+        screen_stack = self.app.get_screen_stack(background_mode)
+
+        try:
+            screen = (
+                screen_stack[0]
+                if (self.app.current_mode == background_mode)
+                else screen_stack[-1]
+            )
+        except KeyError:
+            return None
+        if screen is self.screen:
+            return None
         return screen
 
     def watch_background_mode(self):
@@ -62,7 +65,7 @@ class SessionsScreen(ModalScreen[str]):
     def focus_chain(self) -> list[Widget]:
         return [self.session_grid_select]
 
-    def _on_screen_resume(self, event: ScreenResume) -> None:
+    async def _on_screen_resume(self, event: ScreenResume) -> None:
         current_mode = self.app.screen_stack[0].id
         if current_mode is not None:
             self.session_grid_select.update_current(current_mode)
