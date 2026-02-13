@@ -96,7 +96,10 @@ class CondensedPath(Widget):
         self.display_path = path
 
     def render(self) -> Content:
-        return Content(condense_path(self.display_path, self.size.width))
+        if self.size.width:
+            return Content(condense_path(self.display_path, self.size.width))
+        else:
+            return Content(self.display_path)
 
     def get_content_width(self, container: Size, viewport: Size) -> int:
         if self.display_path:

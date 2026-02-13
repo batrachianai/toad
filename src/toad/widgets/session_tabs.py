@@ -104,12 +104,14 @@ class SessionsTabs(Widget):
     async def watch_current_session(self) -> None:
         self.call_after_refresh(self.update_underline)
 
+    @work
     async def update_underline(self):
         if not self.is_mounted or not self.is_attached:
             return
         current_session = self.current_session
         if not current_session:
             return
+        await asyncio.sleep(0.05)
         if current_label := self.query_one_optional(
             f"#{current_session}", SessionLabel
         ):
@@ -125,7 +127,7 @@ class SessionsTabs(Widget):
                 underline.highlight_start = start
                 underline.highlight_end = end
 
-            self.title_container.scroll_to_center(current_label)
+            self.scroll_to_center(current_label)
 
     def render_session_label(self, session: SessionDetails) -> Content:
         match session.state:

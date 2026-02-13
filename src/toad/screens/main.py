@@ -8,6 +8,7 @@ from textual import getters
 from textual.binding import Binding
 from textual.command import Hit, Hits, Provider, DiscoveryHit
 from textual.content import Content
+from textual.events import ScreenResume
 from textual.screen import Screen
 from textual.reactive import var, reactive
 from textual.widgets import Footer, OptionList, DirectoryTree, Tree
@@ -116,6 +117,9 @@ class MainScreen(Screen, can_focus=False):
             random.shuffle(quotes)
             return FutureText([Content(quote) for quote in quotes])
         return super().get_loading_widget()
+
+    def _on_screen_resume(self, event: ScreenResume) -> None:
+        self.conversation
 
     def compose(self) -> ComposeResult:
         with containers.Center():
