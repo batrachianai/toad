@@ -1,4 +1,5 @@
 import asyncio
+from functools import partial
 from rich.style import Style as RichStyle
 
 from textual.app import ComposeResult, RenderResult
@@ -90,44 +91,49 @@ class SessionsTabs(Widget):
 
     def on_mount(self) -> None:
         self.current_session = self.app.current_mode
-        self.app.mode_change_signal.subscribe(self, self.handle_mode_change)
-        self.app.session_update_signal.subscribe(
-            self, self.handle_session_update_signal
+        self.app.mode_change_signal.subscribe(
+            self, self.handle_mode_change, immediate=True
         )
-        self.call_after_refresh(self.update_underline)
+        self.app.session_update_signal.subscribe(
+            self, self.handle_session_update_signal, immediate=False
+        )
+        self.update_underline(self.current_session, animate=False)
+        self.call_after_refresh(self.update_underline, self.current_session)
 
-    async def handle_mode_change(self, mode: str) -> None:
-        self.query(".-current").remove_class("-current")
-        self.query(f"#{mode}").add_class("-current")
+    def handle_mode_change(self, mode: str) -> None:
         self.current_session = mode
 
-    async def watch_current_session(self) -> None:
-        self.call_after_refresh(self.update_underline)
+    def watch_current_session(self, old_session: str, new_session: str) -> None:
+        self.query(".-current").remove_class("-current")
+        self.query(f"#{new_session}").add_class("-current")
+        if old_session:
+            self.update_underline(old_session, animate=False)
 
-    @work
-    async def update_underline(self):
+        self.update_underline(new_session, animate=True)
+
+    def update_underline(self, session: str, animate: bool = True):
         if not self.is_mounted or not self.is_attached:
             return
-        current_session = self.current_session
-        if not current_session:
+        if not session:
             return
-        await asyncio.sleep(0.05)
-        if current_label := self.query_one_optional(
-            f"#{current_session}", SessionLabel
-        ):
+        if current_label := self.query_one_optional(f"#{session}", SessionLabel):
             tab_region = current_label.virtual_region.shrink((0, 1, 0, 1))
             if not tab_region:
                 return
             start, end = tab_region.column_span
             underline = self.query_one(Underline)
-            if self.screen.is_active:
+            if animate:
                 underline.animate("highlight_start", start, duration=0.3)
-                underline.animate("highlight_end", end, duration=0.3)
+                underline.animate(
+                    "highlight_end",
+                    end,
+                    duration=0.3,
+                    on_complete=partial(self.scroll_to_center, current_label),
+                )
             else:
                 underline.highlight_start = start
                 underline.highlight_end = end
-
-            self.scroll_to_center(current_label)
+                self.scroll_to_center(current_label, animate=False)
 
     def render_session_label(self, session: SessionDetails) -> Content:
         match session.state:
@@ -169,5 +175,4 @@ class SessionsTabs(Widget):
                         ),
                     )
                 )
-        await self.wait_for_refresh()
-        self.call_after_refresh(self.update_underline)
+        self.call_after_refresh(self.update_underline, self.current_session)

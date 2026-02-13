@@ -19,14 +19,12 @@ class SessionGridSelect(GridSelect):
     ) -> None:
         self.session_tracker = session_tracker
         super().__init__(
-            id=id, classes=classes, min_column_width=36, max_column_width=36
+            id=id,
+            classes=classes,
+            min_column_width=36,
         )
 
     def allow_focus(self) -> bool:
-        return True
-
-    @property
-    def visible(self) -> bool:
         return True
 
     def on_mount(self) -> None:

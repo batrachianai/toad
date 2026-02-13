@@ -84,11 +84,9 @@ class SessionSummary(containers.VerticalGroup):
                         classes="subtitle",
                         markup=False,
                     )
-
-                    if session_details.path:
-                        with containers.HorizontalGroup():
-                            yield widgets.Label("📁 ")
-                            yield CondensedPath(session_details.path)
+                    with containers.HorizontalGroup():
+                        yield widgets.Label("📁 ")
+                        yield CondensedPath(session_details.path)
 
 
 if __name__ == "__main__":

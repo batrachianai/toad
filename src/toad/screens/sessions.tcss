@@ -17,12 +17,10 @@ SessionsScreen {
     SessionGridSelect {                 
         width: 1fr;
         margin: 0 1 1 1;
-        padding: 1 0 !important;        
-        visibility: hidden;
+        padding: 1 0 !important;                
     }
 
     SessionSummary {       
-        visibility: visible;        
         border: blank transparent;
         background: black 10%;
         width: auto;

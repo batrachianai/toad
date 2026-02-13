@@ -1241,7 +1241,6 @@ class Conversation(containers.Vertical):
                     sound="question",
                 )
                 permissions_screen = PermissionsScreen(options, diffs)
-                print("SCREEN", repr(self.screen))
                 result = await self.app.push_screen_wait(
                     permissions_screen, mode=self.screen.id
                 )
