@@ -166,6 +166,7 @@ class SessionsTabs(Widget):
             if tab_label := self.query_one_optional(f"#{mode}", SessionLabel):
                 tab_label.update(self.render_session_label(details))
             else:
+                self.query(SessionLabel).remove_class("-current")
                 await self.title_container.mount(
                     SessionLabel(
                         self.render_session_label(details),
@@ -175,4 +176,5 @@ class SessionsTabs(Widget):
                         ),
                     )
                 )
+        await asyncio.sleep(0.05)
         self.call_after_refresh(self.update_underline, self.current_session)

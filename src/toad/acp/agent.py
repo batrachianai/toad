@@ -14,6 +14,7 @@ from textual.content import Content
 from textual.message import Message
 from textual.message_pump import MessagePump
 
+
 from toad import jsonrpc
 import toad
 from toad.agent_schema import Agent as AgentData
