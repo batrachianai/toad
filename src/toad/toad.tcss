@@ -221,12 +221,11 @@ SessionsTabs {
     #title-container {
         width: auto;
         Label {
-            text-opacity: 0.6;
+            text-style: dim;
             pointer: pointer;
             padding: 0 1;            
             &.-current {
-                text-opacity: 0.95;
-                
+                text-style: not dim;                
             }
         }
     }

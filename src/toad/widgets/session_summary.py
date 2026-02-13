@@ -39,29 +39,7 @@ class SessionSummary(containers.VerticalGroup):
         self.blink_timer: Timer | None = None
         self.set_reactive(SessionSummary.session_details, session_details)
 
-    # def watch_session_details(self, session_details: SessionDetails | None) -> None:
-    #     self.remove_class(
-    #         "-state-notready",
-    #         "-state-busy",
-    #         "-state-asking",
-    #         "-state-idle",
-    #         update=False,
-    #     )
-    #     if session_details is None:
-    #         self.add_class("-state-notready")
-    #         return
-    #     self.title.update(session_details.title)
-    #     self.subtitle.update(session_details.subtitle)
-    #     self.add_class(f"-state-{session_details.state}")
-    #     if self.blink_timer is not None:
-    #         if session_details == "asking":
-    #             self.blink_timer.resume()
-    #         else:
-    #             self.blink_timer.pause()
-    #             self.blink_timer.reset()
-
     def on_mount(self) -> None:
-        # self.watch_session_details(self.session_details)
 
         def do_blink() -> None:
             self.blink = not self.blink

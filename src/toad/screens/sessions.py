@@ -28,32 +28,32 @@ class SessionsScreen(ModalScreen[str]):
     session_grid_select = getters.query_one(SessionGridSelect)
     background_mode = reactive("")
 
-    def get_background_screen(self) -> Screen | None:
-        background_mode = self.background_mode or self.app.current_mode
-        screen_stack = self.app.get_screen_stack(background_mode)
+    # def get_background_screen(self) -> Screen | None:
+    #     background_mode = self.background_mode or self.app.current_mode
+    #     screen_stack = self.app.get_screen_stack(background_mode)
 
-        try:
-            screen = (
-                screen_stack[0]
-                if (self.app.current_mode == background_mode)
-                else screen_stack[-1]
-            )
-        except KeyError:
-            return None
-        if screen is self.screen:
-            return None
-        return screen
+    #     try:
+    #         screen = (
+    #             screen_stack[0]
+    #             if (self.app.current_mode == background_mode)
+    #             else screen_stack[-1]
+    #         )
+    #     except KeyError:
+    #         return None
+    #     if screen is self.screen:
+    #         return None
+    #     return screen
 
-    def watch_background_mode(self):
-        screen = self.get_background_screen()
-        if screen is not None:
-            screen.refresh()
-        self.app.temporary_background_screen = screen
+    # def watch_background_mode(self):
+    #     screen = self.get_background_screen()
+    #     if screen is not None:
+    #         screen.refresh()
+    #     self.app.temporary_background_screen = screen
 
-    def render(self) -> RenderableType:
-        if (screen := self.get_background_screen()) is None:
-            return Blank(self.background_colors[1])
-        return BackgroundScreen(screen, self.styles.background)
+    # def render(self) -> RenderableType:
+    #     if (screen := self.get_background_screen()) is None:
+    #         return Blank(self.background_colors[1])
+    #     return BackgroundScreen(screen, self.styles.background)
 
     def compose(self) -> ComposeResult:
         with containers.Center(id="title-container"):

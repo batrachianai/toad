@@ -1,7 +1,8 @@
 SessionsScreen {
     
     # background: transparent;
-    background: $background 40%;
+    # background: $background 40%;
+    background: $background;
 
     #title-container {
         padding: 1 1 0 1;              
@@ -41,6 +42,7 @@ SessionsScreen {
     
         CondensedPath {
             color: $text-warning;
+            width: 1fr;
         }
         
         BusyIndicator {

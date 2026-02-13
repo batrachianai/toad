@@ -1215,6 +1215,8 @@ class Conversation(containers.Vertical):
         else:
             kind = "edit"
 
+        self.post_message(self.SessionUpdate(state="asking"))
+
         if kind == "edit":
             diffs: list[tuple[str, str, str | None, str]] = []
 
@@ -1239,7 +1241,11 @@ class Conversation(containers.Vertical):
                     sound="question",
                 )
                 permissions_screen = PermissionsScreen(options, diffs)
-                result = await self.app.push_screen_wait(permissions_screen)
+                print("SCREEN", repr(self.screen))
+                result = await self.app.push_screen_wait(
+                    permissions_screen, mode=self.screen.id
+                )
+                self.post_message(self.SessionUpdate(state="busy"))
                 self.app.terminal_alert(False)
                 result_future.set_result(result)
                 return
@@ -1252,6 +1258,9 @@ class Conversation(containers.Vertical):
             except Exception:
                 # I've seen this occur in shutdown with an `InvalidStateError`
                 pass
+
+            if not self.prompt.ask_queue:
+                self.post_message(self.SessionUpdate(state="busy"))
 
         tool_call_content = tool_call_update.get("content", None) or []
         self.ask(

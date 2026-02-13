@@ -1,8 +1,11 @@
+import asyncio
 from rich.style import Style as RichStyle
 
 from textual.app import ComposeResult, RenderResult
 
+from textual import work
 from textual import events
+from textual.content import Content
 from textual.geometry import Offset
 from textual.reactive import reactive
 from textual.renderables.bar import Bar
@@ -81,9 +84,9 @@ class SessionsTabs(Widget):
     ALLOW_SELECT = False
     app: getters.app[ToadApp] = getters.app(ToadApp)
 
-    title_container = getters.query_one("#title-container")
+    title_container = getters.query_one("#title-container", Widget)
 
-    current_session = reactive("")
+    current_session = reactive("", init=False)
 
     def on_mount(self) -> None:
         self.current_session = self.app.current_mode
@@ -101,7 +104,9 @@ class SessionsTabs(Widget):
     async def watch_current_session(self) -> None:
         self.call_after_refresh(self.update_underline)
 
-    def update_underline(self):
+    async def update_underline(self):
+        if not self.is_mounted or not self.is_attached:
+            return
         current_session = self.current_session
         if not current_session:
             return
@@ -119,19 +124,30 @@ class SessionsTabs(Widget):
             else:
                 underline.highlight_start = start
                 underline.highlight_end = end
-            current_label.scroll_visible()
+
+            self.title_container.scroll_to_center(current_label)
+
+    def render_session_label(self, session: SessionDetails) -> Content:
+        match session.state:
+            case "asking":
+                return Content.assemble(
+                    ("❯ ", "not dim $text-secondary"), session.title
+                )
+            case "busy":
+                return Content(f"⌛ {session.title}")
+        return Content(session.title)
 
     def compose(self) -> ComposeResult:
         with containers.HorizontalGroup(id="title-container"):
             for session in self.app.session_tracker.ordered_sessions:
                 yield SessionLabel(
-                    session.title,
+                    self.render_session_label(session),
                     id=session.mode_name,
                     classes="-current" if session.mode_name == self.screen.id else "",
-                    markup=False,
                 )
         yield Underline()
 
+    @work
     async def handle_session_update_signal(
         self, update: tuple[str, SessionDetails | None]
     ) -> None:
@@ -140,20 +156,16 @@ class SessionsTabs(Widget):
             await self.query(f"{mode}").remove()
         else:
             if tab_label := self.query_one_optional(f"#{mode}", SessionLabel):
-                tab_label.update(details.title)
+                tab_label.update(self.render_session_label(details))
             else:
                 await self.title_container.mount(
                     SessionLabel(
-                        details.title,
+                        self.render_session_label(details),
                         id=details.mode_name,
                         classes=(
                             "-current" if details.mode_name == self.screen.id else ""
                         ),
-                        markup=False,
                     )
                 )
+        await self.wait_for_refresh()
         self.call_after_refresh(self.update_underline)
-
-    # @on(widgets.Tabs.TabActivated)
-    # def on_tab_activated(self, event: widgets.Tabs.TabActivated) -> None:
-    #     pass
