@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed handling of agents that post null responses (OpenCode)
 
+### Changed
+
+- Added semantic styled edge to diff view
+
 ## [0.5.38]
 
 ### Fixed

@@ -242,6 +242,11 @@ class DiffView(containers.VerticalGroup):
         " ": "",
         "/": "",
     }
+    EDGE_STYLES = {
+        "+": "$text-success 30% on $success 20%",
+        "-": "$text-error 30% on $error 20%",
+        " ": "$foreground 10% on $foreground 3%",
+    }
 
     def __init__(
         self,
@@ -458,6 +463,7 @@ class DiffView(containers.VerticalGroup):
 
             NUMBER_STYLES = self.NUMBER_STYLES
             LINE_STYLES = self.LINE_STYLES
+            EDGE_STYLES = self.EDGE_STYLES
 
             line_number_width = max(
                 len("" if line_no is None else str(line_no))
@@ -468,10 +474,12 @@ class DiffView(containers.VerticalGroup):
                 yield LineAnnotations(
                     [
                         (
-                            Content(f" {' ' * line_number_width} ")
+                            Content(f"▎{' ' * line_number_width} ")
                             if line_no is None
-                            else Content(f" {line_no:>{line_number_width}} ")
-                        ).stylize(NUMBER_STYLES[annotation])
+                            else Content(f"▎{line_no:>{line_number_width}} ")
+                        )
+                        .stylize(NUMBER_STYLES[annotation], 1)
+                        .stylize(EDGE_STYLES[annotation], 0, 1)
                         for line_no, annotation in zip(line_numbers_a, annotations)
                     ]
                 )
@@ -584,9 +592,9 @@ class DiffView(containers.VerticalGroup):
                 return (
                     hatch
                     if line_no is None
-                    else Content(f" {line_no:>{line_number_width}} ").stylize(
-                        self.NUMBER_STYLES[annotation]
-                    )
+                    else Content(f"▎{line_no:>{line_number_width}} ")
+                    .stylize(self.NUMBER_STYLES[annotation], 1)
+                    .stylize(self.EDGE_STYLES[annotation], 0, 1)
                 )
 
             with containers.HorizontalGroup(classes="diff-group"):
