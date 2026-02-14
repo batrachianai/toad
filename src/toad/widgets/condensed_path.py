@@ -78,7 +78,7 @@ class CondensedPath(Widget):
         self, path: str = "", *, id: str | None = None, classes: str | None = None
     ) -> None:
         super().__init__(id=id, classes=classes)
-        self.path = path
+        self.set_reactive(CondensedPath.path, path)
 
     def on_resize(self) -> None:
         self.watch_path(self.path)

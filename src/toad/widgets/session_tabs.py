@@ -2,9 +2,9 @@ import asyncio
 from functools import partial
 from rich.style import Style as RichStyle
 
+from textual import work
 from textual.app import ComposeResult, RenderResult
 
-from textual import work
 from textual import events
 from textual.content import Content
 from textual.geometry import Offset
@@ -91,11 +91,9 @@ class SessionsTabs(Widget):
 
     def on_mount(self) -> None:
         self.current_session = self.app.current_mode
-        self.app.mode_change_signal.subscribe(
-            self, self.handle_mode_change, immediate=True
-        )
+        self.app.mode_change_signal.subscribe(self, self.handle_mode_change)
         self.app.session_update_signal.subscribe(
-            self, self.handle_session_update_signal, immediate=False
+            self, self.handle_session_update_signal
         )
         self.update_underline(self.current_session, animate=False)
         self.call_after_refresh(self.update_underline, self.current_session)
@@ -111,9 +109,11 @@ class SessionsTabs(Widget):
 
         self.update_underline(new_session, animate=True)
 
-    def update_underline(self, session: str, animate: bool = True):
+    def update_underline(self, session: str | None = None, animate: bool = True):
         if not self.is_mounted or not self.is_attached:
             return
+        if session is None:
+            session = self.current_session
         if not session:
             return
         if current_label := self.query_one_optional(f"#{session}", SessionLabel):
