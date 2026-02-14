@@ -14,6 +14,7 @@ LoadingIndicator {
 Throbber {
     width: 100%;
     height: 1;    
+    offset-y: 1;
     overlay: screen;
     visibility: hidden;
     &.-busy {
@@ -206,8 +207,7 @@ SessionsTabs {
     overflow: scroll scroll;
     scrollbar-size: 0 0;
     width: 1fr;
-    
-    padding-top: 1;    
+        
     height: 2;
     box-sizing: content-box;
     Underline {
