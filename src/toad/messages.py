@@ -92,6 +92,18 @@ class SessionSwitch(Message):
 
 
 @dataclass
+class SessionNew(Message):
+    """Open a new session."""
+
+    path: str
+    """project directory path."""
+    agent: str
+    """Agent identity."""
+    prompt: str
+    """Initial prompt or command"""
+
+
+@dataclass
 class SessionUpdate(Message):
     name: str | None = None
     """Name of the session, or `None` for no change."""
@@ -107,3 +119,11 @@ class SessionUpdate(Message):
 class SessionClose(Message):
     name: str
     """Name of the session."""
+
+
+@dataclass
+class LaunchAgent(Message):
+    identity: str
+    session_id: str | None = None
+    pk: int | None = None
+    prompt: str | None = None

@@ -96,6 +96,7 @@ class MainScreen(Screen, can_focus=False):
         agent_session_id: str | None = None,
         agent_session_title: str | None = None,
         session_pk: int | None = None,
+        initial_prompt: str | None = None,
     ) -> None:
         super().__init__()
         self.set_reactive(MainScreen.project_path, project_path)
@@ -103,6 +104,7 @@ class MainScreen(Screen, can_focus=False):
         self._agent_session_id = agent_session_id
         self._agent_session_title = agent_session_title
         self._session_pk = session_pk
+        self._initial_prompt = initial_prompt
 
     def watch_title(self, title: str) -> None:
         self.app.update_terminal_title()
@@ -139,11 +141,15 @@ class MainScreen(Screen, can_focus=False):
                 self._agent,
                 self._agent_session_id,
                 self._session_pk,
+                initial_prompt=self._initial_prompt,
             ).data_bind(
                 project_path=MainScreen.project_path,
                 column=MainScreen.column,
             )
         yield Footer()
+
+    def run_prompt(self, prompt: str) -> None:
+        self.conversation
 
     def update_node_styles(self, animate: bool = True) -> None:
         self.conversation.update_node_styles(animate=animate)

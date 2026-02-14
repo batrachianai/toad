@@ -745,6 +745,12 @@ class ToadApp(App, inherit_bindings=False):
     def on_session_switch(self, event: messages.SessionSwitch) -> None:
         self.switch_mode(event.mode_name)
 
+    @on(messages.SessionNew)
+    def on_session_new(self, event: messages.SessionNew) -> None:
+        self.launch_agent(
+            event.agent, project_path=Path(event.path), initial_prompt=event.prompt
+        )
+
     @work
     async def action_sessions(self) -> None:
         if (session_screen_name := await self.push_screen_wait("sessions")) is not None:
@@ -752,3 +758,61 @@ class ToadApp(App, inherit_bindings=False):
                 self.app.switch_mode(session_screen_name)
             except KeyError:
                 pass
+
+    @on(messages.LaunchAgent)
+    def on_launch_agent(self, message: messages.LaunchAgent) -> None:
+        self.launch_agent(
+            message.identity,
+            agent_session_id=message.session_id,
+            session_pk=message.pk,
+            initial_prompt=message.prompt,
+        )
+
+    @work
+    async def launch_agent(
+        self,
+        agent_identity: str,
+        *,
+        agent_session_id: str | None = None,
+        session_pk: int | None = None,
+        project_path: Path | None = None,
+        initial_prompt: str | None = None,
+    ) -> None:
+        from toad.screens.main import MainScreen
+        from toad.agent_schema import Agent
+        from toad.agents import read_agents
+
+        agent: Agent | None = None
+        if session_pk is not None:
+            db = DB()
+            session = await db.session_get(session_pk)
+            if session is not None:
+                meta = json.loads(session["meta_json"])
+                if agent_data := meta.get("agent_data"):
+                    agent = agent_data
+
+        if agent is None:
+            agents = await read_agents()
+            try:
+                agent = agents[agent_identity]
+            except KeyError:
+                self.notify("Agent not found", title="Launch agent", severity="error")
+                return
+        if project_path is None:
+            project_path = Path(self.project_dir or os.getcwd())
+
+        def get_screen():
+            screen = MainScreen(
+                project_path,
+                agent,
+                agent_session_id,
+                session_pk=session_pk,
+                initial_prompt=initial_prompt,
+            ).data_bind(
+                column=ToadApp.column,
+                column_width=ToadApp.column_width,
+            )
+
+            return screen
+
+        await self.new_session_screen(get_screen)

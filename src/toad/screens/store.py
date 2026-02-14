@@ -1,8 +1,6 @@
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import zip_longest
-import json
-import os
 from pathlib import Path
 from random import shuffle
 from typing import Literal, Self
@@ -23,8 +21,8 @@ from textual import widgets
 
 import toad
 from toad.app import ToadApp
-from toad.db import DB
 from toad.pill import pill
+from toad import messages
 from toad.widgets.directory_input import DirectoryInput
 from toad.widgets.mandelbrot import Mandelbrot
 from toad.widgets.condensed_path import CondensedPath
@@ -47,13 +45,6 @@ QR = """\
 █ ███ █ ██▄▄▀▀█▀▀██▀█▄██▄
 █ ▀▀▀ █ ██▄▄ ▀  ▄▀ ▄▄█▀ █
 ▀▀▀▀▀▀▀ ▀▀▀  ▀   ▀▀▀▀▀▀▀▀"""
-
-
-@dataclass
-class LaunchAgent(Message):
-    identity: str
-    session_id: str | None = None
-    pk: int | None = None
 
 
 @dataclass
@@ -210,7 +201,7 @@ Your favorite agents.
             return
         child = self.children[self.highlighted]
         assert isinstance(child, LauncherItem)
-        self.post_message(LaunchAgent(child.agent["identity"]))
+        self.post_message(messages.LaunchAgent(child.agent["identity"]))
 
 
 class Launcher(containers.VerticalGroup):
@@ -316,7 +307,7 @@ class AgentGridSelect(GridSelect):
             return
         child = self.children[self.highlighted]
         assert isinstance(child, AgentItem)
-        self.post_message(LaunchAgent(child.agent["identity"]))
+        self.post_message(messages.LaunchAgent(child.agent["identity"]))
 
 
 class Container(containers.VerticalScroll):
@@ -491,7 +482,7 @@ class StoreScreen(Screen):
         modal_response = await self.app.push_screen_wait(AgentModal(event.widget.agent))
         self.app.save_settings()
         if modal_response == "launch":
-            self.post_message(LaunchAgent(event.widget.agent["identity"]))
+            self.post_message(messages.LaunchAgent(event.widget.agent["identity"]))
 
     @on(OpenAgentDetails)
     @work
@@ -505,7 +496,7 @@ class StoreScreen(Screen):
         modal_response = await self.app.push_screen_wait(AgentModal(agent))
         self.app.save_settings()
         if modal_response == "launch":
-            self.post_message(LaunchAgent(agent["identity"]))
+            self.post_message(messages.LaunchAgent(agent["identity"]))
 
     @on(GridSelect.Selected, "#launcher GridSelect")
     @work
@@ -520,53 +511,12 @@ class StoreScreen(Screen):
         )
         self.app.save_settings()
         if modal_response == "launch":
-            self.post_message(LaunchAgent(launcher_item.agent["identity"]))
+            self.post_message(messages.LaunchAgent(launcher_item.agent["identity"]))
 
     @on(ChangeDirectory)
     def on_change_directory(self, event: ChangeDirectory) -> None:
         self.project_dir = Path(event.path)
         self.app.project_dir = self.project_dir
-
-    @work
-    async def launch_agent(
-        self,
-        agent_identity: str,
-        agent_session_id: str | None,
-        session_pk: int | None = None,
-    ) -> None:
-        from toad.screens.main import MainScreen
-
-        agent: Agent | None = None
-        if session_pk is not None:
-            db = DB()
-            session = await db.session_get(session_pk)
-            if session is not None:
-                meta = json.loads(session["meta_json"])
-                if agent_data := meta.get("agent_data"):
-                    agent = agent_data
-
-        if agent is None:
-            try:
-                agent = self.agents[agent_identity]
-            except KeyError:
-                self.notify("Agent not found", title="Launch agent", severity="error")
-                return
-        project_path = Path(self.app.project_dir or os.getcwd())
-
-        def get_screen():
-            screen = MainScreen(
-                project_path, agent, agent_session_id, session_pk=session_pk
-            ).data_bind(
-                column=ToadApp.column,
-                column_width=ToadApp.column_width,
-            )
-            return screen
-
-        await self.app.new_session_screen(get_screen)
-
-    @on(LaunchAgent)
-    def on_launch_agent(self, message: LaunchAgent) -> None:
-        self.launch_agent(message.identity, message.session_id, message.pk)
 
     @work
     async def on_mount(self) -> None:
@@ -628,7 +578,7 @@ class StoreScreen(Screen):
         session = await self.app.push_screen_wait(SessionResumeModal())
         if session is not None:
             self.post_message(
-                LaunchAgent(
+                messages.LaunchAgent(
                     session["agent_identity"],
                     session["agent_session_id"],
                     pk=session["id"],

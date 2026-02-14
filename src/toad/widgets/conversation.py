@@ -375,6 +375,7 @@ class Conversation(containers.Vertical):
         agent: AgentData | None = None,
         agent_session_id: str | None = None,
         session_pk: int | None = None,
+        initial_prompt: str | None = None,
     ) -> None:
         super().__init__()
 
@@ -409,6 +410,8 @@ class Conversation(containers.Vertical):
 
         self._directory_changed = False
         self._directory_watcher: DirectoryWatcher | None = None
+
+        self._initial_prompt = initial_prompt
 
     def update_title(self) -> None:
         """Update the screen title."""
@@ -1338,6 +1341,11 @@ class Conversation(containers.Vertical):
                 "/toad:session-close",
                 "Close the current session",
             ),
+            SlashCommand(
+                "/toad:session-new",
+                "Open a new session in the current working directory",
+                "<initial prompt or command>",
+            ),
         ]
 
         slash_commands.extend(self.agent_slash_commands)
@@ -1406,6 +1414,7 @@ class Conversation(containers.Vertical):
             self.agent_ready = False
         self.update_title()
 
+    @work
     async def watch_agent_ready(self, ready: bool) -> None:
         with suppress(asyncio.TimeoutError):
             async with asyncio.timeout(2.0):
@@ -1419,6 +1428,17 @@ class Conversation(containers.Vertical):
                 from toad.widgets.markdown_note import MarkdownNote
 
                 await self.post(MarkdownNote(welcome))
+        if ready and self._initial_prompt is not None:
+            prompt = self._initial_prompt
+            if prompt.startswith("!"):
+                self.post_message(
+                    messages.UserInputSubmitted(self._initial_prompt[1:], shell=True)
+                )
+            else:
+                self.post_message(
+                    messages.UserInputSubmitted(self._initial_prompt, shell=False)
+                )
+            self._initial_prompt = None
 
     def on_mouse_down(self, event: events.MouseDown) -> None:
         self._mouse_down_offset = event.screen_offset
@@ -1889,6 +1909,16 @@ class Conversation(containers.Vertical):
         elif command == "toad:session-close":
             if self.screen.id is not None:
                 self.post_message(messages.SessionClose(self.screen.id))
+                return True
+        elif command == "toad:session-new":
+            if self._agent_data is not None:
+                self.post_message(
+                    messages.SessionNew(
+                        self.working_directory,
+                        self._agent_data["identity"],
+                        parameters.strip(),
+                    )
+                )
                 return True
 
         return False
