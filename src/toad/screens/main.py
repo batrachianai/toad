@@ -172,8 +172,8 @@ class MainScreen(Screen, can_focus=False):
         ]
         self.query_one("SideBar Plan", Plan).entries = entries
 
-    @on(Conversation.SessionUpdate)
-    async def on_session_update(self, event: Conversation.SessionUpdate) -> None:
+    @on(messages.SessionUpdate)
+    async def on_session_update(self, event: messages.SessionUpdate) -> None:
         # TODO: May not be required
         if event.name is not None:
             self._agent_session_title = event.name
@@ -185,6 +185,30 @@ class MainScreen(Screen, can_focus=False):
                 path=event.path,
                 state=event.state,
             )
+
+    @on(messages.SessionClose)
+    async def on_session_close(self, event: messages.SessionClose) -> None:
+
+        if self.id is None:
+            return
+        current_mode = self.id
+        session_tracker = self.app.session_tracker
+
+        session_count = session_tracker.session_count
+
+        if session_count <= 1:
+
+            session_tracker.close_session(current_mode)
+            await self.app.switch_mode("store")
+
+        else:
+            if new_mode := self.app.session_tracker.session_cursor_move(
+                current_mode, -1
+            ):
+                await self.app.switch_mode(new_mode)
+            session_tracker.close_session(current_mode)
+
+        self.app.call_later(self.app.remove_mode, current_mode)
 
     def on_mount(self) -> None:
         for tree in self.query("#project_directory_tree").results(DirectoryTree):

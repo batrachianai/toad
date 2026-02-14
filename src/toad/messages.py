@@ -89,3 +89,21 @@ class SessionSwitch(Message):
     """Switch to specified session."""
 
     mode_name: str
+
+
+@dataclass
+class SessionUpdate(Message):
+    name: str | None = None
+    """Name of the session, or `None` for no change."""
+    subtitle: str | None = None
+    """Session subtitle (name of agent)."""
+    path: str | None = None
+    """Project directory path."""
+    state: SessionState | None = None
+    """New session state."""
+
+
+@dataclass
+class SessionClose(Message):
+    name: str
+    """Name of the session."""

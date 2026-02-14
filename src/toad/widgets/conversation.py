@@ -25,7 +25,6 @@ from textual.binding import Binding
 from textual.content import Content
 from textual.geometry import clamp
 from textual.css.query import NoMatches
-from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 from textual.widgets.markdown import MarkdownBlock, MarkdownFence
@@ -370,17 +369,6 @@ class Conversation(containers.Vertical):
 
     title = var("")
 
-    @dataclass
-    class SessionUpdate(Message):
-        name: str | None = None
-        """Name of the session, or `None` for no change."""
-        subtitle: str | None = None
-        """Session subtitle (name of agent)."""
-        path: str | None = None
-        """Project directory path."""
-        state: SessionState | None = None
-        """New session state."""
-
     def __init__(
         self,
         project_path: Path,
@@ -470,7 +458,7 @@ class Conversation(containers.Vertical):
         self.prompt.prompt_text_area.insert(" ")
 
     def watch_project_path(self, path: Path) -> None:
-        self.post_message(self.SessionUpdate(path=str(path)))
+        self.post_message(messages.SessionUpdate(path=str(path)))
 
     async def watch_shell_history_index(self, previous_index: int, index: int) -> None:
         if previous_index == 0:
@@ -495,9 +483,9 @@ class Conversation(containers.Vertical):
 
     def watch_turn(self, turn: str) -> None:
         if turn == "client":
-            self.post_message(self.SessionUpdate(state="idle"))
+            self.post_message(messages.SessionUpdate(state="idle"))
         elif turn == "agent":
-            self.post_message(self.SessionUpdate(state="busy"))
+            self.post_message(messages.SessionUpdate(state="busy"))
 
     @on(events.Key)
     async def on_key(self, event: events.Key):
@@ -881,7 +869,7 @@ class Conversation(containers.Vertical):
 
         self._turn_count += 1
 
-        self.post_message(self.SessionUpdate(state="idle"))
+        self.post_message(messages.SessionUpdate(state="idle"))
 
         if stop_reason != "end_turn":
             from toad.widgets.markdown_note import MarkdownNote
@@ -1215,7 +1203,7 @@ class Conversation(containers.Vertical):
         else:
             kind = "edit"
 
-        self.post_message(self.SessionUpdate(state="asking"))
+        self.post_message(messages.SessionUpdate(state="asking"))
 
         if kind == "edit":
             diffs: list[tuple[str, str, str | None, str]] = []
@@ -1244,7 +1232,7 @@ class Conversation(containers.Vertical):
                 result = await self.app.push_screen_wait(
                     permissions_screen, mode=self.screen.id
                 )
-                self.post_message(self.SessionUpdate(state="busy"))
+                self.post_message(messages.SessionUpdate(state="busy"))
                 self.app.terminal_alert(False)
                 result_future.set_result(result)
                 return
@@ -1259,7 +1247,7 @@ class Conversation(containers.Vertical):
                 pass
 
             if not self.prompt.ask_queue:
-                self.post_message(self.SessionUpdate(state="busy"))
+                self.post_message(messages.SessionUpdate(state="busy"))
 
         tool_call_content = tool_call_update.get("content", None) or []
         self.ask(
@@ -1346,6 +1334,10 @@ class Conversation(containers.Vertical):
                 "Give the current session a friendly name",
                 "<session name>",
             ),
+            SlashCommand(
+                "/toad:session-close",
+                "Close the current session",
+            ),
         ]
 
         slash_commands.extend(self.agent_slash_commands)
@@ -1386,7 +1378,9 @@ class Conversation(containers.Vertical):
                     self._session_pk,
                 )
                 self.agent.start(self)
-                self.post_message(self.SessionUpdate("New Session", self.agent_title))
+                self.post_message(
+                    messages.SessionUpdate("New Session", self.agent_title)
+                )
 
             self.call_after_refresh(start_agent)
 
@@ -1889,8 +1883,12 @@ class Conversation(containers.Vertical):
                 return True
             if self.agent is not None:
                 await self.agent.set_session_name(name)
-                self.post_message(self.SessionUpdate(name=name))
+                self.post_message(messages.SessionUpdate(name=name))
                 self.flash(f"Renamed session to [b]'{name}'", style="success")
             return True
+        elif command == "toad:session-close":
+            if self.screen.id is not None:
+                self.post_message(messages.SessionClose(self.screen.id))
+                return True
 
         return False

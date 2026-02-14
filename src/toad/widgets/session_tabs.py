@@ -161,7 +161,7 @@ class SessionsTabs(Widget):
     ) -> None:
         mode, details = update
         if details is None:
-            await self.query(f"{mode}").remove()
+            await self.query(f"#{mode}").remove()
         else:
             if tab_label := self.query_one_optional(f"#{mode}", SessionLabel):
                 tab_label.update(self.render_session_label(details))

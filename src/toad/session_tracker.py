@@ -38,6 +38,10 @@ class SessionTracker:
         self._session_index = 0
         self.signal = signal
 
+    @property
+    def session_count(self) -> int:
+        return len(self.sessions)
+
     def new_session(self) -> SessionDetails:
         self._session_index += 1
         mode_name = f"session-{self._session_index}"
@@ -46,6 +50,11 @@ class SessionTracker:
         )
         self.sessions[mode_name] = session_meta
         return session_meta
+
+    def close_session(self, mode_name: str) -> None:
+        if mode_name in self.sessions:
+            del self.sessions[mode_name]
+            self.signal.publish((mode_name, None))
 
     def get_session(self, mode_name: str) -> SessionDetails | None:
         return self.sessions.get(mode_name, None)
