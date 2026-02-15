@@ -86,7 +86,7 @@ class PromptTextArea(HighlightedTextArea):
     HELP = """\
 ## Prompt
 
-This is your prompt, where you can talk to your AI.
+Talk to your agent in natural language.
 See on-screen instructions for details.
 
 - Be simple
