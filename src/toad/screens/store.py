@@ -21,6 +21,7 @@ from textual import widgets
 
 import toad
 from toad.app import ToadApp
+from toad.format_path import format_path
 from toad.pill import pill
 from toad import messages
 from toad.widgets.directory_input import DirectoryInput
@@ -76,16 +77,19 @@ class DirectoryDisplay(containers.HorizontalGroup):
     def __init__(self, project_dir: Path) -> None:
         super().__init__()
         self.project_dir = project_dir
-        self.path = str(project_dir)
+        self.path = format_path(project_dir, directory=True)
 
     def watch_project_dir(self, path: Path) -> None:
-        self.path = str(path)
+        self.path = format_path(path, directory=True)
         self.refresh(layout=True)
 
     def focus(self, scroll_visible=True) -> Self:
         self.edit = True
         self.directory_input.focus(scroll_visible=scroll_visible)
         return self
+
+    # def validate_path(self, path: str) -> str:
+    #     return format_path(path, directory=True)
 
     @on(events.Click, "CondensedPath")
     def on_click(self) -> None:
@@ -99,7 +103,7 @@ class DirectoryDisplay(containers.HorizontalGroup):
     @on(widgets.Input.Submitted)
     def on_input_submitted(self, event: widgets.Input.Submitted) -> None:
         self.edit = False
-        path = Path(event.value)
+        path = Path(event.value).expanduser().resolve()
         if not path.is_dir():
             self.notify(
                 f"Unable to change directory to {str(path)!r}",
@@ -107,7 +111,6 @@ class DirectoryDisplay(containers.HorizontalGroup):
                 severity="error",
             )
             return
-        path = path.expanduser().resolve()
         self.post_message(ChangeDirectory(str(path)))
 
     def action_dismiss(self) -> None:
@@ -123,7 +126,7 @@ class DirectoryDisplay(containers.HorizontalGroup):
         yield CondensedPath(self.path, directory=True).data_bind(
             path=DirectoryDisplay.path
         )
-        yield DirectoryInput(self.path, select_on_focus=False, compact=True).data_bind(
+        yield DirectoryInput(self.path, select_on_focus=True, compact=True).data_bind(
             value=DirectoryDisplay.path
         )
 
