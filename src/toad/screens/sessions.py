@@ -15,6 +15,9 @@ from toad.widgets.session_grid_select import SessionGridSelect
 from toad.widgets.session_summary import SessionSummary
 
 
+INSTRUCTIONS_NO_SESSIONS = "Your sessions will be shown here."
+
+
 class SessionsScreen(ModalScreen[str]):
     CSS_PATH = "sessions.tcss"
     BINDINGS = [Binding("escape", "dismiss", "Dismiss")]
@@ -25,6 +28,7 @@ class SessionsScreen(ModalScreen[str]):
     def compose(self) -> ComposeResult:
         with containers.Center(id="title-container"):
             yield widgets.Label("Sessions")
+        yield widgets.Static(INSTRUCTIONS_NO_SESSIONS, classes="instructions")
         yield SessionGridSelect(self.app.session_tracker)
         yield widgets.Footer()
 
@@ -34,6 +38,8 @@ class SessionsScreen(ModalScreen[str]):
 
     def _on_screen_resume(self, event: ScreenResume) -> None:
         current_mode = self.app.screen_stack[0].id
+        for instructions in self.query(".instructions"):
+            instructions.display = not self.session_grid_select.children
         if current_mode is not None:
             self.session_grid_select.update_current(current_mode)
 

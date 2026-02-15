@@ -13,6 +13,12 @@ SessionsScreen {
         }
     }
 
+    .instructions {
+        margin: 1 1;
+        color: $text-muted;
+        text-style: italic;
+    }
+
 
     SessionGridSelect {                 
         width: 1fr;
