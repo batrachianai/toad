@@ -290,7 +290,7 @@ class DiffView(containers.VerticalGroup):
             text_lines_a = self.code_before.splitlines()
             text_lines_b = self.code_after.splitlines()
             sequence_matcher = difflib.SequenceMatcher(
-                lambda character: character in " \t",
+                lambda character: character in {" ", "\t"},
                 text_lines_a,
                 text_lines_b,
                 autojunk=True,
@@ -331,7 +331,7 @@ class DiffView(containers.VerticalGroup):
         code_a = Content("\n").join(content for content in lines_a)
         code_b = Content("\n").join(content for content in lines_b)
         sequence_matcher = difflib.SequenceMatcher(
-            lambda character: character in " \t",
+            lambda character: character in {" ", "\t"},
             code_a.plain,
             code_b.plain,
             autojunk=True,
