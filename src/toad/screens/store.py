@@ -123,7 +123,7 @@ class DirectoryDisplay(containers.HorizontalGroup):
         yield widgets.Label("📁 ")
         yield CondensedPath(self.path, directory=True).data_bind(
             path=DirectoryDisplay.path
-        )
+        ).with_tooltip("Project directory for new agent sessions (click to edit)")
         yield DirectoryInput(self.path, select_on_focus=True, compact=True).data_bind(
             value=DirectoryDisplay.path
         )

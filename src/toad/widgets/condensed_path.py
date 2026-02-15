@@ -93,7 +93,8 @@ class CondensedPath(Widget):
         if not path or not self.size.width:
             return
         path = os.path.abspath(os.path.expanduser(path))
-        self.tooltip = str(path)
+        if not self.tooltip:
+            self.tooltip = str(path)
         user_root = os.path.abspath(os.path.expanduser("~/"))
         if not user_root.endswith("/"):
             user_root += "/"
