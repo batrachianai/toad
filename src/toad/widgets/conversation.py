@@ -559,7 +559,11 @@ class Conversation(containers.Vertical):
     @on(DirectoryChanged)
     def on_directory_changed(self, event: DirectoryChanged) -> None:
         event.stop()
-        self._directory_changed = True
+        print("DIRECTORY CHANGED", self, self.turn)
+        if self.turn == "client":
+            self.post_message(messages.ProjectDirectoryUpdated())
+        else:
+            self._directory_changed = True
 
     @on(Terminal.Finalized)
     def on_terminal_finalized(self, event: Terminal.Finalized) -> None:
