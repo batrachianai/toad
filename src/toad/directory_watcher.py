@@ -65,7 +65,6 @@ class DirectoryWatcher(threading.Thread, FileSystemEventHandler):
             return
         if isinstance(observer, PollingObserver):
             return
-        return
         try:
             observer.schedule(
                 self,
@@ -81,7 +80,8 @@ class DirectoryWatcher(threading.Thread, FileSystemEventHandler):
                 ],
             )
             observer.start()
-        except Exception:
+        except Exception as error:
+            print(error)
             return
         self._enabled = True
         while not self._stop_event.wait(1):
