@@ -73,6 +73,7 @@ class DirectoryDisplay(containers.HorizontalGroup):
     edit = reactive(False, toggle_class="-edit")
 
     directory_input = getters.query_one(DirectoryInput)
+    condensed_path = getters.query_one(CondensedPath)
 
     def __init__(self, project_dir: Path) -> None:
         super().__init__()
@@ -81,15 +82,11 @@ class DirectoryDisplay(containers.HorizontalGroup):
 
     def watch_project_dir(self, path: Path) -> None:
         self.path = format_path(path, directory=True)
-        self.refresh(layout=True)
 
     def focus(self, scroll_visible=True) -> Self:
         self.edit = True
         self.directory_input.focus(scroll_visible=scroll_visible)
         return self
-
-    # def validate_path(self, path: str) -> str:
-    #     return format_path(path, directory=True)
 
     @on(events.Click, "CondensedPath")
     def on_click(self) -> None:
@@ -102,8 +99,8 @@ class DirectoryDisplay(containers.HorizontalGroup):
 
     @on(widgets.Input.Submitted)
     def on_input_submitted(self, event: widgets.Input.Submitted) -> None:
-        self.edit = False
         path = Path(event.value).expanduser().resolve()
+        self.edit = False
         if not path.is_dir():
             self.notify(
                 f"Unable to change directory to {str(path)!r}",
@@ -111,6 +108,7 @@ class DirectoryDisplay(containers.HorizontalGroup):
                 severity="error",
             )
             return
+        self.condensed_path.path = format_path(path, directory=True)
         self.post_message(ChangeDirectory(str(path)))
 
     def action_dismiss(self) -> None:
@@ -557,6 +555,7 @@ class StoreScreen(Screen):
         if event.character is None:
             return
         LAUNCHER_KEYS = "123456789abcdef"
+
         if event.character in LAUNCHER_KEYS:
             launch_item_offset = LAUNCHER_KEYS.find(event.character)
             try:
