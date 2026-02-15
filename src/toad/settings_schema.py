@@ -48,8 +48,8 @@ SCHEMA: list[SchemaDict] = [
                 "default": "always",
                 "choices": [
                     ("Always", "always"),
-                    ("When there are more than one session", "multiple"),
-                    ("Never show the sessions bar", "never"),
+                    ("When there are multiple sessions", "multiple"),
+                    ("Never", "never"),
                 ],
             },
             {
