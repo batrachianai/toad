@@ -678,8 +678,8 @@ class ToadApp(App, inherit_bindings=False):
                 Panel(
                     version_meta.upgrade_message,
                     style="magenta",
-                    border_style="bright_red",
-                    title="🐸 Update available 🐸",
+                    border_style="dim green",
+                    title="🐸 [bold green not dim]Update available![/] 🐸",
                     expand=False,
                     padding=(1, 4),
                 )
