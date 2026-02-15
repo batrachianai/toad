@@ -267,7 +267,6 @@ class Conversation(containers.Vertical):
     BLANK = True
     BINDING_GROUP_TITLE = "Conversation"
     CURSOR_BINDING_GROUP = Binding.Group(description="Cursor")
-    SESSION_NAVIGATION_GROUP = Binding.Group(description="Sessions")
     BINDINGS = [
         Binding(
             "alt+up",
@@ -281,18 +280,6 @@ class Conversation(containers.Vertical):
             "cursor_down",
             "Block cursor down",
             group=CURSOR_BINDING_GROUP,
-        ),
-        Binding(
-            "ctrl+left_square_bracket",
-            "session_previous",
-            "Previous session",
-            group=SESSION_NAVIGATION_GROUP,
-        ),
-        Binding(
-            "ctrl+right_square_bracket",
-            "session_next",
-            "Next session",
-            group=SESSION_NAVIGATION_GROUP,
         ),
         Binding(
             "enter",
@@ -1651,14 +1638,6 @@ class Conversation(containers.Vertical):
             await self.post(ShellResult(command))
             width, height = self.get_terminal_dimensions()
             await self.shell.send(command, width, height)
-
-    def action_session_previous(self) -> None:
-        if self.screen.id is not None:
-            self.post_message(messages.SessionNavigate(self.screen.id, -1))
-
-    def action_session_next(self) -> None:
-        if self.screen.id is not None:
-            self.post_message(messages.SessionNavigate(self.screen.id, +1))
 
     def action_cursor_up(self) -> None:
         if not self.contents.displayed_children or self.cursor_offset == 0:

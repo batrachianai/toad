@@ -34,11 +34,13 @@ class SessionGridSelect(GridSelect):
 
     def update_current(self, current_mode: str) -> None:
         for index, session_summary in enumerate(self.query_children(SessionSummary)):
+            session_summary.current = False
             if session_summary.session_details is not None:
                 current = session_summary.session_details.mode_name == current_mode
                 session_summary.current = current
                 if current:
                     self.highlighted = index
+                    break
 
     async def handle_session_update_signal(
         self, update: tuple[str, SessionDetails | None]

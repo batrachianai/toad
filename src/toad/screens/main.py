@@ -70,9 +70,22 @@ class MainScreen(Screen, can_focus=False):
 
     COMMANDS = {ModeProvider}
 
+    SESSION_NAVIGATION_GROUP = Binding.Group(description="Sessions")
     BINDINGS = [
         Binding("ctrl+b,f20", "show_sidebar", "Sidebar"),
         Binding("ctrl+h", "go_home", "Home"),
+        Binding(
+            "ctrl+left_square_bracket",
+            "session_previous",
+            "Previous session",
+            group=SESSION_NAVIGATION_GROUP,
+        ),
+        Binding(
+            "ctrl+right_square_bracket",
+            "session_next",
+            "Next session",
+            group=SESSION_NAVIGATION_GROUP,
+        ),
     ]
 
     BINDING_GROUP_TITLE = "Screen"
@@ -155,6 +168,14 @@ class MainScreen(Screen, can_focus=False):
         self.conversation.update_node_styles(animate=animate)
         self.query_one(Footer).update_node_styles(animate=animate)
         self.query_one(SideBar).update_node_styles(animate=animate)
+
+    def action_session_previous(self) -> None:
+        if self.screen.id is not None:
+            self.post_message(messages.SessionNavigate(self.screen.id, -1))
+
+    def action_session_next(self) -> None:
+        if self.screen.id is not None:
+            self.post_message(messages.SessionNavigate(self.screen.id, +1))
 
     @on(messages.ProjectDirectoryUpdated)
     async def on_project_directory_update(self) -> None:
