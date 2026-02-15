@@ -68,6 +68,18 @@ class CondensedPath(Widget):
     path = reactive("")
     display_path = reactive("")
 
+    DEFAULT_CSS = """
+    CondensedPath {
+        height: 1;
+    }
+    """
+
+    def __init__(
+        self, path: str = "", *, id: str | None = None, classes: str | None = None
+    ) -> None:
+        super().__init__(id=id, classes=classes)
+        self.set_reactive(CondensedPath.path, path)
+
     def on_resize(self) -> None:
         self.watch_path(self.path)
 
@@ -84,7 +96,10 @@ class CondensedPath(Widget):
         self.display_path = path
 
     def render(self) -> Content:
-        return Content(condense_path(self.display_path, self.size.width))
+        if self.size.width:
+            return Content(condense_path(self.display_path, self.size.width))
+        else:
+            return Content(self.path)
 
     def get_content_width(self, container: Size, viewport: Size) -> int:
         if self.display_path:

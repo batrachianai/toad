@@ -25,7 +25,6 @@ from textual.binding import Binding
 from textual.content import Content
 from textual.geometry import clamp
 from textual.css.query import NoMatches
-from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 from textual.widgets.markdown import MarkdownBlock, MarkdownFence
@@ -45,12 +44,14 @@ from toad.acp import protocol as acp_protocol
 from toad.acp.agent import Mode
 from toad.answer import Answer
 from toad.agent import AgentBase, AgentReady, AgentFail
+from toad.format_path import format_path
 from toad.directory_watcher import DirectoryWatcher, DirectoryChanged
 from toad.history import History
 from toad.widgets.flash import Flash
 from toad.widgets.menu import Menu
 from toad.widgets.note import Note
 from toad.widgets.prompt import Prompt
+from toad.widgets.session_tabs import SessionsTabs
 from toad.widgets.terminal import Terminal
 from toad.widgets.throbber import Throbber
 from toad.widgets.user_input import UserInput
@@ -61,6 +62,7 @@ from toad.menus import MenuItem
 from toad.widgets.shell_terminal import ShellTerminal
 
 if TYPE_CHECKING:
+    from toad.session_tracker import SessionState
     from toad.widgets.terminal import Terminal
     from toad.widgets.agent_response import AgentResponse
     from toad.widgets.agent_thought import AgentThought
@@ -265,6 +267,7 @@ class Conversation(containers.Vertical):
     BLANK = True
     BINDING_GROUP_TITLE = "Conversation"
     CURSOR_BINDING_GROUP = Binding.Group(description="Cursor")
+    SESSION_NAVIGATION_GROUP = Binding.Group(description="Sessions")
     BINDINGS = [
         Binding(
             "alt+up",
@@ -278,6 +281,18 @@ class Conversation(containers.Vertical):
             "cursor_down",
             "Block cursor down",
             group=CURSOR_BINDING_GROUP,
+        ),
+        Binding(
+            "ctrl+left_square_bracket",
+            "session_previous",
+            "Previous session",
+            group=SESSION_NAVIGATION_GROUP,
+        ),
+        Binding(
+            "ctrl+right_square_bracket",
+            "session_next",
+            "Next session",
+            group=SESSION_NAVIGATION_GROUP,
         ),
         Binding(
             "enter",
@@ -328,7 +343,7 @@ class Conversation(containers.Vertical):
 
     busy_count = var(0)
     cursor_offset = var(-1, init=False)
-    project_path = var(Path("./").expanduser().absolute())
+    project_path = var("")
     working_directory: var[str] = var("")
     _blocks: var[list[MarkdownBlock] | None] = var(None)
 
@@ -354,17 +369,13 @@ class Conversation(containers.Vertical):
 
     title = var("")
 
-    @dataclass
-    class SessionUpdate(Message):
-        name: str | None
-        """Name of the session, or `None` for no change."""
-
     def __init__(
         self,
         project_path: Path,
         agent: AgentData | None = None,
         agent_session_id: str | None = None,
         session_pk: int | None = None,
+        initial_prompt: str | None = None,
     ) -> None:
         super().__init__()
 
@@ -400,23 +411,13 @@ class Conversation(containers.Vertical):
         self._directory_changed = False
         self._directory_watcher: DirectoryWatcher | None = None
 
+        self._initial_prompt = initial_prompt
+
     def update_title(self) -> None:
         """Update the screen title."""
 
-        def path_with_tilde(path: Path) -> str:
-            """Convert path to use ~ for home directory if applicable."""
-            path = Path(path).expanduser().resolve()
-            home = Path.home()
-
-            try:
-                relative = path.relative_to(home)
-                return f"~/{relative}"
-            except ValueError:
-                # Path is not relative to home
-                return str(path)
-
         if agent_title := self.agent_title:
-            project_path = path_with_tilde(self.project_path)
+            project_path = format_path(self.project_path)
             self.screen.title = f"{agent_title} {project_path}"
         else:
             self.screen.title = ""
@@ -459,6 +460,9 @@ class Conversation(containers.Vertical):
         self.prompt.prompt_text_area.insert(insert_text)
         self.prompt.prompt_text_area.insert(" ")
 
+    def watch_project_path(self, path: Path) -> None:
+        self.post_message(messages.SessionUpdate(path=str(path)))
+
     async def watch_shell_history_index(self, previous_index: int, index: int) -> None:
         if previous_index == 0:
             self.shell_history.current = self.prompt.text
@@ -480,6 +484,12 @@ class Conversation(containers.Vertical):
         else:
             self.prompt.text = history_entry["input"]
 
+    def watch_turn(self, turn: str) -> None:
+        if turn == "client":
+            self.post_message(messages.SessionUpdate(state="idle"))
+        elif turn == "agent":
+            self.post_message(messages.SessionUpdate(state="busy"))
+
     @on(events.Key)
     async def on_key(self, event: events.Key):
         if (
@@ -493,6 +503,7 @@ class Conversation(containers.Vertical):
 
     def compose(self) -> ComposeResult:
         yield Throbber(id="throbber")
+        yield SessionsTabs()
         with Window():
             with ContentsGrid():
                 with CursorContainer(id="cursor-container"):
@@ -548,7 +559,10 @@ class Conversation(containers.Vertical):
     @on(DirectoryChanged)
     def on_directory_changed(self, event: DirectoryChanged) -> None:
         event.stop()
-        self._directory_changed = True
+        if self.turn is None or self.turn == "client":
+            self.post_message(messages.ProjectDirectoryUpdated())
+        else:
+            self._directory_changed = True
 
     @on(Terminal.Finalized)
     def on_terminal_finalized(self, event: Terminal.Finalized) -> None:
@@ -860,6 +874,8 @@ class Conversation(containers.Vertical):
             self.prompt.project_directory_updated()
 
         self._turn_count += 1
+
+        self.post_message(messages.SessionUpdate(state="idle"))
 
         if stop_reason != "end_turn":
             from toad.widgets.markdown_note import MarkdownNote
@@ -1193,6 +1209,8 @@ class Conversation(containers.Vertical):
         else:
             kind = "edit"
 
+        self.post_message(messages.SessionUpdate(state="asking"))
+
         if kind == "edit":
             diffs: list[tuple[str, str, str | None, str]] = []
 
@@ -1217,7 +1235,10 @@ class Conversation(containers.Vertical):
                     sound="question",
                 )
                 permissions_screen = PermissionsScreen(options, diffs)
-                result = await self.app.push_screen_wait(permissions_screen)
+                result = await self.app.push_screen_wait(
+                    permissions_screen, mode=self.screen.id
+                )
+                self.post_message(messages.SessionUpdate(state="busy"))
                 self.app.terminal_alert(False)
                 result_future.set_result(result)
                 return
@@ -1230,6 +1251,9 @@ class Conversation(containers.Vertical):
             except Exception:
                 # I've seen this occur in shutdown with an `InvalidStateError`
                 pass
+
+            if not self.prompt.ask_queue:
+                self.post_message(messages.SessionUpdate(state="busy"))
 
         tool_call_content = tool_call_update.get("content", None) or []
         self.ask(
@@ -1316,6 +1340,15 @@ class Conversation(containers.Vertical):
                 "Give the current session a friendly name",
                 "<session name>",
             ),
+            SlashCommand(
+                "/toad:session-close",
+                "Close the current session",
+            ),
+            SlashCommand(
+                "/toad:session-new",
+                "Open a new session in the current working directory",
+                "<initial prompt or command>",
+            ),
         ]
 
         slash_commands.extend(self.agent_slash_commands)
@@ -1356,6 +1389,9 @@ class Conversation(containers.Vertical):
                     self._session_pk,
                 )
                 self.agent.start(self)
+                self.post_message(
+                    messages.SessionUpdate("New Session", self.agent_title)
+                )
 
             self.call_after_refresh(start_agent)
 
@@ -1381,6 +1417,7 @@ class Conversation(containers.Vertical):
             self.agent_ready = False
         self.update_title()
 
+    @work
     async def watch_agent_ready(self, ready: bool) -> None:
         with suppress(asyncio.TimeoutError):
             async with asyncio.timeout(2.0):
@@ -1394,6 +1431,17 @@ class Conversation(containers.Vertical):
                 from toad.widgets.markdown_note import MarkdownNote
 
                 await self.post(MarkdownNote(welcome))
+        if ready and self._initial_prompt is not None:
+            prompt = self._initial_prompt
+            if prompt.startswith("!"):
+                self.post_message(
+                    messages.UserInputSubmitted(self._initial_prompt[1:], shell=True)
+                )
+            else:
+                self.post_message(
+                    messages.UserInputSubmitted(self._initial_prompt, shell=False)
+                )
+            self._initial_prompt = None
 
     def on_mouse_down(self, event: events.MouseDown) -> None:
         self._mouse_down_offset = event.screen_offset
@@ -1603,6 +1651,14 @@ class Conversation(containers.Vertical):
             await self.post(ShellResult(command))
             width, height = self.get_terminal_dimensions()
             await self.shell.send(command, width, height)
+
+    def action_session_previous(self) -> None:
+        if self.screen.id is not None:
+            self.post_message(messages.SessionNavigate(self.screen.id, -1))
+
+    def action_session_next(self) -> None:
+        if self.screen.id is not None:
+            self.post_message(messages.SessionNavigate(self.screen.id, +1))
 
     def action_cursor_up(self) -> None:
         if not self.contents.displayed_children or self.cursor_offset == 0:
@@ -1850,8 +1906,22 @@ class Conversation(containers.Vertical):
                 return True
             if self.agent is not None:
                 await self.agent.set_session_name(name)
-                self.post_message(self.SessionUpdate(name=name))
+                self.post_message(messages.SessionUpdate(name=name))
                 self.flash(f"Renamed session to [b]'{name}'", style="success")
             return True
+        elif command == "toad:session-close":
+            if self.screen.id is not None:
+                self.post_message(messages.SessionClose(self.screen.id))
+                return True
+        elif command == "toad:session-new":
+            if self._agent_data is not None:
+                self.post_message(
+                    messages.SessionNew(
+                        self.working_directory,
+                        self._agent_data["identity"],
+                        parameters.strip(),
+                    )
+                )
+                return True
 
         return False

@@ -123,7 +123,7 @@ class SlashComplete(containers.VerticalGroup):
         Args:
             prompt: Text prompt.
         """
-        prompt = prompt.lstrip("/").casefold()
+        prompt = prompt.lstrip("/").casefold().rstrip()
         columns = self.columns = Columns("auto", "flex")
 
         slash_commands = sorted(

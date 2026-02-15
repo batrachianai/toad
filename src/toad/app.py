@@ -6,7 +6,7 @@ from pathlib import Path
 import platform
 import json
 from time import monotonic
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import Any, Callable, ClassVar, TYPE_CHECKING
 
 from rich import terminal_theme
 
@@ -19,20 +19,24 @@ from textual import events
 from textual.signal import Signal
 from textual.timer import Timer
 from textual.notifications import Notify
+from textual.screen import Screen
 
 import toad
 from toad.db import DB
 from toad.settings import Schema, Settings
 from toad.agent_schema import Agent as AgentData
+from toad import messages
 from toad.settings_schema import SCHEMA
 from toad.version import VersionMeta
 from toad import paths
 from toad import atomic
+from toad.session_tracker import SessionTracker, SessionDetails
 
 if TYPE_CHECKING:
     from toad.screens.main import MainScreen
     from toad.screens.settings import SettingsScreen
     from toad.screens.store import StoreScreen
+    from toad.screens.sessions import SessionsScreen
     from toad.db import DB
 
 
@@ -217,10 +221,20 @@ def get_store_screen() -> StoreScreen:
     return StoreScreen()
 
 
+def get_sessions_screen() -> SessionsScreen:
+    from toad.screens.sessions import SessionsScreen
+
+    return SessionsScreen()
+
+
 class ToadApp(App, inherit_bindings=False):
     """The top level app."""
 
-    SCREENS = {"settings": get_settings_screen}
+    CSS_PATH = "toad.tcss"
+    SCREENS = {
+        "settings": get_settings_screen,
+        "sessions": get_sessions_screen,
+    }
     MODES = {"store": get_store_screen}
     BINDING_GROUP_TITLE = "System"
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -233,6 +247,7 @@ class ToadApp(App, inherit_bindings=False):
             priority=True,
         ),
         Binding("ctrl+c", "help_quit", show=False, system=True),
+        Binding("ctrl+s", "sessions", "Sessions"),
         Binding("f1", "toggle_help_panel", "Help", priority=True),
         Binding(
             "f2,ctrl+comma",
@@ -241,7 +256,6 @@ class ToadApp(App, inherit_bindings=False):
             tooltip="Settings screen",
         ),
     ]
-    CSS_PATH = "toad.tcss"
     ALLOW_IN_MAXIMIZED_VIEW = ""
 
     _settings = var(dict)
@@ -254,6 +268,8 @@ class ToadApp(App, inherit_bindings=False):
     terminal_title_icon: var[str] = var("🐸")
     terminal_title_flash = var(0)
     terminal_title_blink = var(False)
+    project_dir = var(Path)
+    show_sessions = var(False, toggle_class="-show-sessions-bar")
 
     HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (100, "-wide")]
 
@@ -271,17 +287,26 @@ class ToadApp(App, inherit_bindings=False):
             mode: Initial mode.
             agent: Agent identity or shor name.
         """
-        self.settings_changed_signal = Signal(self, "settings_changed")
-        self.agent_data = agent_data
-        self.project_dir = (
-            None if project_dir is None else Path(project_dir).expanduser().resolve()
+        self.settings_changed_signal: Signal[tuple[int, object]] = Signal(
+            self, "settings_changed"
         )
+        self.agent_data = agent_data
+
         self._initial_mode = mode
         self.version_meta: VersionMeta | None = None
         self._supports_pyperclip: bool | None = None
         self._terminal_title_flash_timer: Timer | None = None
 
+        self.session_update_signal: Signal[tuple[str, SessionDetails | None]] = Signal(
+            self, "session_update"
+        )
+        self._session_tracker = SessionTracker(self.session_update_signal)
+        self.temporary_background_screen: Screen | None = None
+
         super().__init__()
+        self.project_dir = (
+            None if project_dir is None else Path(project_dir).expanduser().resolve()
+        )
 
     @property
     def config_path(self) -> Path:
@@ -294,6 +319,13 @@ class ToadApp(App, inherit_bindings=False):
     @property
     def db_path(self) -> Path:
         return paths.get_state() / "toad.db"
+
+    @property
+    def _background_screens(self) -> list[Screen]:
+        background_screens = super()._background_screens
+        if self.temporary_background_screen:
+            background_screens.append(self.temporary_background_screen)
+        return background_screens
 
     async def get_db(self) -> DB:
         """Get an instance of the database."""
@@ -330,6 +362,10 @@ class ToadApp(App, inherit_bindings=False):
             self.save_settings()
             self.call_later(self.capture_event, "toad-install")
         return anon_id
+
+    @property
+    def session_tracker(self) -> SessionTracker:
+        return self._session_tracker
 
     def copy_to_clipboard(self, text: str) -> None:
         """Override copy to clipboard to use pyperclip first, then OSC 52.
@@ -566,6 +602,8 @@ class ToadApp(App, inherit_bindings=False):
             self.set_class(not bool(value), "-hide-thoughts")
         elif key == "sidebar.hide":
             self.set_class(bool(value), "-hide-sidebar")
+        elif key == "ui.sessions-bar":
+            self.update_show_sessions()
 
         self.settings_changed_signal.publish((key, value))
 
@@ -585,18 +623,35 @@ class ToadApp(App, inherit_bindings=False):
         self._settings = settings
         self.settings.set_all()
 
+    async def new_session_screen(
+        self, get_screen: Callable[[], Screen]
+    ) -> SessionDetails:
+        session_details = self._session_tracker.new_session()
+        self.update_show_sessions()
+        self.session_update_signal.publish((session_details.mode_name, session_details))
+
+        def make_screen() -> Screen:
+            screen = get_screen()
+            screen.id = session_details.mode_name
+            return screen
+
+        self.add_mode(session_details.mode_name, make_screen)
+        await self.switch_mode(session_details.mode_name)
+        return session_details
+
     async def on_mount(self) -> None:
         self.capture_event("toad-run")
-        self.anon_id
-
+        self.anon_id  # Created on frst reference
         if mode := self._initial_mode:
             self.switch_mode(mode)
         else:
-            self.push_screen(self.get_main_screen())
+            self.notify("new_screen")
+            await self.new_session_screen(self.get_main_screen)
 
         self.update_terminal_title()
         self.set_timer(1, self.run_version_check)
         self.set_process_title()
+        self.update_show_sessions()
 
     @work(thread=True, exit_on_error=False)
     def set_process_title(self) -> None:
@@ -628,8 +683,8 @@ class ToadApp(App, inherit_bindings=False):
                 Panel(
                     version_meta.upgrade_message,
                     style="magenta",
-                    border_style="bright_red",
-                    title="🐸 Update available 🐸",
+                    border_style="dim green",
+                    title="🐸 [bold green not dim]Update available![/] 🐸",
                     expand=False,
                     padding=(1, 4),
                 )
@@ -682,3 +737,100 @@ class ToadApp(App, inherit_bindings=False):
             self.action_hide_help_panel()
         else:
             self.action_show_help_panel()
+
+    def update_show_sessions(self) -> None:
+        match self.settings.get("ui.sessions-bar", str):
+            case "always":
+                self.show_sessions = True
+            case "never":
+                self.show_sessions = False
+            case "multiple":
+                self.show_sessions = self.session_tracker.session_count > 1
+
+    @on(messages.SessionNavigate)
+    def on_session_navigate(self, event: messages.SessionNavigate) -> None:
+        new_mode = self._session_tracker.session_cursor_move(
+            event.mode_name, event.direction
+        )
+        if new_mode is not None:
+            self.switch_mode(new_mode)
+
+    @on(messages.SessionSwitch)
+    def on_session_switch(self, event: messages.SessionSwitch) -> None:
+        self.switch_mode(event.mode_name)
+
+    @on(messages.SessionNew)
+    def on_session_new(self, event: messages.SessionNew) -> None:
+        self.launch_agent(
+            event.agent, project_path=Path(event.path), initial_prompt=event.prompt
+        )
+
+    @on(messages.SessionClose)
+    def on_session_close(self) -> None:
+        self.update_show_sessions()
+
+    @work
+    async def action_sessions(self) -> None:
+        if (session_screen_name := await self.push_screen_wait("sessions")) is not None:
+            try:
+                self.app.switch_mode(session_screen_name)
+            except KeyError:
+                pass
+
+    @on(messages.LaunchAgent)
+    def on_launch_agent(self, message: messages.LaunchAgent) -> None:
+        self.launch_agent(
+            message.identity,
+            agent_session_id=message.session_id,
+            session_pk=message.pk,
+            initial_prompt=message.prompt,
+        )
+
+    @work
+    async def launch_agent(
+        self,
+        agent_identity: str,
+        *,
+        agent_session_id: str | None = None,
+        session_pk: int | None = None,
+        project_path: Path | None = None,
+        initial_prompt: str | None = None,
+    ) -> None:
+        from toad.screens.main import MainScreen
+        from toad.agent_schema import Agent
+        from toad.agents import read_agents
+
+        agent: Agent | None = None
+        if session_pk is not None:
+            db = DB()
+            session = await db.session_get(session_pk)
+            if session is not None:
+                meta = json.loads(session["meta_json"])
+                if agent_data := meta.get("agent_data"):
+                    agent = agent_data
+
+        if agent is None:
+            agents = await read_agents()
+            try:
+                agent = agents[agent_identity]
+            except KeyError:
+                self.notify("Agent not found", title="Launch agent", severity="error")
+                return
+        if project_path is None:
+            project_path = Path(self.project_dir or os.getcwd())
+
+        def get_screen():
+            screen = MainScreen(
+                project_path,
+                agent,
+                agent_session_id,
+                session_pk=session_pk,
+                initial_prompt=initial_prompt,
+            ).data_bind(
+                column=ToadApp.column,
+                column_width=ToadApp.column_width,
+            )
+
+            return screen
+
+        await self.new_session_screen(get_screen)

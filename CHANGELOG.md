@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Added project directory switcher
+- Added sessions, sessions tabs, sessions screen
+
 ### Fixed
 
 - Fixed handling of agents that post null responses (OpenCode)
@@ -15,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added semantic styled edge to diff view
 
-## [0.5.38]
+## [0.5.38] - 2026-02-01
 
 ### Fixed
 
@@ -25,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - PathSearch and SlashCommand inputs are now overlays to avoid moving conversation content
 
-## [0.5.37] - 2026-01-01
+## [0.5.37] - 2026-02-01
 
 ### Fixed
 

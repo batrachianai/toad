@@ -411,7 +411,7 @@ See on-screen instructions for details.
 class Prompt(containers.VerticalGroup):
 
     BINDINGS = [
-        Binding("escape", "dismiss", "Dismiss"),
+        Binding("escape", "dismiss", "Dismiss", show=False),
     ]
 
     PROMPT_NULL = " "

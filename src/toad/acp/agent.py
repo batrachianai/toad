@@ -14,6 +14,7 @@ from textual.content import Content
 from textual.message import Message
 from textual.message_pump import MessagePump
 
+
 from toad import jsonrpc
 import toad
 from toad.agent_schema import Agent as AgentData
@@ -570,7 +571,10 @@ class Agent(AgentBase):
             await db.session_update_last_used(self.session_pk)
 
         if self._process is not None:
-            self._process.terminate()
+            try:
+                self._process.terminate()
+            except OSError:
+                pass
 
     async def run(self) -> None:
         """The main logic of the Agent."""
@@ -667,8 +671,9 @@ class Agent(AgentBase):
 
         if self.supports_load_session:
             db = DB()
+            session_name = "New Session"
             self.session_pk = await db.session_new(
-                "New Session",
+                session_name,
                 self._agent_data["name"],
                 self._agent_data["identity"],
                 self.session_id,

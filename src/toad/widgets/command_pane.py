@@ -25,9 +25,7 @@ class CommandPane(Terminal):
     DEFAULT_CSS = """
     CommandPane {
         scrollbar-size: 0 0;
-
     }
-
     """
 
     def __init__(

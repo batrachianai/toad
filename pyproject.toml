@@ -26,6 +26,7 @@ dependencies = [
     "setproctitle>=1.3.7",
     "psutil>=7.2.1",
     "aiosqlite>=0.22.1",
+    "mypy>=1.19.1",
 ]
 
 [tool.uv.workspace]
@@ -35,7 +36,7 @@ members = [
 
 [tool.uv.sources]
 #textual-serve = { path = "../textual-serve", editable = true }
-#textual = { path = "../textual", editable = true }
+textual = { path = "../textual", editable = true }
 #textual-dev = { path = "../textual-dev", editable = true }
 #rich = { path = "../rich", editable = true }
 

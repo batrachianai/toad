@@ -162,7 +162,7 @@ class ToolCall(containers.VerticalGroup):
         header = Content.assemble(expand_icon, "🔧 ", (title, "$text-success"))
 
         if status == "pending":
-            header += Content.assemble(" ⏲")
+            header += Content.assemble(" ⌛")
         elif status == "in_progress":
             pass
         elif status == "failed":

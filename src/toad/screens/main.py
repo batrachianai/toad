@@ -8,6 +8,7 @@ from textual import getters
 from textual.binding import Binding
 from textual.command import Hit, Hits, Provider, DiscoveryHit
 from textual.content import Content
+from textual.events import ScreenResume
 from textual.screen import Screen
 from textual.reactive import var, reactive
 from textual.widgets import Footer, OptionList, DirectoryTree, Tree
@@ -65,9 +66,13 @@ class ModeProvider(Provider):
 class MainScreen(Screen, can_focus=False):
     AUTO_FOCUS = "Conversation Prompt TextArea"
 
+    CSS_PATH = "main.tcss"
+
     COMMANDS = {ModeProvider}
+
     BINDINGS = [
         Binding("ctrl+b,f20", "show_sidebar", "Sidebar"),
+        Binding("ctrl+h", "go_home", "Home"),
     ]
 
     BINDING_GROUP_TITLE = "Screen"
@@ -91,6 +96,7 @@ class MainScreen(Screen, can_focus=False):
         agent_session_id: str | None = None,
         agent_session_title: str | None = None,
         session_pk: int | None = None,
+        initial_prompt: str | None = None,
     ) -> None:
         super().__init__()
         self.set_reactive(MainScreen.project_path, project_path)
@@ -98,6 +104,7 @@ class MainScreen(Screen, can_focus=False):
         self._agent_session_id = agent_session_id
         self._agent_session_title = agent_session_title
         self._session_pk = session_pk
+        self._initial_prompt = initial_prompt
 
     def watch_title(self, title: str) -> None:
         self.app.update_terminal_title()
@@ -113,6 +120,9 @@ class MainScreen(Screen, can_focus=False):
             return FutureText([Content(quote) for quote in quotes])
         return super().get_loading_widget()
 
+    def _on_screen_resume(self, event: ScreenResume) -> None:
+        self.conversation
+
     def compose(self) -> ComposeResult:
         with containers.Center():
             yield SideBar(
@@ -127,12 +137,19 @@ class MainScreen(Screen, can_focus=False):
                 ),
             )
             yield Conversation(
-                self.project_path, self._agent, self._agent_session_id, self._session_pk
+                self.project_path,
+                self._agent,
+                self._agent_session_id,
+                self._session_pk,
+                initial_prompt=self._initial_prompt,
             ).data_bind(
                 project_path=MainScreen.project_path,
                 column=MainScreen.column,
             )
         yield Footer()
+
+    def run_prompt(self, prompt: str) -> None:
+        self.conversation
 
     def update_node_styles(self, animate: bool = True) -> None:
         self.conversation.update_node_styles(animate=animate)
@@ -161,11 +178,43 @@ class MainScreen(Screen, can_focus=False):
         ]
         self.query_one("SideBar Plan", Plan).entries = entries
 
-    @on(Conversation.SessionUpdate)
-    async def on_session_update(self, event: Conversation.SessionUpdate) -> None:
+    @on(messages.SessionUpdate)
+    async def on_session_update(self, event: messages.SessionUpdate) -> None:
         # TODO: May not be required
         if event.name is not None:
             self._agent_session_title = event.name
+        if self.id is not None:
+            self.app.session_tracker.update_session(
+                self.id,
+                title=event.name,
+                subtitle=event.subtitle,
+                path=event.path,
+                state=event.state,
+            )
+
+    @on(messages.SessionClose)
+    async def on_session_close(self, event: messages.SessionClose) -> None:
+
+        if self.id is None:
+            return
+        current_mode = self.id
+        session_tracker = self.app.session_tracker
+
+        session_count = session_tracker.session_count
+
+        if session_count <= 1:
+
+            session_tracker.close_session(current_mode)
+            await self.app.switch_mode("store")
+
+        else:
+            if new_mode := self.app.session_tracker.session_cursor_move(
+                current_mode, -1
+            ):
+                await self.app.switch_mode(new_mode)
+            session_tracker.close_session(current_mode)
+
+        self.app.call_later(self.app.remove_mode, current_mode)
 
     def on_mount(self) -> None:
         for tree in self.query("#project_directory_tree").results(DirectoryTree):
@@ -190,6 +239,9 @@ class MainScreen(Screen, can_focus=False):
 
     def action_focus_prompt(self) -> None:
         self.conversation.focus_prompt()
+
+    async def action_go_home(self) -> None:
+        await self.app.switch_mode("store")
 
     @on(SideBar.Dismiss)
     def on_side_bar_dismiss(self, message: SideBar.Dismiss):

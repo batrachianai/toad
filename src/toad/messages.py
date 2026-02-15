@@ -6,6 +6,8 @@ from textual.content import Content
 from textual.widget import Widget
 from textual.message import Message
 
+from toad.session_tracker import SessionState
+
 
 class WorkStarted(Message):
     """Work has started."""
@@ -72,3 +74,56 @@ class Flash(Message):
 
 class ProjectDirectoryUpdated(Message):
     """The project directory may may changed."""
+
+
+@dataclass
+class SessionNavigate(Message):
+    """Request to switch session."""
+
+    mode_name: str
+    direction: Literal[-1, +1]
+
+
+@dataclass
+class SessionSwitch(Message):
+    """Switch to specified session."""
+
+    mode_name: str
+
+
+@dataclass
+class SessionNew(Message):
+    """Open a new session."""
+
+    path: str
+    """project directory path."""
+    agent: str
+    """Agent identity."""
+    prompt: str
+    """Initial prompt or command"""
+
+
+@dataclass
+class SessionUpdate(Message):
+    name: str | None = None
+    """Name of the session, or `None` for no change."""
+    subtitle: str | None = None
+    """Session subtitle (name of agent)."""
+    path: str | None = None
+    """Project directory path."""
+    state: SessionState | None = None
+    """New session state."""
+
+
+@dataclass
+class SessionClose(Message):
+    name: str
+    """Name of the session."""
+
+
+@dataclass
+class LaunchAgent(Message):
+    identity: str
+    session_id: str | None = None
+    pk: int | None = None
+    prompt: str | None = None

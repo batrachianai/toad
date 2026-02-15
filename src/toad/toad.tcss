@@ -11,14 +11,10 @@ LoadingIndicator {
     background: transparent;
 }
 
-
-# Markdown:empty {
-#     display: none;
-# }
-
 Throbber {
     width: 100%;
     height: 1;    
+    
     overlay: screen;
     visibility: hidden;
     &.-busy {
@@ -87,664 +83,18 @@ App.-compact-input {
     }
 }
 
+App.-show-sessions-bar {
+    SessionsTabs {
+        display: block;
+    }
+    Throbber {
+        offset-y: 1;
+    }
+}
+
 Checkbox {
     # TODO: Bug in Textual?
     text-overflow: clip;    
-}
-
-
-Note,MarkdownNote {
-    padding: 0 1 0 0;
-    &.about MarkdownTable {
-        # Make the tables compact in /about
-        width: auto;
-    }
-    &.-error {
-        border: heavy $error;
-    }    
-    &.-stop-reason {        
-        border: wide $error 50%;        
-        padding: 0 1;
-        MarkdownH2 {           
-            margin: 1 0 1 0;
-        }
-    }
-}
-
-
-Toast {    
-    margin: 0 0;
-    padding: 0 1;
-    background: $background;
-    color: $text-muted;
-    .toast--title {        
-        color: $text;            
-    }    
-    &.-information {
-        border: round $primary;                          
-    }
-    &.-warning {
-        border: round $warning;                        
-    }
-    &.-error {
-        border: round $error;                  
-    }    
-}
-
-Menu {
-    border: round $accent;
-    background: transparent;
-}
-
-
-Loading {
-    color: $text-primary;    
-    
-}
-
-
-
-Plan {        
-    border: panel $secondary;            
-    background: transparent;        
-    margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
-    padding: 1 0 0 1;        
-    height: auto;                        
-    grid-size: 2;
-    grid-columns: auto 1fr;
-    grid-rows: auto;        
-
-    .-no-plan {
-        text-style: dim italic;
-
-    }
-
-    .plan {
-        color: $text-secondary;
-    }
-    .status {
-        padding: 0 0 0 0;
-        color: $text-secondary;
-    }
-    .priority {
-        padding: 0 0 0 0;
-    }
-    .status.status-completed {
-        color: $text-success;            
-    }
-    .status-pending {
-        opacity: 0.7;
-    }
-    .plan.status-completed {
-        
-    }        
-}
-
-
-Conversation {    
-    Window {                      
-        layout: stream;
-        margin: 0;                
-        scrollbar-size-vertical: 2;        
-        padding: 0 1 0 1;       
-        height: 1fr;                
-        align: left bottom;   
-    }
-
-    &.-scrollbar-thin {
-        Window {
-            # scrollbar-gutter: stable;
-            scrollbar-size-vertical: 1;
-        }
-        
-    }
-    &.-scrollbar-hidden {
-        Window {
-            # scrollbar-gutter: auto;
-            scrollbar-size-vertical: 0;
-        }
-    }
-
-    height: 1fr;    
-    layers: base prompt float;        
-
-    
-    &.-column {
-        max-width: 100;             
-        background: black 7%;   
-        
-        #info-container {            
-            margin: 1 1;
-        }                  
-    }
-    
-    Contents {        
-        layout: stream;
-        width: 1fr;
-        overflow: hidden;         
-        height: auto;  
-        padding: 0 0 0 0;                         
-    }    
-
-    ContentsGrid {            
-        grid-size: 2;
-        grid-columns: 1 1fr;
-        grid-rows: auto;
-        height: auto;                
-    }
-
-    #cursor-container {            
-        height: auto;
-        width: 1;                    
-        color: $foreground 7%;            
-                
-        &> Cursor {
-            height: 0;            
-            width: 1;     
-                                 
-            border-left: outer $text-accent;
-            visibility: visible;
-            &.-blink {
-                border-left: outer $text-accent 20%;
-            } 
-        }
-    }        
-
-    AgentResponse {           
-        min-height: 1;        
-        padding: 0 1 0 0;       
-        overflow-x: auto;
-        scrollbar-size-horizontal: 0;
-        layout: stream;
-        MarkdownBlock:last-child {
-            margin-bottom: 0;
-        }
-    }
-
-    LoadingIndicator {
-        height: 10;
-    }
-
-    AgentThought {
-        background: $primary-muted 20%;
-        color: $text-primary;        
-        min-height: 1;        
-        margin: 1 1 1 0;              
-        padding:  0 1 0 1;
-        border: blank transparent;
-        overflow-x: auto;
-        scrollbar-size-horizontal: 0;
-        layout: stream;
-        MarkdownBlock:last-child {
-            margin-bottom: 0;
-        }
-       
-        &.-loading {            
-            background: transparent !important;
-            padding: 0;
-            margin: 0;            
-        }
-        max-height: 10;
-        overflow-y: auto;
-        scrollbar-visibility: hidden;
-
-        &.-maximized {
-            max-height: 100h;
-            margin: 1 2;
-            scrollbar-visibility: visible;
-            &>* {                
-                padding-right: 1;
-            }
-        }
-        &:focus {
-            border: tall $primary;
-        }
-    }
-
-    ToolCall {
-        padding: 0 0 0 1;        
-        width: 1fr;
-        layout: stream;
-        height: auto;
-
-        .icon {
-            width: auto;
-            margin-right: 1;
-        }
-        #tool-content {
-            display: none;
-        }
-        &.-has-content #tool-content {
-            margin-top: 1;                        
-        }
-        &.-expanded {
-            #tool-content {
-                display: block;
-            }
-        }
-
-        ToolCallHeader {     
-            pointer: pointer;       
-            width: auto;
-            max-width: 1fr;            
-        }        
-    }
-
-   
-
-    ShellResult {        
-        border-left: blank $primary;
-        background: $foreground 4%;        
-        padding: 1 0;   
-        margin: 1 1 1 0; 
-        #prompt {
-            margin: 0 1 0 0;
-            color: $text-primary;            
-        }  
-    }
-    
-    Terminal {        
-        width: 1fr;
-        height: auto;
-        padding: 0 1 0 0;
-        margin: 1 0;
-        overflow: scroll;
-        scrollbar-size: 0 0;          
-    }
-
-    TerminalTool {
-        height: auto;   
-        border: panel $text-secondary 90%;          
-        padding: 1 1 0 1;                
-        &.-success {
-            border: panel $text-success 90%;              
-        }
-        &.-error {
-            border: panel $error-muted;              
-            border-title-color: $text-error;
-            border-subtitle-align: right;
-            border-subtitle-style: bold;
-        }             
-    }
-         
-    UserInput {
-        border-left: blank $secondary;
-        background: $secondary 15%;
-        padding: 1 1 1 0;   
-        margin: 1 1 1 0; 
-        Markdown {            
-            padding:0 2 0 0;
-        }
-        Markdown > MarkdownBlock:last-child {
-            margin-bottom: 0;
-        }
-        MarkdownFence {                           
-            margin: 0 2 1 0;
-        }
-        #prompt {
-            margin: 0 1 0 0;
-            color: $text-secondary;
-        }
-    }
-
-}
-
-
-Welcome {    
-    height: auto;       
-    #logo {
-        color: $text-success;        
-    }
-    #message {        
-        padding: 0;
-        width: 1fr;
-        height: auto;
-    }
-}
-
-
-ACPToolCallContent {
-    Markdown {
-        margin: 0;
-        padding-left: 0;
-        MarkdownBlock:last-of-type {
-            margin-bottom: 0;
-        }
-    }
-}
-
-
-Prompt {            
-    padding: 0 0 0 0;    
-    height: auto;  
-    dock: bottom;  
-   
-    &.-shell-mode {
-        #prompt-container:focus-within {
-            border: tall $primary;
-        }
-    }    
-
-    PathSearch, SlashComplete {
-        display: none;
-        overlay: screen;
-        offset-y: -16;
-        height: 16;
-        Input {
-            margin: 0 1;
-            padding: 0 1;
-        }
-        OptionList {
-            border: none;
-            height: 1fr;           
-            padding: 0;
-            margin: 0 1;                     
-            overflow: hidden;
-            text-wrap: nowrap;
-            text-overflow: ellipsis;  
-            & > .option-list--option {
-                padding: 0 1;    
-         
-            }
-        }
-        DirectoryTree {
-            margin: 0 1;
-            padding: 0 0 0 1;
-            &:focus {
-                background-tint:transparent;
-            }
-        }
-        .message {
-            background: $foreground 8%;
-            color: $text 40%;
-            margin: 0 1;    
-            padding: 0 1;        
-        }
-    }
-
-    &.-show-path-search {
-        PathSearch {
-            display: block
-        }
-    }
-
-    &.-show-slash-complete {
-        SlashComplete {
-            display: block;
-        }
-    }
-
-    Question {
-        display: none;
-        #title {
-            width: 1fr;            
-        }
-        height: auto;                
-        
-
-        #contents {
-            margin-top: 0;
-            height: auto;            
-            overflow: auto;
-            max-height: 50vh;  
-            margin-bottom: 1;
-            
-            DiffView {
-                .diff-group {                    
-                    margin-bottom: 0;
-                }
-            }
-            #title {
-                margin: 0;
-            }
-            & > * {                
-                # height: 0;
-                margin: 1 0 0 0;
-            } 
-                     
-            &:empty {
-                height: 1;                
-            }
-        }
-        #option-container {
-            # margin-top: 1;
-            dock: bottom;
-        }
-    }
-    &.-mode-ask {
-        Question {
-            display: block;            
-        }
-        #text-prompt {
-            display: none;
-        }
-    }
-
-    PromptContainer {       
-        &:dark {
-            background: black 10%;
-        }
-        &:light {
-            background: white 40%;
-        }
-        height: auto;
-        margin: 0 0 1 0;
-        border: tall transparent;
-        border-subtitle-align: left;
-        border-subtitle-style: reverse;
-        
-        &:focus-within {
-            border: tall $secondary;            
-            #prompt {
-                text-opacity: 100%;
-            }
-        }
-        
-        #prompt {
-            padding: 0 1;
-            text-opacity: 30%;
-        }
-        
-        PromptTextArea {
-            padding: 0 1 0 0;
-            background: transparent;
-            border: none;
-            height: auto;
-            max-height: 50vh;
-
-            &:blur {
-                text-opacity: 0.5;
-            }
-        }
-    }
-
-    &.-working-directory-out-of-bounds #info-container CondensedPath {        
-        color: $text-error;
-    }
-    
-    #info-container {                
-        
-        height: 1;
-        margin: 1 1;
-        # padding: 1 0;
-        
-        AgentInfo {
-            padding: 0 1;
-            margin: 0 1 0 0;
-            color: $text-primary;
-            background: $primary 10%;
-            width: auto;           
-        }
-
-        CondensedPath { 
-            &:first-of-type {
-                margin: 0 1 0 0;
-            }
-            margin: 0 1;
-            width: 1fr;            
-            height: 1;
-            text-wrap: nowrap;
-            color: $text-secondary;            
-        }
-
-        StatusLine {            
-            color: $secondary 70%;    
-            margin: 0 1;
-            width: auto;
-            height: 1;    
-            text-align: right;            
-            text-wrap: nowrap;
-            text-overflow: ellipsis;                           
-        }
-        
-        ModeInfo {
-            padding: 0 1;
-            margin: 0 0;
-            color: $text-secondary;
-            background: $secondary 10%;
-            dock: right; 
-            display: none;
-        }        
-    }
-
-    &.-has-mode #info-container ModeInfo {
-        display: block;
-    }
-
-}
-
-
-ModeInfo:hover {
-    text-style: underline;
-    pointer: pointer;
-}
-
-ModeSwitcher {
-
-    max-height: 50vh;
-        
-    border: none;
-    padding: 0;
-    width: auto;    
-    max-width: 100;
-    
-    overlay: screen;
-    overflow: hidden;
-    constrain: inside inflect;    
-    min-width: 12;    
-    margin: 1 0;
-    height: auto;     
-    
-    & > .option-list--option {
-        padding: 0 1;
-    }
-   
-    &:blur {
-        display: none;
-    }
-
-    &:focus > .option-list--option-highlighted {
-        background: $primary 30%;
-        text-style: not bold;
-    }
-}
-
-MainScreen {    
-    background: $background;
-    layers: sidebar screen base;    
-
-    SideBar {        
-        border-right: tall black 10%;
-        background: transparent;        
-        dock: left;
-
-        overflow: hidden scroll;
-        scrollbar-size: 0 0;
-        box-sizing: border-box;        
-        
-        padding: 0 0;
-        margin: 0;
-        width: 40;
-        max-width: 45%;
-        min-width: 40;
-        height: 1fr;             
-                         
-        DirectoryTree {  
-            height: 1fr;                                  
-            background: transparent;
-            &:focus {
-                background-tint: transparent;
-            }                                        
-        }
-
-
-        Plan {
-            border: none;
-            margin: 0 !important;
-            padding: 0 1 0 0;    
-            .plan {
-                color: $text-secondary;    
-            }
-        }
-
-
-        Collapsible {   
-        
-            width: 1fr;                  
-            height: 1fr;              
-            min-height: 3;
-
-            &.-collapsed {
-                height: auto;
-            }
-
-            &.-fixed {                
-                height: auto;
-                Contents {
-                    height: auto;
-                }
-            }
-                               
-            Contents {                
-                height: 1fr;
-                padding: 1 0 0 0;                                           
-            }
-        }
-
-
-    }
-
-}
-
-
-Version {
-    layer: float;
-    offset-x: 0;
-    overlay: screen;
-    width: auto;
-    color: $text-success 50%;
-    text-style: bold;
-}
-
-Explain {
-    layer: float;    
-    padding: 0;    
-    & > Markdown {        
-        margin: 1;
-        height: auto;
-        min-height: 1fr;
-        width: 100%;        
-
-    }
-    scrollbar-gutter: stable;
-    margin: 0;
-    dock: bottom;
-    border: panel $primary;
-    height: 50%;    
-    margin: 1 0;
-    display: none;  
-    overflow: auto;
-    width: 100%;    
 }
 
 
@@ -829,6 +179,64 @@ HelpPanel {
         &> BindingsTable > .bindings-table--header {        
             color: $primary;
             text-style: underline;
+        }
+    }
+}
+
+
+
+Toast {    
+    margin: 0 0;
+    padding: 0 1;
+    background: $background;
+    color: $text-muted;
+    .toast--title {        
+        color: $text;            
+    }    
+    &.-information {
+        border: round $primary;                          
+    }
+    &.-warning {
+        border: round $warning;                        
+    }
+    &.-error {
+        border: round $error;                  
+    }    
+}
+
+
+Loading {
+    color: $text-primary;        
+}
+
+SessionsTabs {
+    layout: grid;
+    grid-columns: auto auto;
+    grid-size: 1 ;
+    overflow: scroll scroll;
+    scrollbar-size: 0 0;
+    width: 1fr;
+    display: none;
+        
+    height: 2;
+    box-sizing: content-box;
+    Underline {
+        width: 1fr;
+        height: 1;
+        & > .underline--bar {
+            color: $block-cursor-background;
+            background: $foreground 10%;
+        }        
+    }
+    #title-container {
+        width: auto;
+        Label {
+            text-style: dim;
+            pointer: pointer;
+            padding: 0 1;            
+            &.-current {
+                text-style: not dim;                
+            }
         }
     }
 }
