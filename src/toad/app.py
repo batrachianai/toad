@@ -269,6 +269,7 @@ class ToadApp(App, inherit_bindings=False):
     terminal_title_flash = var(0)
     terminal_title_blink = var(False)
     project_dir = var(Path)
+    show_sessions = var(False, toggle_class="-show-sessions-bar")
 
     HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (100, "-wide")]
 
@@ -601,6 +602,8 @@ class ToadApp(App, inherit_bindings=False):
             self.set_class(not bool(value), "-hide-thoughts")
         elif key == "sidebar.hide":
             self.set_class(bool(value), "-hide-sidebar")
+        elif key == "ui.sessions-bar":
+            self.update_show_sessions()
 
         self.settings_changed_signal.publish((key, value))
 
@@ -624,6 +627,7 @@ class ToadApp(App, inherit_bindings=False):
         self, get_screen: Callable[[], Screen]
     ) -> SessionDetails:
         session_details = self._session_tracker.new_session()
+        self.update_show_sessions()
         self.session_update_signal.publish((session_details.mode_name, session_details))
 
         def make_screen() -> Screen:
@@ -647,6 +651,7 @@ class ToadApp(App, inherit_bindings=False):
         self.update_terminal_title()
         self.set_timer(1, self.run_version_check)
         self.set_process_title()
+        self.update_show_sessions()
 
     @work(thread=True, exit_on_error=False)
     def set_process_title(self) -> None:
@@ -733,6 +738,15 @@ class ToadApp(App, inherit_bindings=False):
         else:
             self.action_show_help_panel()
 
+    def update_show_sessions(self) -> None:
+        match self.settings.get("ui.sessions-bar", str):
+            case "always":
+                self.show_sessions = True
+            case "never":
+                self.show_sessions = False
+            case "multiple":
+                self.show_sessions = self.session_tracker.session_count > 1
+
     @on(messages.SessionNavigate)
     def on_session_navigate(self, event: messages.SessionNavigate) -> None:
         new_mode = self._session_tracker.session_cursor_move(
@@ -750,6 +764,10 @@ class ToadApp(App, inherit_bindings=False):
         self.launch_agent(
             event.agent, project_path=Path(event.path), initial_prompt=event.prompt
         )
+
+    @on(messages.SessionClose)
+    def on_session_close(self) -> None:
+        self.update_show_sessions()
 
     @work
     async def action_sessions(self) -> None:

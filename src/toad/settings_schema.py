@@ -41,6 +41,18 @@ SCHEMA: list[SchemaDict] = [
                 "default": False,
             },
             {
+                "key": "sessions-bar",
+                "title": "Show sessions bar?",
+                "help": "When to show the sessions bar (tabs at top of screen).",
+                "type": "choices",
+                "default": "always",
+                "choices": [
+                    ("Always", "always"),
+                    ("When there are more than one session", "multiple"),
+                    ("Never show the sessions bar", "never"),
+                ],
+            },
+            {
                 "key": "footer",
                 "title": "Enable footer?",
                 "help": "Disable the footer if you want additional room.",
