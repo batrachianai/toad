@@ -75,10 +75,16 @@ class CondensedPath(Widget):
     """
 
     def __init__(
-        self, path: str = "", *, id: str | None = None, classes: str | None = None
+        self,
+        path: str = "",
+        *,
+        directory: bool = False,
+        id: str | None = None,
+        classes: str | None = None
     ) -> None:
         super().__init__(id=id, classes=classes)
         self.set_reactive(CondensedPath.path, path)
+        self._directory = directory
 
     def on_resize(self) -> None:
         self.watch_path(self.path)
@@ -93,6 +99,8 @@ class CondensedPath(Widget):
             user_root += "/"
         if path.startswith(user_root):
             path = "~/" + path[len(user_root) :]
+        if self._directory and not path.endswith("/"):
+            path += "/"
         self.display_path = path
 
     def render(self) -> Content:

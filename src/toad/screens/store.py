@@ -120,7 +120,9 @@ class DirectoryDisplay(containers.HorizontalGroup):
 
     def compose(self) -> ComposeResult:
         yield widgets.Label("📁 ")
-        yield CondensedPath(self.path).data_bind(path=DirectoryDisplay.path)
+        yield CondensedPath(self.path, directory=True).data_bind(
+            path=DirectoryDisplay.path
+        )
         yield DirectoryInput(self.path, select_on_focus=False, compact=True).data_bind(
             value=DirectoryDisplay.path
         )
