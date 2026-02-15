@@ -204,7 +204,7 @@ Your favorite agents.
             return
         child = self.children[self.highlighted]
         assert isinstance(child, LauncherItem)
-        self.post_message(messages.LaunchAgent(child.agent["identity"]))
+        self.screen.post_message(messages.LaunchAgent(child.agent["identity"]))
 
 
 class Launcher(containers.VerticalGroup):

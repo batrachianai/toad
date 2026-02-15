@@ -123,6 +123,8 @@ class SessionClose(Message):
 
 @dataclass
 class LaunchAgent(Message):
+    """Inform app to launch agent."""
+
     identity: str
     session_id: str | None = None
     pk: int | None = None

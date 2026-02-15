@@ -4,6 +4,7 @@ SessionsScreen {
     # background: $background 40%;
     background: $background;
 
+
     #title-container {
         padding: 1 1 0 1;              
         color: $text-success;
@@ -14,13 +15,17 @@ SessionsScreen {
     }
 
     .instructions {
+        width: auto;
         margin: 1 1;
         color: $text-muted;
         text-style: italic;
     }
 
 
-    SessionGridSelect {                 
+    SessionGridSelect {   
+        &:empty {
+            visibility: hidden;
+        }              
         width: 1fr;
         margin: 0 1 1 1;
         padding: 1 0 !important;                

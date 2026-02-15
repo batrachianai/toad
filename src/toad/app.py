@@ -779,7 +779,6 @@ class ToadApp(App, inherit_bindings=False):
 
     @on(messages.LaunchAgent)
     def on_launch_agent(self, message: messages.LaunchAgent) -> None:
-        self.notify(f"LAUNCH AGENT {message!r}")
         self.launch_agent(
             message.identity,
             agent_session_id=message.session_id,
