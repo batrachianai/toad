@@ -124,6 +124,19 @@ Toad blends a traditional shell based workflow and powerful agentic AI, with an 
     </tr>
     <tr>
       <td>
+        <h3>Concurrent sessions</h3>
+        <p>
+        Launch and run multiple agents from potentially different providers.
+        <p>
+        Hit <kbd>ctrl+s</kbd> to show the current state of all your agents in one screen.
+        </p>        
+      </td> 
+      <td>
+        <img  alt="Screenshot 2026-02-16 at 17 33 40-fs8" src="https://github.com/user-attachments/assets/cd3128eb-b348-4f40-b5c0-4816d07dcbe9" />
+      </td>    
+    </tr>
+    <tr>
+      <td>
         <h3>Session Resume</h3>
         <p>
         Resume previous sessions with your agent.    
@@ -133,7 +146,7 @@ Toad blends a traditional shell based workflow and powerful agentic AI, with an 
       <td>
         <img alt="Screenshot 2026-02-01 at 16 57 46" src="https://github.com/user-attachments/assets/7c1ad59e-027c-4542-a216-9a32ef573936" />
       </td>    
-    </tr>
+    </tr>    
   </tbody>
 </table>
 
@@ -271,6 +284,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
