@@ -307,12 +307,12 @@ class DiffView(containers.VerticalGroup):
         for group in self.grouped_opcodes:
             for tag, i1, i2, j1, j2 in group:
                 if tag == "delete":
-                    removals += 1
+                    removals += i2 - i1
                 elif tag == "replace":
-                    additions += 1
-                    removals += 1
+                    additions += j2 - j1
+                    removals += i2 - i1
                 elif tag == "insert":
-                    additions += 1
+                    additions += j1 - j2
         return additions, removals
 
     @classmethod
@@ -374,7 +374,9 @@ class DiffView(containers.VerticalGroup):
             if self.code_before:
                 for group in self.grouped_opcodes:
                     for tag, i1, i2, j1, j2 in group:
-                        if tag == "replace" and (j2 - j1) / (i2 - i1) <= 1.5:
+                        # Show character level diff only when there is the same number of lines
+                        # Otherwise you get noisy diffs that don't make a great deal of sense
+                        if tag == "replace" and (j2 - j1) == (i2 - i1):
                             diff_lines_a, diff_lines_b = self._highlight_diff_lines(
                                 lines_a[i1:i2], lines_b[j1:j2]
                             )
