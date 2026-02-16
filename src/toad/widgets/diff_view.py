@@ -25,6 +25,8 @@ from textual.widget import Widget
 from textual.widgets import Static
 from textual import containers
 
+from toad._loop import loop_last
+
 type Annotation = Literal["+", "-", "/", " "]
 
 
@@ -34,7 +36,7 @@ class DiffScrollContainer(containers.HorizontalGroup):
     DiffScrollContainer {
         overflow: scroll hidden;
         scrollbar-size: 0 0;
-        height: auto;
+        height: auto;        
     }
     """
 
@@ -216,8 +218,7 @@ class DiffView(containers.VerticalGroup):
         
         .diff-group {
             height: auto;
-            background: $foreground 4%;
-            margin-bottom: 1;
+            background: $foreground 4%;            
         }                
 
         .annotations { width: 1; }
@@ -226,6 +227,13 @@ class DiffView(containers.VerticalGroup):
         }
         .title {            
             border-bottom: dashed $foreground 20%;
+        }
+        .ellipsis {
+            text-align: center;
+            width: 1fr;
+            color: $text-primary;
+            text-style:bold;
+            offset-x: -1;
         }
         
     }
@@ -437,7 +445,7 @@ class DiffView(containers.VerticalGroup):
     def compose_unified(self) -> ComposeResult:
         lines_a, lines_b = self.highlighted_code_lines
 
-        for group in self.grouped_opcodes:
+        for last, group in loop_last(self.grouped_opcodes):
             line_numbers_a: list[int | None] = []
             line_numbers_b: list[int | None] = []
             annotations: list[str] = []
@@ -512,6 +520,9 @@ class DiffView(containers.VerticalGroup):
                 with DiffScrollContainer():
                     yield DiffCode(LineContent(code_lines, code_line_styles))
 
+            if not last:
+                yield Static("⋮", classes="ellipsis")
+
     def compose_split(self) -> ComposeResult:
         lines_a, lines_b = self.highlighted_code_lines
 
@@ -540,7 +551,7 @@ class DiffView(containers.VerticalGroup):
                 return annotation_hatch
             return annotation_blank
 
-        for group in self.grouped_opcodes:
+        for last, group in loop_last(self.grouped_opcodes):
             line_numbers_a: list[int | None] = []
             line_numbers_b: list[int | None] = []
             annotations_a: list[Annotation] = []
@@ -646,6 +657,9 @@ class DiffView(containers.VerticalGroup):
                 # Link scroll containers, so they scroll together
                 scroll_container_a.scroll_link = scroll_container_b
                 scroll_container_b.scroll_link = scroll_container_a
+
+            if not last:
+                yield Static("⋮", classes="ellipsis")
 
 
 if __name__ == "__main__":
