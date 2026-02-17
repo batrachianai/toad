@@ -167,14 +167,27 @@ class PathSearch(containers.VerticalGroup):
         fuzzy_search = self.fuzzy_search
         fuzzy_search.cache.grow(len(self.paths))
         
-        # Use batch matching if available (Rust implementation with parallelism)
-        if hasattr(fuzzy_search, 'match_batch'):
+        # Use top-K optimization if available (much faster for large lists)
+        if hasattr(fuzzy_search, 'match_batch_top_k'):
+            candidates = [path.plain for path in self.highlighted_paths]
+            top_results = fuzzy_search.match_batch_top_k(search, candidates, 20)
+            # Results are already sorted and limited to top 20
+            scores: list[tuple[float, Sequence[int], Content]] = [
+                (score, offsets, self.highlighted_paths[idx])
+                for idx, score, offsets in top_results
+            ]
+        # Fall back to batch matching if available (Rust implementation with parallelism)
+        elif hasattr(fuzzy_search, 'match_batch'):
             candidates = [path.plain for path in self.highlighted_paths]
             batch_results = fuzzy_search.match_batch(search, candidates)
             scores: list[tuple[float, Sequence[int], Content]] = [
                 (score, offsets, path)
                 for (score, offsets), path in zip(batch_results, self.highlighted_paths)
             ]
+            scores = sorted(
+                [score for score in scores if score[0]], key=itemgetter(0), reverse=True
+            )
+            scores = scores[:20]
         else:
             # Fallback to sequential matching
             scores: list[tuple[float, Sequence[int], Content]] = [
@@ -184,11 +197,10 @@ class PathSearch(containers.VerticalGroup):
                 )
                 for highlighted_path in self.highlighted_paths
             ]
-
-        scores = sorted(
-            [score for score in scores if score[0]], key=itemgetter(0), reverse=True
-        )
-        scores = scores[:20]
+            scores = sorted(
+                [score for score in scores if score[0]], key=itemgetter(0), reverse=True
+            )
+            scores = scores[:20]
 
         def highlight_offsets(path: Content, offsets: Sequence[int]) -> Content:
             return path.add_spans(

@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.28", features = ["extension-module"] }
 rayon = "1.10"
+memchr = "2.7"
 
 [profile.release]
 lto = true

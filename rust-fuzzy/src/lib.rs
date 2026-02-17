@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, BinaryHeap};
+use std::cmp::Ordering;
 
 /// Scoring strategy for fuzzy search
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -9,6 +10,35 @@ enum ScoringMode {
     Default,
     /// Path mode: first letters are at position 0 and after '/' characters
     Path,
+}
+
+/// A scored result for heap-based top-K tracking
+#[derive(Debug, Clone)]
+struct ScoredResult {
+    score: f64,
+    positions: Vec<usize>,
+    index: usize,
+}
+
+impl PartialEq for ScoredResult {
+    fn eq(&self, other: &Self) -> bool {
+        self.score == other.score
+    }
+}
+
+impl Eq for ScoredResult {}
+
+impl PartialOrd for ScoredResult {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // Reverse ordering for min-heap (we want to keep highest scores)
+        other.score.partial_cmp(&self.score)
+    }
+}
+
+impl Ord for ScoredResult {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    }
 }
 
 /// Get positions of first letters of words in a string (default mode)
@@ -381,6 +411,148 @@ impl FuzzySearch {
             results.sort_by_key(|(idx, _)| *idx);
             results.into_iter().map(|(_, result)| result).collect()
         }
+    }
+    
+    /// Match a query against multiple candidates and return only the top K results
+    /// 
+    /// This is significantly faster than match_batch when you only need the best matches,
+    /// as it can skip processing candidates that can't beat the current top K.
+    /// 
+    /// Args:
+    ///     query: The fuzzy query string
+    ///     candidates: A list of candidate strings to match against
+    ///     k: Number of top results to return
+    /// 
+    /// Returns:
+    ///     A list of tuples (index, score, list of offsets) for the top K matches,
+    ///     sorted by score in descending order.
+    fn match_batch_top_k(
+        &mut self,
+        query: &str,
+        candidates: Vec<String>,
+        k: usize,
+    ) -> Vec<(usize, f64, Vec<usize>)> {
+        if candidates.is_empty() || k == 0 {
+            return vec![];
+        }
+        
+        // For small batches or large K, just use regular batch matching and sort
+        if candidates.len() < 1000 || k >= candidates.len() / 2 {
+            let results = self.match_batch(query, candidates);
+            let mut scored: Vec<_> = results
+                .into_iter()
+                .enumerate()
+                .filter(|(_, (score, _))| *score > 0.0)
+                .map(|(idx, (score, positions))| (idx, score, positions))
+                .collect();
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+            scored.truncate(k);
+            return scored;
+        }
+        
+        // Use a min-heap to track top K results
+        let mut top_k: BinaryHeap<ScoredResult> = BinaryHeap::with_capacity(k + 1);
+        let mut min_score_threshold = 0.0;
+        
+        let case_sensitive = self.case_sensitive;
+        let scoring_mode = self.scoring_mode;
+        let query_str = query.to_string();
+        
+        // Process in parallel with top-K tracking
+        let local_results: Vec<_> = candidates
+            .par_iter()
+            .enumerate()
+            .filter_map(|(idx, candidate)| {
+                // Check cache first
+                let cache_key = (query_str.clone(), candidate.clone());
+                if let Some(cached) = self.cache.get(&cache_key) {
+                    if cached.0 > 0.0 {
+                        return Some((idx, cached.0, cached.1.clone()));
+                    }
+                    return None;
+                }
+                
+                // Quick character presence check
+                let candidate_lower = if case_sensitive {
+                    candidate.clone()
+                } else {
+                    candidate.to_lowercase()
+                };
+                
+                let query_lower = if case_sensitive {
+                    query_str.clone()
+                } else {
+                    query_str.to_lowercase()
+                };
+                
+                let mut char_set: HashSet<char> = HashSet::new();
+                for c in candidate_lower.chars() {
+                    char_set.insert(c);
+                }
+                
+                for qc in query_lower.chars() {
+                    if !char_set.contains(&qc) {
+                        return None;
+                    }
+                }
+                
+                // Perform full fuzzy match
+                let matches = match_fuzzy(&query_str, candidate, case_sensitive, scoring_mode);
+                let result = matches
+                    .into_iter()
+                    .fold(None, |acc: Option<(f64, Vec<usize>)>, item| {
+                        match acc {
+                            None => Some(item),
+                            Some(current) => {
+                                if item.0 > current.0 {
+                                    Some(item)
+                                } else {
+                                    Some(current)
+                                }
+                            }
+                        }
+                    })
+                    .unwrap_or((0.0, vec![]));
+                
+                if result.0 > 0.0 {
+                    Some((idx, result.0, result.1))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        
+        // Build top K from results
+        for (idx, score, positions) in local_results {
+            // Update cache first
+            let cache_key = (query.to_string(), candidates[idx].clone());
+            self.cache.insert(cache_key, (score, positions.clone()));
+            
+            if score > min_score_threshold || top_k.len() < k {
+                top_k.push(ScoredResult {
+                    score,
+                    positions,
+                    index: idx,
+                });
+                
+                if top_k.len() > k {
+                    top_k.pop();
+                }
+                
+                if top_k.len() == k {
+                    min_score_threshold = top_k.peek().map(|r| r.score).unwrap_or(0.0);
+                }
+            }
+        }
+        
+        // Convert heap to sorted vec
+        let mut results: Vec<_> = top_k
+            .into_iter()
+            .map(|r| (r.index, r.score, r.positions))
+            .collect();
+        
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        results
     }
 }
 

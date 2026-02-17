@@ -208,6 +208,23 @@ class _RustFuzzySearchAdapter:
             A list of tuples (score, list of offsets) for each candidate.
         """
         return self._inner.match_batch(query, candidates)
+    
+    def match_batch_top_k(self, query: str, candidates: list[str], k: int) -> list[tuple[int, float, Sequence[int]]]:
+        """Match a query against multiple candidates and return only top K results.
+        
+        This is optimized for cases where you only need the best matches and is significantly
+        faster than match_batch + sorting when K << len(candidates).
+        
+        Args:
+            query: The fuzzy query string
+            candidates: A list of candidate strings to match against
+            k: Number of top results to return
+            
+        Returns:
+            A list of tuples (index, score, list of offsets) for the top K matches,
+            sorted by score in descending order.
+        """
+        return self._inner.match_batch_top_k(query, candidates, k)
 
 
 # Export the appropriate implementation
