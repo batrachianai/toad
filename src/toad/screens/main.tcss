@@ -24,13 +24,11 @@ Menu {
 }
 
 
-
-
 Plan {        
     border: panel $secondary;            
     background: transparent;        
     margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
-    padding: 1 0 0 1;        
+    padding: 1 1 0 0;        
     height: auto;                        
     grid-size: 2;
     grid-columns: auto 1fr;
