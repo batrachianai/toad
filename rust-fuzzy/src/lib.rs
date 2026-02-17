@@ -147,6 +147,35 @@ fn get_all_offsets(
     }
 }
 
+/// Fast path for single character queries
+fn match_single_char(query_char: char, candidate: &str, scoring_mode: ScoringMode) -> Vec<(f64, Vec<usize>)> {
+    let candidate_chars: Vec<(usize, char)> = candidate.chars().enumerate().collect();
+    
+    let first_letters = match scoring_mode {
+        ScoringMode::Default => get_first_letters_default(&candidate_chars),
+        ScoringMode::Path => get_first_letters_path(&candidate_chars),
+    };
+    
+    let mut results = Vec::new();
+    for (idx, c) in &candidate_chars {
+        if *c == query_char {
+            // Score: 1 (for match) + boost if first letter
+            let score = if first_letters.contains(idx) {
+                4.0  // Boosted score for first letter
+            } else {
+                1.0
+            };
+            results.push((score, vec![*idx]));
+        }
+    }
+    
+    if results.is_empty() {
+        vec![(0.0, vec![])]
+    } else {
+        results
+    }
+}
+
 /// Perform fuzzy matching and return all possible matches with scores
 fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool, scoring_mode: ScoringMode) -> Vec<(f64, Vec<usize>)> {
     // Handle empty query
@@ -165,6 +194,13 @@ fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool, scoring_mode:
     } else {
         candidate.to_lowercase()
     };
+    
+    // Fast path for single character queries
+    if query_str.chars().count() == 1 {
+        if let Some(query_char) = query_str.chars().next() {
+            return match_single_char(query_char, &candidate_str, scoring_mode);
+        }
+    }
     
     // Early rejection: check if all query characters exist in candidate
     // This is much faster than full fuzzy matching for non-matches
@@ -458,6 +494,15 @@ impl FuzzySearch {
         let scoring_mode = self.scoring_mode;
         let query_str = query.to_string();
         
+        // Pre-compute query info for fast filtering
+        let query_lower = if case_sensitive {
+            query_str.clone()
+        } else {
+            query_str.to_lowercase()
+        };
+        let query_len = query_lower.chars().count();
+        let query_first_char = query_lower.chars().next();
+        
         // Process in parallel with top-K tracking
         let local_results: Vec<_> = candidates
             .par_iter()
@@ -472,19 +517,26 @@ impl FuzzySearch {
                     return None;
                 }
                 
-                // Quick character presence check
+                // Pre-filtering: length check
+                let candidate_len = candidate.chars().count();
+                if candidate_len < query_len {
+                    return None;
+                }
+                
                 let candidate_lower = if case_sensitive {
                     candidate.clone()
                 } else {
                     candidate.to_lowercase()
                 };
                 
-                let query_lower = if case_sensitive {
-                    query_str.clone()
-                } else {
-                    query_str.to_lowercase()
-                };
+                // Pre-filtering: first character must exist in candidate
+                if let Some(first_char) = query_first_char {
+                    if !candidate_lower.contains(first_char) {
+                        return None;
+                    }
+                }
                 
+                // Quick character presence check
                 let mut char_set: HashSet<char> = HashSet::new();
                 for c in candidate_lower.chars() {
                     char_set.insert(c);
