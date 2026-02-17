@@ -33,7 +33,7 @@ class StrikeText(Widget):
         content = self.content
         if self.strike_time is not None:
             position = int((monotonic() - self.strike_time) * 70)
-            content = content.stylize("strike", 0, position)
+            content = content.stylize("strike $text-primary", 0, position)
             if position > len(content):
                 self.auto_refresh = None
         return content

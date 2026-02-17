@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from textual.app import ComposeResult
 from textual.content import Content
-from textual.layout import Layout
 from textual.reactive import reactive
 from textual import containers
 from textual.widgets import Static
@@ -19,18 +18,21 @@ class Plan(containers.Grid):
     BORDER_TITLE = "Plan"
     DEFAULT_CLASSES = "block"
     DEFAULT_CSS = """
-    Plan {
-        background: black 20%;
-        height: auto;
-        padding: 0 1;
-        margin: 0 1 1 1;
-        border: tall transparent;
-        
+
+    Plan {        
+        border: panel $secondary;            
+        background: transparent;        
+        margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
+        padding: 1 0 0 1;        
+        height: auto;                        
         grid-size: 2;
         grid-columns: auto 1fr;
-        grid-rows: auto;
-        height: auto;        
-    
+        grid-rows: auto;        
+
+        .-no-plan {
+            text-style: dim italic;
+        }
+
         .plan {
             color: $text-secondary;
         }
@@ -42,12 +44,14 @@ class Plan(containers.Grid):
             padding: 0 0 0 0;
         }
         .status.status-completed {
-            color: $text-success;
-            text-style: bold;
+            color: $text-success;            
         }
         .status-pending {
-            opacity: 0.8;
+            opacity: 0.7;
         }
+        .plan.status-completed {
+            
+        }        
     }
 
     """
@@ -118,11 +122,11 @@ class Plan(containers.Grid):
 
     def render_status(self, status: str) -> Content:
         if status == "completed":
-            return Content.from_markup("✔ ")
+            return Content.from_markup("[$text-primary]  ✔")
         elif status == "pending":
-            return Content.styled("⏲ ")
+            return Content.styled(" ⏳ ")
         elif status == "in_progress":
-            return Content.from_markup("⮕")
+            return Content.from_markup(" 👉 ")
         return Content()
 
 
@@ -137,7 +141,7 @@ if __name__ == "__main__":
             "high",
             "in_progress",
         ),
-        Plan.Entry(Content.from_markup("???"), "medium", "in_progress"),
+        Plan.Entry(Content.from_markup("???"), "medium", "pending"),
         Plan.Entry(
             Content.from_markup("[b]Profit[/b]. Retire to Costa Rica"),
             "low",
@@ -153,7 +157,7 @@ if __name__ == "__main__":
             "high",
             "completed",
         ),
-        Plan.Entry(Content.from_markup("???"), "medium", "in_progress"),
+        Plan.Entry(Content.from_markup("???"), "medium", "pending"),
         Plan.Entry(
             Content.from_markup("[b]Profit[/b]. Retire to Costa Rica"),
             "low",
