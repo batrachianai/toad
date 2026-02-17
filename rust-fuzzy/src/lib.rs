@@ -93,6 +93,22 @@ fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool) -> Vec<(f64, 
         candidate.to_lowercase()
     };
     
+    // Early rejection: check if all query characters exist in candidate
+    // This is much faster than full fuzzy matching for non-matches
+    // Build a character frequency map for the candidate
+    let mut candidate_char_set = std::collections::HashSet::with_capacity(candidate_str.len());
+    for c in candidate_str.chars() {
+        candidate_char_set.insert(c);
+    }
+    
+    // Check if all query characters are present
+    for query_char in query_str.chars() {
+        if !candidate_char_set.contains(&query_char) {
+            // Early exit - this character isn't in the candidate at all
+            return vec![(0.0, vec![])];
+        }
+    }
+    
     // Pre-compute character indices and characters for the candidate
     // This avoids repeated O(n) operations
     let candidate_chars: Vec<(usize, char)> = candidate_str
