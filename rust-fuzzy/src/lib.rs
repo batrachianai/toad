@@ -1,15 +1,15 @@
 use pyo3::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-/// Get positions of first letters of words in a string
-fn get_first_letters(candidate: &str) -> HashSet<usize> {
+/// Get positions of first letters of words in a string (cached char indices version)
+fn get_first_letters(candidate_chars: &[(usize, char)]) -> HashSet<usize> {
     let mut positions = HashSet::new();
     let mut in_word = false;
     
-    for (i, c) in candidate.char_indices() {
+    for &(char_idx, c) in candidate_chars {
         if c.is_alphanumeric() {
             if !in_word {
-                positions.insert(i);
+                positions.insert(char_idx);
                 in_word = true;
             }
         } else {
@@ -21,12 +21,12 @@ fn get_first_letters(candidate: &str) -> HashSet<usize> {
 }
 
 /// Score a search based on positions
-fn score_positions(candidate: &str, positions: &[usize]) -> f64 {
+fn score_positions(candidate_chars: &[(usize, char)], positions: &[usize]) -> f64 {
     if positions.is_empty() {
         return 0.0;
     }
     
-    let first_letters = get_first_letters(candidate);
+    let first_letters = get_first_letters(candidate_chars);
     let offset_count = positions.len();
     
     // Boost first letter matches
@@ -93,29 +93,57 @@ fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool) -> Vec<(f64, 
         candidate.to_lowercase()
     };
     
+    // Pre-compute character indices and characters for the candidate
+    // This avoids repeated O(n) operations
+    let candidate_chars: Vec<(usize, char)> = candidate_str
+        .chars()
+        .enumerate()
+        .collect();
+    let candidate_len = candidate_chars.len();
+    
+    // Build a map from character index to byte position for fast lookup
+    let mut char_to_byte: Vec<usize> = Vec::with_capacity(candidate_len + 1);
+    let mut byte_pos = 0;
+    for (_, c) in &candidate_chars {
+        char_to_byte.push(byte_pos);
+        byte_pos += c.len_utf8();
+    }
+    char_to_byte.push(byte_pos); // Add final position
+    
+    let query_chars: Vec<char> = query_str.chars().collect();
+    let query_len = query_chars.len();
+    
     let mut letter_positions: Vec<Vec<usize>> = Vec::new();
     let mut position = 0;
     
     // Find all positions for each query letter
-    for (offset, letter) in query_str.chars().enumerate() {
-        let candidate_chars_count = candidate_str.chars().count();
-        let last_index = candidate_chars_count - offset;
+    for (offset, &letter) in query_chars.iter().enumerate() {
+        let last_index = candidate_len - offset;
         let mut positions = Vec::new();
         let mut index = position;
         
         loop {
-            // Find the letter starting from index (using byte positions)
-            let byte_index = candidate_str.char_indices()
-                .nth(index)
-                .map(|(i, _)| i)
-                .unwrap_or(candidate_str.len());
+            if index >= candidate_len {
+                break;
+            }
             
-            if let Some(byte_location) = candidate_str[byte_index..].find(letter) {
+            let byte_index = char_to_byte[index];
+            
+            if let Some(byte_offset) = candidate_str[byte_index..].find(letter) {
                 // Convert byte offset back to character offset
-                let abs_byte_location = byte_index + byte_location;
-                let abs_location = candidate_str[..abs_byte_location].chars().count();
-                positions.push(abs_location);
-                index = abs_location + 1;
+                let abs_byte_location = byte_index + byte_offset;
+                
+                // Binary search or linear search to find char position
+                // Since we have char_to_byte, we can find the position efficiently
+                let char_pos = char_to_byte.iter()
+                    .position(|&b| b == abs_byte_location)
+                    .unwrap_or_else(|| {
+                        // If not exact match, find the position by counting
+                        candidate_str[..abs_byte_location].chars().count()
+                    });
+                
+                positions.push(char_pos);
+                index = char_pos + 1;
                 
                 if index >= last_index {
                     break;
@@ -137,7 +165,7 @@ fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool) -> Vec<(f64, 
     let mut possible_offsets = Vec::new();
     get_all_offsets(
         &letter_positions,
-        query_str.chars().count(),
+        query_len,
         Vec::new(),
         0,
         &mut possible_offsets,
@@ -147,7 +175,7 @@ fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool) -> Vec<(f64, 
     possible_offsets
         .into_iter()
         .map(|offsets| {
-            let score = score_positions(&candidate_str, &offsets);
+            let score = score_positions(&candidate_chars, &offsets);
             (score, offsets)
         })
         .collect()
