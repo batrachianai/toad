@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 /// Scoring strategy for fuzzy search
@@ -118,6 +119,11 @@ fn get_all_offsets(
 
 /// Perform fuzzy matching and return all possible matches with scores
 fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool, scoring_mode: ScoringMode) -> Vec<(f64, Vec<usize>)> {
+    // Handle empty query
+    if query.is_empty() {
+        return vec![(0.0, vec![])];
+    }
+    
     let query_str = if case_sensitive {
         query.to_string()
     } else {
@@ -299,6 +305,82 @@ impl FuzzySearch {
     /// Get the number of cached entries
     fn cache_size(&self) -> usize {
         self.cache.len()
+    }
+    
+    /// Match a query against multiple candidates in parallel
+    /// 
+    /// Args:
+    ///     query: The fuzzy query string
+    ///     candidates: A list of candidate strings to match against
+    /// 
+    /// Returns:
+    ///     A list of tuples (score, list of offsets) for each candidate.
+    ///     Returns (0.0, []) for candidates with no match.
+    fn match_batch(&mut self, query: &str, candidates: Vec<String>) -> Vec<(f64, Vec<usize>)> {
+        // Use a threshold to decide when parallelism is worth it
+        // For small batches, overhead of threading exceeds benefits
+        // Benchmarks show parallel becomes beneficial around 1000 paths
+        const PARALLEL_THRESHOLD: usize = 1000;
+        
+        if candidates.len() < PARALLEL_THRESHOLD {
+            // Process serially for small batches
+            candidates
+                .iter()
+                .map(|candidate| self.match_(query, candidate))
+                .collect()
+        } else {
+            // For larger batches, check cache first and collect non-cached items
+            let mut results = Vec::with_capacity(candidates.len());
+            let mut to_process = Vec::new();
+            
+            for (idx, candidate) in candidates.iter().enumerate() {
+                let cache_key = (query.to_string(), candidate.clone());
+                if let Some(cached) = self.cache.get(&cache_key) {
+                    results.push((idx, cached.clone()));
+                } else {
+                    to_process.push((idx, candidate.clone()));
+                }
+            }
+            
+            // Process non-cached items in parallel
+            let case_sensitive = self.case_sensitive;
+            let scoring_mode = self.scoring_mode;
+            let query_str = query.to_string();
+            
+            let processed: Vec<_> = to_process
+                .par_iter()
+                .map(|(idx, candidate)| {
+                    let matches = match_fuzzy(&query_str, candidate, case_sensitive, scoring_mode);
+                    let result = matches
+                        .into_iter()
+                        .fold(None, |acc: Option<(f64, Vec<usize>)>, item| {
+                            match acc {
+                                None => Some(item),
+                                Some(current) => {
+                                    if item.0 > current.0 {
+                                        Some(item)
+                                    } else {
+                                        Some(current)
+                                    }
+                                }
+                            }
+                        })
+                        .unwrap_or((0.0, vec![]));
+                    (*idx, candidate.clone(), result)
+                })
+                .collect();
+            
+            // Update cache and results with processed items
+            for (idx, candidate, result) in processed {
+                let cache_key = (query.to_string(), candidate);
+                self.cache.insert(cache_key, result.clone());
+                results.push((idx, result));
+            }
+            
+            // Sort by original index and extract just the results
+            results.sort_by_key(|(idx, _)| *idx);
+            results.into_iter().map(|(_, result)| result).collect()
+        }
     }
 }
 

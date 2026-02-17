@@ -196,6 +196,18 @@ class _RustFuzzySearchAdapter:
     def match(self, query: str, candidate: str) -> tuple[float, Sequence[int]]:
         """Match against a query (adapts match_ to match)."""
         return self._inner.match_(query, candidate)
+    
+    def match_batch(self, query: str, candidates: list[str]) -> list[tuple[float, Sequence[int]]]:
+        """Match a query against multiple candidates in parallel.
+        
+        Args:
+            query: The fuzzy query string
+            candidates: A list of candidate strings to match against
+            
+        Returns:
+            A list of tuples (score, list of offsets) for each candidate.
+        """
+        return self._inner.match_batch(query, candidates)
 
 
 # Export the appropriate implementation

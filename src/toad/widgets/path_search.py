@@ -166,13 +166,24 @@ class PathSearch(containers.VerticalGroup):
 
         fuzzy_search = self.fuzzy_search
         fuzzy_search.cache.grow(len(self.paths))
-        scores: list[tuple[float, Sequence[int], Content]] = [
-            (
-                *fuzzy_search.match(search, highlighted_path.plain),
-                highlighted_path,
-            )
-            for highlighted_path in self.highlighted_paths
-        ]
+        
+        # Use batch matching if available (Rust implementation with parallelism)
+        if hasattr(fuzzy_search, 'match_batch'):
+            candidates = [path.plain for path in self.highlighted_paths]
+            batch_results = fuzzy_search.match_batch(search, candidates)
+            scores: list[tuple[float, Sequence[int], Content]] = [
+                (score, offsets, path)
+                for (score, offsets), path in zip(batch_results, self.highlighted_paths)
+            ]
+        else:
+            # Fallback to sequential matching
+            scores: list[tuple[float, Sequence[int], Content]] = [
+                (
+                    *fuzzy_search.match(search, highlighted_path.plain),
+                    highlighted_path,
+                )
+                for highlighted_path in self.highlighted_paths
+            ]
 
         scores = sorted(
             [score for score in scores if score[0]], key=itemgetter(0), reverse=True
