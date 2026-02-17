@@ -1,8 +1,17 @@
 use pyo3::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-/// Get positions of first letters of words in a string (cached char indices version)
-fn get_first_letters(candidate_chars: &[(usize, char)]) -> HashSet<usize> {
+/// Scoring strategy for fuzzy search
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ScoringMode {
+    /// Default mode: first letters are at word boundaries (\w+)
+    Default,
+    /// Path mode: first letters are at position 0 and after '/' characters
+    Path,
+}
+
+/// Get positions of first letters of words in a string (default mode)
+fn get_first_letters_default(candidate_chars: &[(usize, char)]) -> HashSet<usize> {
     let mut positions = HashSet::new();
     let mut in_word = false;
     
@@ -20,13 +29,41 @@ fn get_first_letters(candidate_chars: &[(usize, char)]) -> HashSet<usize> {
     positions
 }
 
+/// Get positions of first letters for path mode
+/// Position 0 and positions after '/' are considered first letters
+fn get_first_letters_path(candidate_chars: &[(usize, char)]) -> HashSet<usize> {
+    let mut positions = HashSet::new();
+    
+    // Position 0 is always a first letter
+    if !candidate_chars.is_empty() {
+        positions.insert(0);
+    }
+    
+    // Positions after '/' are first letters
+    for window in candidate_chars.windows(2) {
+        if window[0].1 == '/' {
+            positions.insert(window[1].0);
+        }
+    }
+    
+    positions
+}
+
+/// Get first letters based on scoring mode
+fn get_first_letters(candidate_chars: &[(usize, char)], mode: ScoringMode) -> HashSet<usize> {
+    match mode {
+        ScoringMode::Default => get_first_letters_default(candidate_chars),
+        ScoringMode::Path => get_first_letters_path(candidate_chars),
+    }
+}
+
 /// Score a search based on positions
-fn score_positions(candidate_chars: &[(usize, char)], positions: &[usize]) -> f64 {
+fn score_positions(candidate_chars: &[(usize, char)], positions: &[usize], mode: ScoringMode) -> f64 {
     if positions.is_empty() {
         return 0.0;
     }
     
-    let first_letters = get_first_letters(candidate_chars);
+    let first_letters = get_first_letters(candidate_chars, mode);
     let offset_count = positions.len();
     
     // Boost first letter matches
@@ -80,7 +117,7 @@ fn get_all_offsets(
 }
 
 /// Perform fuzzy matching and return all possible matches with scores
-fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool) -> Vec<(f64, Vec<usize>)> {
+fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool, scoring_mode: ScoringMode) -> Vec<(f64, Vec<usize>)> {
     let query_str = if case_sensitive {
         query.to_string()
     } else {
@@ -191,7 +228,7 @@ fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool) -> Vec<(f64, 
     possible_offsets
         .into_iter()
         .map(|offsets| {
-            let score = score_positions(&candidate_chars, &offsets);
+            let score = score_positions(&candidate_chars, &offsets, scoring_mode);
             (score, offsets)
         })
         .collect()
@@ -201,16 +238,18 @@ fn match_fuzzy(query: &str, candidate: &str, case_sensitive: bool) -> Vec<(f64, 
 #[pyclass]
 struct FuzzySearch {
     case_sensitive: bool,
+    scoring_mode: ScoringMode,
     cache: HashMap<(String, String), (f64, Vec<usize>)>,
 }
 
 #[pymethods]
 impl FuzzySearch {
     #[new]
-    #[pyo3(signature = (case_sensitive=false))]
-    fn new(case_sensitive: bool) -> Self {
+    #[pyo3(signature = (case_sensitive=false, path_mode=false))]
+    fn new(case_sensitive: bool, path_mode: bool) -> Self {
         FuzzySearch {
             case_sensitive,
+            scoring_mode: if path_mode { ScoringMode::Path } else { ScoringMode::Default },
             cache: HashMap::new(),
         }
     }
@@ -230,7 +269,7 @@ impl FuzzySearch {
             return result.clone();
         }
         
-        let matches = match_fuzzy(query, candidate, self.case_sensitive);
+        let matches = match_fuzzy(query, candidate, self.case_sensitive, self.scoring_mode);
         // Use fold to get the first max (matching Python's behavior)
         let result = matches
             .into_iter()

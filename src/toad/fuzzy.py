@@ -30,16 +30,18 @@ class _PythonFuzzySearch:
     """
 
     def __init__(
-        self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4
+        self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4, path_mode: bool = False
     ) -> None:
         """Initialize fuzzy search.
 
         Args:
             case_sensitive: Is the match case sensitive?
             cache_size: Number of queries to cache.
+            path_mode: If True, treat '/' as word boundaries instead of word character boundaries.
         """
 
         self.case_sensitive = case_sensitive
+        self.path_mode = path_mode
         self.cache: LRUCache[tuple[str, str], tuple[float, Sequence[int]]] = LRUCache(
             cache_size
         )
@@ -67,6 +69,17 @@ class _PythonFuzzySearch:
     @lru_cache(maxsize=1024)
     def get_first_letters(cls, candidate: str) -> frozenset[int]:
         return frozenset({match.start() for match in finditer(r"\w+", candidate)})
+    
+    @classmethod
+    @lru_cache(maxsize=1024)
+    def get_first_letters_path(cls, candidate: str) -> frozenset[int]:
+        """Get first letters at path boundaries (after '/' characters)."""
+        return frozenset(
+            {
+                0,
+                *[match.start() + 1 for match in finditer(r"/", candidate)],
+            }
+        )
 
     def score(self, candidate: str, positions: Sequence[int]) -> float:
         """Score a search.
@@ -77,7 +90,11 @@ class _PythonFuzzySearch:
         Returns:
             Score.
         """
-        first_letters = self.get_first_letters(candidate)
+        if self.path_mode:
+            first_letters = self.get_first_letters_path(candidate)
+        else:
+            first_letters = self.get_first_letters(candidate)
+        
         # This is a heuristic, and can be tweaked for better results
         # Boost first letter matches
         offset_count = len(positions)
@@ -171,9 +188,9 @@ class _RustCacheAdapter:
 class _RustFuzzySearchAdapter:
     """Adapter to make Rust FuzzySearch compatible with Python API."""
     
-    def __init__(self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4) -> None:
-        # Rust version doesn't support configurable cache_size, but accepts case_sensitive
-        self._inner = _RustFuzzySearch(case_sensitive=case_sensitive)
+    def __init__(self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4, path_mode: bool = False) -> None:
+        # Rust version doesn't support configurable cache_size, but accepts case_sensitive and path_mode
+        self._inner = _RustFuzzySearch(case_sensitive=case_sensitive, path_mode=path_mode)
         self.cache = _RustCacheAdapter(self._inner)
     
     def match(self, query: str, candidate: str) -> tuple[float, Sequence[int]]:
