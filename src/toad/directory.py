@@ -11,6 +11,13 @@ from textual._partition import partition
 
 from toad.path_filter import PathFilter
 
+# Try to import Rust implementation
+try:
+    from toad._rust_fuzzy import scan_directory_parallel as _rust_scan
+    _RUST_AVAILABLE = True
+except ImportError:
+    _RUST_AVAILABLE = False
+
 
 class ScanJob:
     """A single directory scanning job."""
@@ -101,6 +108,30 @@ async def scan(
     Returns:
         A list of Paths.
     """
+    # Use Rust implementation if available (much faster)
+    if _RUST_AVAILABLE:
+        try:
+            # Run Rust scan in thread
+            path_strings = await asyncio.to_thread(
+                _rust_scan,
+                str(root),
+                add_directories,
+                max_duration
+            )
+            
+            # Convert strings to Path objects
+            paths = [Path(p) for p in path_strings]
+            
+            # Apply path filter if provided
+            if path_filter is not None:
+                paths = [p for p in paths if not path_filter.match(p)]
+            
+            return paths
+        except Exception:
+            # Fall back to Python implementation on any error
+            pass
+    
+    # Python implementation (fallback)
     queue: asyncio.Queue[Path] = asyncio.Queue()
     results: list[Path] = []
     jobs = [

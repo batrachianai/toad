@@ -15,24 +15,33 @@ from typing import Iterable, Sequence
 
 from textual.cache import LRUCache
 
+# Try to import the Rust implementation for better performance
+try:
+    from toad._rust_fuzzy import FuzzySearch as _RustFuzzySearch
+    _RUST_AVAILABLE = True
+except ImportError:
+    _RUST_AVAILABLE = False
 
-class FuzzySearch:
+
+class _PythonFuzzySearch:
     """Performs a fuzzy search.
 
     Unlike a regex solution, this will finds all possible matches.
     """
 
     def __init__(
-        self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4
+        self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4, path_mode: bool = False
     ) -> None:
         """Initialize fuzzy search.
 
         Args:
             case_sensitive: Is the match case sensitive?
             cache_size: Number of queries to cache.
+            path_mode: If True, treat '/' as word boundaries instead of word character boundaries.
         """
 
         self.case_sensitive = case_sensitive
+        self.path_mode = path_mode
         self.cache: LRUCache[tuple[str, str], tuple[float, Sequence[int]]] = LRUCache(
             cache_size
         )
@@ -60,6 +69,17 @@ class FuzzySearch:
     @lru_cache(maxsize=1024)
     def get_first_letters(cls, candidate: str) -> frozenset[int]:
         return frozenset({match.start() for match in finditer(r"\w+", candidate)})
+    
+    @classmethod
+    @lru_cache(maxsize=1024)
+    def get_first_letters_path(cls, candidate: str) -> frozenset[int]:
+        """Get first letters at path boundaries (after '/' characters)."""
+        return frozenset(
+            {
+                0,
+                *[match.start() + 1 for match in finditer(r"/", candidate)],
+            }
+        )
 
     def score(self, candidate: str, positions: Sequence[int]) -> float:
         """Score a search.
@@ -70,7 +90,11 @@ class FuzzySearch:
         Returns:
             Score.
         """
-        first_letters = self.get_first_letters(candidate)
+        if self.path_mode:
+            first_letters = self.get_first_letters_path(candidate)
+        else:
+            first_letters = self.get_first_letters(candidate)
+        
         # This is a heuristic, and can be tweaked for better results
         # Boost first letter matches
         offset_count = len(positions)
@@ -138,3 +162,76 @@ class FuzzySearch:
 
         for offsets in possible_offsets:
             yield score(candidate, offsets), offsets
+
+
+# Wrapper class that adapts the Rust API to match the Python API
+class _RustCacheAdapter:
+    """Adapter to make Rust cache compatible with Python LRUCache interface."""
+    
+    def __init__(self, rust_fuzzy: _RustFuzzySearch) -> None:
+        self._rust_fuzzy = rust_fuzzy
+    
+    def grow(self, size: int) -> None:
+        """Grow cache (no-op for Rust version which has dynamic cache)."""
+        # Rust version uses a HashMap which grows automatically
+        pass
+    
+    def clear(self) -> None:
+        """Clear the cache."""
+        self._rust_fuzzy.clear_cache()
+    
+    def __len__(self) -> int:
+        """Get cache size."""
+        return self._rust_fuzzy.cache_size()
+
+
+class _RustFuzzySearchAdapter:
+    """Adapter to make Rust FuzzySearch compatible with Python API."""
+    
+    def __init__(self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4, path_mode: bool = False) -> None:
+        # Rust version doesn't support configurable cache_size, but accepts case_sensitive and path_mode
+        self._inner = _RustFuzzySearch(case_sensitive=case_sensitive, path_mode=path_mode)
+        self.cache = _RustCacheAdapter(self._inner)
+    
+    def match(self, query: str, candidate: str) -> tuple[float, Sequence[int]]:
+        """Match against a query (adapts match_ to match)."""
+        return self._inner.match_(query, candidate)
+    
+    def match_batch(self, query: str, candidates: list[str]) -> list[tuple[float, Sequence[int]]]:
+        """Match a query against multiple candidates in parallel.
+        
+        Args:
+            query: The fuzzy query string
+            candidates: A list of candidate strings to match against
+            
+        Returns:
+            A list of tuples (score, list of offsets) for each candidate.
+        """
+        return self._inner.match_batch(query, candidates)
+    
+    def match_batch_top_k(self, query: str, candidates: list[str], k: int) -> list[tuple[int, float, Sequence[int]]]:
+        """Match a query against multiple candidates and return only top K results.
+        
+        This is optimized for cases where you only need the best matches and is significantly
+        faster than match_batch + sorting when K << len(candidates).
+        
+        Args:
+            query: The fuzzy query string
+            candidates: A list of candidate strings to match against
+            k: Number of top results to return
+            
+        Returns:
+            A list of tuples (index, score, list of offsets) for the top K matches,
+            sorted by score in descending order.
+        """
+        return self._inner.match_batch_top_k(query, candidates, k)
+
+
+# Export the appropriate implementation
+if _RUST_AVAILABLE:
+    FuzzySearch = _RustFuzzySearchAdapter
+else:
+    FuzzySearch = _PythonFuzzySearch
+
+
+__all__ = ["FuzzySearch"]

@@ -2,11 +2,9 @@ from __future__ import annotations
 
 
 import asyncio
-from functools import lru_cache
 from operator import itemgetter
 import os
 from pathlib import Path
-import re2 as re
 from typing import Sequence
 
 
@@ -36,45 +34,12 @@ from toad.widgets.project_directory_tree import ProjectDirectoryTree
 
 
 class PathFuzzySearch(FuzzySearch):
-    @classmethod
-    @lru_cache(maxsize=1024)
-    def get_first_letters(cls, candidate: str) -> frozenset[int]:
-        return frozenset(
-            {
-                0,
-                *[match.start() + 1 for match in re.finditer(r"/", candidate)],
-            }
-        )
-
-    def score(self, candidate: str, positions: Sequence[int]) -> float:
-        """Score a search.
-
-        Args:
-            search: Search object.
-
-        Returns:
-            Score.
-        """
-        first_letters = self.get_first_letters(candidate)
-        # This is a heuristic, and can be tweaked for better results
-        # Boost first letter matches
-        offset_count = len(positions)
-        score: float = offset_count + len(first_letters.intersection(positions))
-
-        # if 0 in first_letters:
-        #     score += 1
-
-        groups = 1
-        last_offset, *offsets = positions
-        for offset in offsets:
-            if offset != last_offset + 1:
-                groups += 1
-            last_offset = offset
-
-        # Boost to favor less groups
-        normalized_groups = (offset_count - (groups - 1)) / offset_count
-        score *= 1 + (normalized_groups * normalized_groups)
-        return score
+    """Fuzzy search optimized for path matching.
+    
+    Uses path_mode=True to treat '/' as word boundaries instead of word character boundaries.
+    """
+    def __init__(self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4) -> None:
+        super().__init__(case_sensitive=case_sensitive, cache_size=cache_size, path_mode=True)
 
 
 class FuzzyInput(Input):
@@ -201,18 +166,41 @@ class PathSearch(containers.VerticalGroup):
 
         fuzzy_search = self.fuzzy_search
         fuzzy_search.cache.grow(len(self.paths))
-        scores: list[tuple[float, Sequence[int], Content]] = [
-            (
-                *fuzzy_search.match(search, highlighted_path.plain),
-                highlighted_path,
+        
+        # Use top-K optimization if available (much faster for large lists)
+        if hasattr(fuzzy_search, 'match_batch_top_k'):
+            candidates = [path.plain for path in self.highlighted_paths]
+            top_results = fuzzy_search.match_batch_top_k(search, candidates, 20)
+            # Results are already sorted and limited to top 20
+            scores: list[tuple[float, Sequence[int], Content]] = [
+                (score, offsets, self.highlighted_paths[idx])
+                for idx, score, offsets in top_results
+            ]
+        # Fall back to batch matching if available (Rust implementation with parallelism)
+        elif hasattr(fuzzy_search, 'match_batch'):
+            candidates = [path.plain for path in self.highlighted_paths]
+            batch_results = fuzzy_search.match_batch(search, candidates)
+            scores: list[tuple[float, Sequence[int], Content]] = [
+                (score, offsets, path)
+                for (score, offsets), path in zip(batch_results, self.highlighted_paths)
+            ]
+            scores = sorted(
+                [score for score in scores if score[0]], key=itemgetter(0), reverse=True
             )
-            for highlighted_path in self.highlighted_paths
-        ]
-
-        scores = sorted(
-            [score for score in scores if score[0]], key=itemgetter(0), reverse=True
-        )
-        scores = scores[:20]
+            scores = scores[:20]
+        else:
+            # Fallback to sequential matching
+            scores: list[tuple[float, Sequence[int], Content]] = [
+                (
+                    *fuzzy_search.match(search, highlighted_path.plain),
+                    highlighted_path,
+                )
+                for highlighted_path in self.highlighted_paths
+            ]
+            scores = sorted(
+                [score for score in scores if score[0]], key=itemgetter(0), reverse=True
+            )
+            scores = scores[:20]
 
         def highlight_offsets(path: Content, offsets: Sequence[int]) -> Content:
             return path.add_spans(
