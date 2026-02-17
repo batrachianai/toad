@@ -5,6 +5,16 @@ run := uv run toad
 run:
 	$(run)
 
+.PHONY: build-rust
+build-rust:
+	cd rust-fuzzy && maturin develop --release
+	cp rust-fuzzy/python/toad/_rust_fuzzy.*.so src/toad/
+
+.PHONY: build-rust-debug
+build-rust-debug:
+	cd rust-fuzzy && maturin develop
+	cp rust-fuzzy/python/toad/_rust_fuzzy.*.so src/toad/
+
 .PHONY: gemini-acp
 gemini-acp:
 	$(run) acp "gemini --experimental-acp" --project-dir ~/sandbox --title "Google Gemini"

@@ -1,0 +1,15 @@
+[package]
+name = "rust-fuzzy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "rust_fuzzy"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.28", features = ["extension-module"] }
+
+[profile.release]
+lto = true
+codegen-units = 1

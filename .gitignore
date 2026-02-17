@@ -7,6 +7,11 @@ wheels/
 *.egg-info
 __pycache__
 
+# Rust build artifacts (platform-specific)
+*.so
+*.pyd
+*.dylib
+
 # Virtual environments
 .venv
 .DS_Store

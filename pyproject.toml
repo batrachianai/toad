@@ -43,15 +43,19 @@ members = [
 toad = "toad.cli:main"
 
 [build-system]
-requires = ["hatchling==1.28.0"]
+requires = ["hatchling==1.28.0", "hatch-mypyc"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/toad"]
+
+[tool.hatch.build.targets.wheel.hooks.mypyc]
+enable-by-default = false
 
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",
     "pyinstrument>=5.1.1",
     "textual-dev>=1.8.0",
+    "maturin>=1.0,<2.0",
 ]

@@ -15,8 +15,15 @@ from typing import Iterable, Sequence
 
 from textual.cache import LRUCache
 
+# Try to import the Rust implementation for better performance
+try:
+    from toad._rust_fuzzy import FuzzySearch as _RustFuzzySearch
+    _RUST_AVAILABLE = True
+except ImportError:
+    _RUST_AVAILABLE = False
 
-class FuzzySearch:
+
+class _PythonFuzzySearch:
     """Performs a fuzzy search.
 
     Unlike a regex solution, this will finds all possible matches.
@@ -138,3 +145,47 @@ class FuzzySearch:
 
         for offsets in possible_offsets:
             yield score(candidate, offsets), offsets
+
+
+# Wrapper class that adapts the Rust API to match the Python API
+class _RustCacheAdapter:
+    """Adapter to make Rust cache compatible with Python LRUCache interface."""
+    
+    def __init__(self, rust_fuzzy: _RustFuzzySearch) -> None:
+        self._rust_fuzzy = rust_fuzzy
+    
+    def grow(self, size: int) -> None:
+        """Grow cache (no-op for Rust version which has dynamic cache)."""
+        # Rust version uses a HashMap which grows automatically
+        pass
+    
+    def clear(self) -> None:
+        """Clear the cache."""
+        self._rust_fuzzy.clear_cache()
+    
+    def __len__(self) -> int:
+        """Get cache size."""
+        return self._rust_fuzzy.cache_size()
+
+
+class _RustFuzzySearchAdapter:
+    """Adapter to make Rust FuzzySearch compatible with Python API."""
+    
+    def __init__(self, case_sensitive: bool = False, *, cache_size: int = 1024 * 4) -> None:
+        # Rust version doesn't support configurable cache_size, but accepts case_sensitive
+        self._inner = _RustFuzzySearch(case_sensitive=case_sensitive)
+        self.cache = _RustCacheAdapter(self._inner)
+    
+    def match(self, query: str, candidate: str) -> tuple[float, Sequence[int]]:
+        """Match against a query (adapts match_ to match)."""
+        return self._inner.match_(query, candidate)
+
+
+# Export the appropriate implementation
+if _RUST_AVAILABLE:
+    FuzzySearch = _RustFuzzySearchAdapter
+else:
+    FuzzySearch = _PythonFuzzySearch
+
+
+__all__ = ["FuzzySearch"]
