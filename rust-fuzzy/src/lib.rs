@@ -1,7 +1,8 @@
 use pyo3::prelude::*;
+use pyo3::types::PyModule;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet, BinaryHeap};
-use std::cmp::Ordering;
+use std::cmp::Ordering as CmpOrdering;
 
 /// Scoring strategy for fuzzy search
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -29,15 +30,15 @@ impl PartialEq for ScoredResult {
 impl Eq for ScoredResult {}
 
 impl PartialOrd for ScoredResult {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<CmpOrdering> {
         // Reverse ordering for min-heap (we want to keep highest scores)
         other.score.partial_cmp(&self.score)
     }
 }
 
 impl Ord for ScoredResult {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    fn cmp(&self, other: &Self) -> CmpOrdering {
+        self.partial_cmp(other).unwrap_or(CmpOrdering::Equal)
     }
 }
 
@@ -481,7 +482,7 @@ impl FuzzySearch {
                 .filter(|(_, (score, _))| *score > 0.0)
                 .map(|(idx, (score, positions))| (idx, score, positions))
                 .collect();
-            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(CmpOrdering::Equal));
             scored.truncate(k);
             return scored;
         }
@@ -603,14 +604,99 @@ impl FuzzySearch {
             .map(|r| (r.index, r.score, r.positions))
             .collect();
         
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(CmpOrdering::Equal));
         results
     }
+}
+
+use std::path::Path as StdPath;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use ignore::WalkBuilder;
+
+/// Recursively scan directories in parallel using the ignore crate's WalkBuilder
+/// This properly handles .gitignore files at all levels
+#[pyfunction]
+#[pyo3(signature = (root, add_directories=false, max_duration=None))]
+fn scan_directory_parallel(
+    root: String,
+    add_directories: bool,
+    max_duration: Option<f64>,
+) -> PyResult<Vec<String>> {
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
+    
+    let root_path = StdPath::new(&root);
+    let results = Arc::new(Mutex::new(Vec::new()));
+    let timed_out = Arc::new(AtomicBool::new(false));
+    let start_time = Instant::now();
+    
+    // Use the ignore crate's parallel walker
+    // This handles .gitignore files correctly at all levels
+    let walker = WalkBuilder::new(root_path)
+        .hidden(false)  // Don't skip hidden files by default
+        .git_ignore(true)  // Respect .gitignore files
+        .git_global(false)  // Don't use global gitignore
+        .git_exclude(false)  // Don't use .git/info/exclude
+        .require_git(false)  // Work even without .git directory
+        .follow_links(false)  // Don't follow symbolic links
+        .threads(rayon::current_num_threads().min(8))  // Use parallel threads
+        .build_parallel();
+    
+    let results_clone = results.clone();
+    let timed_out_clone = timed_out.clone();
+    
+    walker.run(|| {
+        let results = results_clone.clone();
+        let timed_out = timed_out_clone.clone();
+        let start_time = start_time;
+        let max_duration = max_duration;
+        
+        Box::new(move |entry_result| {
+            // Check timeout
+            if let Some(max_dur) = max_duration {
+                if start_time.elapsed() > Duration::from_secs_f64(max_dur) {
+                    timed_out.store(true, AtomicOrdering::Relaxed);
+                    return ignore::WalkState::Quit;
+                }
+            }
+            
+            if timed_out.load(AtomicOrdering::Relaxed) {
+                return ignore::WalkState::Quit;
+            }
+            
+            match entry_result {
+                Ok(entry) => {
+                    let path = entry.path();
+                    
+                    // Skip .git directories explicitly
+                    if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
+                        return ignore::WalkState::Skip;
+                    }
+                    
+                    let path_str = path.to_string_lossy().to_string();
+                    let is_dir = path.is_dir();
+                    
+                    // Collect files and optionally directories
+                    if !is_dir || add_directories {
+                        let mut r = results.lock().unwrap();
+                        r.push(path_str);
+                    }
+                    
+                    ignore::WalkState::Continue
+                }
+                Err(_) => ignore::WalkState::Continue,
+            }
+        })
+    });
+    
+    let final_results = results.lock().unwrap().clone();
+    Ok(final_results)
 }
 
 /// A Python module implemented in Rust for fuzzy searching
 #[pymodule]
 fn _rust_fuzzy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<FuzzySearch>()?;
+    m.add_function(wrap_pyfunction!(scan_directory_parallel, m)?)?;
     Ok(())
 }
