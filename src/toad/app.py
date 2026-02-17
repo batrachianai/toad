@@ -1,3 +1,4 @@
+import asyncio
 from importlib.resources import files
 from datetime import datetime, timezone
 from functools import cached_property
@@ -359,7 +360,7 @@ class ToadApp(App, inherit_bindings=False):
 
             anon_id = str(uuid.uuid4())
             self.settings.set("anon_id", anon_id)
-            self.save_settings()
+            self._save_settings()
             self.call_later(self.capture_event, "toad-install")
         return anon_id
 
@@ -565,8 +566,18 @@ class ToadApp(App, inherit_bindings=False):
         self._notifications.add(event.notification)
         self._refresh_notifications()
 
-    def save_settings(self) -> None:
-        if self.settings.changed:
+    async def save_settings(self, force: bool = False) -> None:
+        """Save settings in a thread.
+
+        Args:
+            force: Force saving, even when no change detected.
+
+        """
+        await asyncio.to_thread(self._save_settings, force=force)
+
+    def _save_settings(self, force: bool = False) -> None:
+        """Save the settings if they have changed."""
+        if force or self.settings.changed:
             path = str(self.settings_path)
             try:
                 atomic.write(path, self.settings.json)
@@ -722,7 +733,21 @@ class ToadApp(App, inherit_bindings=False):
     @work
     async def action_settings(self) -> None:
         await self.push_screen_wait("settings")
-        self.save_settings()
+        await self.save_settings()
+
+    async def action_quit(self) -> None:
+        """An [action](/guide/actions) to quit the app as soon as possible."""
+
+        self.screen.set_focus(None)
+
+        async def save_settings_and_exit():
+            await self.save_settings()
+            self.exit()
+
+        # TODO: Can we avoid the timer?
+        # If the user presses ctrl+q while on the settings page, we want to make sure the blur event is handled,
+        # which will update the setting the user is editing.
+        self.set_timer(0.05, save_settings_and_exit)
 
     def action_help_quit(self) -> None:
         if (time := monotonic()) - self.last_ctrl_c_time <= 5.0:

@@ -483,7 +483,7 @@ class StoreScreen(Screen):
         from toad.screens.agent_modal import AgentModal
 
         modal_response = await self.app.push_screen_wait(AgentModal(event.widget.agent))
-        self.app.save_settings()
+        await self.app.save_settings()
         if modal_response == "launch":
             self.post_message(messages.LaunchAgent(event.widget.agent["identity"]))
 
@@ -497,7 +497,7 @@ class StoreScreen(Screen):
         except KeyError:
             return
         modal_response = await self.app.push_screen_wait(AgentModal(agent))
-        self.app.save_settings()
+        await self.app.save_settings()
         if modal_response == "launch":
             self.post_message(messages.LaunchAgent(agent["identity"]))
 
@@ -512,7 +512,7 @@ class StoreScreen(Screen):
         modal_response = await self.app.push_screen_wait(
             AgentModal(launcher_item.agent)
         )
-        self.app.save_settings()
+        await self.app.save_settings()
         if modal_response == "launch":
             self.post_message(messages.LaunchAgent(launcher_item.agent["identity"]))
 

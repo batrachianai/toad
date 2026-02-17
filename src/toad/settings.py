@@ -313,7 +313,6 @@ class Settings:
             value: New value.
         """
         current_value = self.get(key, expand=False)
-
         updated_settings = copy.deepcopy(self._settings)
 
         setting = updated_settings
