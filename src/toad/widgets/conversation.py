@@ -1364,7 +1364,7 @@ class Conversation(containers.Vertical):
         self.shell
         if self._agent_data is not None:
 
-            def start_agent() -> None:
+            async def start_agent() -> None:
                 """Start the agent after refreshing the UI."""
                 assert self._agent_data is not None
                 from toad.acp.agent import Agent
@@ -1375,7 +1375,7 @@ class Conversation(containers.Vertical):
                     self._agent_session_id,
                     self._session_pk,
                 )
-                self.agent.start(self)
+                await self.agent.start(self)
                 self.post_message(
                     messages.SessionUpdate("New Session", self.agent_title)
                 )

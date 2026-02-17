@@ -169,11 +169,13 @@ class Agent(AgentBase):
         agent_name = self._agent_data["name"]
         return Content(agent_name)
 
-    def start(self, message_target: MessagePump | None = None) -> None:
+    async def start(self, message_target: MessagePump | None = None) -> None:
         """Start the agent."""
         self._message_target = message_target
         try:
-            self._log_file_path.parent.mkdir(parents=True, exist_ok=True)
+            await asyncio.to_thread(
+                self._log_file_path.parent.mkdir, parents=True, exist_ok=True
+            )
         except OSError:
             pass
         self._agent_task = asyncio.create_task(self._run_agent())

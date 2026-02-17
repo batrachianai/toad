@@ -23,7 +23,7 @@ class Plan(containers.Grid):
         border: panel $secondary;            
         background: transparent;        
         margin: 1 0 1 0 !important;   # Special case because the tall border reduces the apparent width           
-        padding: 1 1 0 0;        
+        padding: 1 1 0 1;        
         height: auto;                        
         grid-size: 2;
         grid-columns: auto 1fr;
@@ -115,18 +115,18 @@ class Plan(containers.Grid):
                     classes=f"plan {classes}",
                 )
             )
-            if entry in self.newly_completed or (
-                not self.is_mounted and entry.status == "completed"
-            ):
+            if entry in self.newly_completed:
                 self.call_after_refresh(strike_text.strike)
+            elif entry.status == "completed":
+                strike_text.add_class("-complete")
 
     def render_status(self, status: str) -> Content:
         if status == "completed":
-            return Content.from_markup("[$text-primary]  ✔")
+            return Content.from_markup("[$text-primary] ✔ ")
         elif status == "pending":
-            return Content.styled(" ⏳ ")
+            return Content.styled("⏳")
         elif status == "in_progress":
-            return Content.from_markup(" 👉 ")
+            return Content.from_markup("👉")
         return Content()
 
 
@@ -134,6 +134,11 @@ if __name__ == "__main__":
     from textual.app import App
 
     entries = [
+        Plan.Entry(
+            Content("This entry is already completee"),
+            "hide",
+            "completed",
+        ),
         Plan.Entry(
             Content.from_markup(
                 "Build the best damn UI for agentic coding in the terminal"
@@ -150,6 +155,11 @@ if __name__ == "__main__":
     ]
 
     new_entries = [
+        Plan.Entry(
+            Content("This entry is already completee"),
+            "hide",
+            "completed",
+        ),
         Plan.Entry(
             Content.from_markup(
                 "Build the best damn UI for agentic coding in the terminal"

@@ -10,6 +10,10 @@ class StrikeText(Widget):
     DEFAULT_CSS = """
     StrikeText {
         height: auto;
+        &.-complete {
+            text-style: strike;
+            color: $text-primary;
+        }
     }
     """
 
