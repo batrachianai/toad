@@ -26,6 +26,7 @@ from toad.widgets.throbber import Throbber
 from toad.widgets.conversation import Conversation
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
 from toad.widgets.side_bar import SideBar
+from toad.screens.file_editor_modal import FileEditorModal
 
 
 class ModeProvider(Provider):
@@ -184,7 +185,21 @@ class MainScreen(Screen, can_focus=False):
     @on(DirectoryTree.FileSelected, "ProjectDirectoryTree")
     def on_project_directory_tree_selected(self, event: Tree.NodeSelected):
         if (data := event.node.data) is not None:
-            self.conversation.insert_path_into_prompt(data.path)
+            path = data.path
+            if path.is_file():
+                self.app.push_screen(
+                    FileEditorModal(path),
+                    callback=self._on_editor_closed,
+                )
+
+    @on(ProjectDirectoryTree.FileInsertRequested)
+    def on_file_insert_requested(
+        self, event: ProjectDirectoryTree.FileInsertRequested
+    ) -> None:
+        self.conversation.insert_path_into_prompt(event.path)
+
+    def _on_editor_closed(self, result: bool) -> None:
+        self.conversation.focus_prompt()
 
     @on(acp_messages.Plan)
     async def on_acp_plan(self, message: acp_messages.Plan):
@@ -256,7 +271,7 @@ class MainScreen(Screen, can_focus=False):
         return True
 
     def action_show_sidebar(self) -> None:
-        self.side_bar.query_one("Collapsible CollapsibleTitle").focus()
+        self.query_one(ProjectDirectoryTree).focus()
 
     def action_focus_prompt(self) -> None:
         self.conversation.focus_prompt()

@@ -5,6 +5,7 @@ import asyncio
 
 from textual import work
 from textual.binding import Binding
+from textual.message import Message
 from textual.widgets import DirectoryTree
 from textual.widgets.directory_tree import DirEntry
 
@@ -19,7 +20,8 @@ class ProjectDirectoryTree(DirectoryTree):
 This shows the files in your project directory.
 
 - **cursor keys** navigation
-- **Enter** expand folder
+- **Enter** open file in editor
+- **Tab** insert file path into prompt
 """
     BINDINGS = [
         Binding(
@@ -30,7 +32,15 @@ This shows the files in your project directory.
             show=False,
         ),
         Binding("ctrl+r", "refresh", "Refresh", tooltip="Refresh file view", show=True),
+        Binding("tab", "insert_file", "Insert into prompt", show=False),
     ]
+
+    class FileInsertRequested(Message):
+        """Posted when the user presses Tab on a file to insert its path."""
+
+        def __init__(self, path: Path) -> None:
+            self.path = path
+            super().__init__()
 
     def __init__(
         self,
@@ -83,6 +93,14 @@ This shows the files in your project directory.
                     yield path
         else:
             yield from paths
+
+    def action_insert_file(self) -> None:
+        """Insert the currently highlighted file path into the prompt."""
+        node = self.cursor_node
+        if node is not None and node.data is not None:
+            path = node.data.path
+            if path.is_file():
+                self.post_message(self.FileInsertRequested(path))
 
     @work
     async def action_refresh(self) -> None:
