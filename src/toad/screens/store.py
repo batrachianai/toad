@@ -525,7 +525,15 @@ class StoreScreen(Screen):
     async def on_mount(self) -> None:
         self.app.settings_changed_signal.subscribe(self, self.setting_updated)
         try:
-            self._agents = await read_agents()
+            result = await read_agents()
+            self._agents = result.agents
+            for error in result.validation_errors:
+                self.notify(
+                    f"[b]{error.file_path.name}[/b]: {error.error_message}",
+                    title="Custom agent validation error",
+                    severity="warning",
+                    timeout=10,
+                )
         except Exception as error:
             self.notify(
                 f"Failed to read agents data ({error})",

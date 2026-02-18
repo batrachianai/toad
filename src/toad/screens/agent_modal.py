@@ -52,12 +52,10 @@ class AgentModal(ModalScreen):
         launcher_set = frozenset(app.settings.get("launcher.agents", str).splitlines())
         agent = self._agent
         actions = agent["actions"]
-
-        script_os = cast(OS, toad.os)
-        if script_os not in actions:
-            script_os = "*"
-
-        commands: dict[Action, Command] = actions[cast(OS, script_os)]
+        commands: dict[Action, Command] = {}
+        if actions:
+            script_os = cast(OS, toad.os)
+            commands = actions.get(script_os) or actions.get("*") or {}
         script_choices = [
             (action["description"], name) for name, action in commands.items()
         ]
