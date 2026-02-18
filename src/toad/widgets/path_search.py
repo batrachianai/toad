@@ -139,7 +139,7 @@ class PathSearch(containers.VerticalGroup):
 
     root: var[Path] = var(Path("./"))
     paths: var[list[Path]] = var(list)
-    highlighted_paths: var[list[Content]] = var(list)
+    display_paths: var[list[str]] = var(list)
     filtered_path_indices: var[list[int]] = var(list)
     loaded = var(False)
     filter = var("")
@@ -193,26 +193,32 @@ class PathSearch(containers.VerticalGroup):
         if not search:
             self.option_list.set_options(
                 [
-                    Option(highlighted_path, highlighted_path.plain)
-                    for highlighted_path in self.highlighted_paths[:100]
+                    Option(self.highlight_path(path), path)
+                    for path in self.display_paths[:100]
                 ],
             )
             return
 
         fuzzy_search = self.fuzzy_search
         fuzzy_search.cache.grow(len(self.paths))
-        scores: list[tuple[float, Sequence[int], Content]] = [
+        scored_paths: list[tuple[float, Sequence[int], str]] = [
             (
-                *fuzzy_search.match(search, highlighted_path.plain),
-                highlighted_path,
+                *fuzzy_search.match(search, path),
+                path,
             )
-            for highlighted_path in self.highlighted_paths
+            for path in self.display_paths
         ]
 
-        scores = sorted(
-            [score for score in scores if score[0]], key=itemgetter(0), reverse=True
+        scored_paths = sorted(
+            [score for score in scored_paths if score[0]],
+            key=itemgetter(0),
+            reverse=True,
         )
-        scores = scores[:20]
+
+        scores = [
+            (score, highlights, self.highlight_path(path))
+            for score, highlights, path in scored_paths[:20]
+        ]
 
         def highlight_offsets(path: Content, offsets: Sequence[int]) -> Content:
             return path.add_spans(
@@ -379,13 +385,13 @@ class PathSearch(containers.VerticalGroup):
             else:
                 return str(path.relative_to(self.root))
 
-        display_paths = sorted(map(path_display, paths), key=str.lower)
-        self.highlighted_paths = [self.highlight_path(path) for path in display_paths]
+        self.display_paths = sorted(map(path_display, paths), key=str.lower)
+
         self.option_list.set_options(
             [
-                Option(highlighted_path, id=highlighted_path.plain)
-                for highlighted_path in self.highlighted_paths
-            ][:100]
+                Option(self.highlight_path(path), id=path)
+                for path in self.display_paths[:100]
+            ]
         )
         with self.option_list.prevent(OptionList.OptionHighlighted):
             self.option_list.highlighted = 0
