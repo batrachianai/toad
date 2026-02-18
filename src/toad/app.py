@@ -835,7 +835,8 @@ class ToadApp(App, inherit_bindings=False):
                     agent = agent_data
 
         if agent is None:
-            agents = await read_agents()
+            result = await read_agents()
+            agents = result.agents
             try:
                 agent = agents[agent_identity]
             except KeyError:

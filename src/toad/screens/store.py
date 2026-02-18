@@ -29,7 +29,7 @@ from toad.widgets.mandelbrot import Mandelbrot
 from toad.widgets.condensed_path import CondensedPath
 from toad.widgets.grid_select import GridSelect
 from toad.agent_schema import Agent
-from toad.agents import read_agents, AgentReadResult
+from toad.agents import read_agents
 
 
 QR = """\
