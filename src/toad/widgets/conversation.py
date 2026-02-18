@@ -811,6 +811,11 @@ class Conversation(containers.Vertical):
             if text.startswith("/") and await self.slash_command(text):
                 # Toad has processed the slash command.
                 return
+            # Start a fresh agent response block for each new user prompt.
+            # Without this, pre-prompt ACP chunks (for example startup greetings)
+            # can be appended to the next prompted reply in the same UI block.
+            self._agent_response = None
+            self._agent_thought = None
             await self.post(UserInput(text))
             self._loading = await self.post(Loading("Please wait..."), loading=True)
             await asyncio.sleep(0)
