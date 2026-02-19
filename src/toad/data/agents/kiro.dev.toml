@@ -1,0 +1,42 @@
+# Schema defined in agent_schema.py
+# https://kiro.dev/cli/
+
+identity = "kiro.dev"
+name = "Kiro CLI"
+short_name = "kiro"
+url = "https://kiro.dev/cli/"
+protocol = "acp"
+author_name = "Amazon Web Services"
+author_url = "https://aws.amazon.com/"
+publisher_name = "Amazon Web Services"
+publisher_url = "https://kiro.dev/"
+type = "coding"
+description = "AI-assisted development in your terminal. Native ACP support, MCP integration, and smart workflows—built by AWS."
+tags = []
+run_command."*" = "kiro-cli acp"
+
+help = '''
+# Kiro CLI
+
+**AI-assisted development in your terminal**
+
+Kiro CLI brings AI-powered coding assistance to your command line with native Agent Client Protocol support—no adapter needed.
+
+## Features
+
+- **Native ACP**: Built-in ACP support via `kiro-cli acp`
+- **MCP Integration**: Connect external tools and data sources
+- **Session Management**: Save and resume conversations
+- **Image Support**: Include images in prompts
+- **Custom Agents**: Create specialized agents for your workflows
+- **Smart Hooks**: Automate workflows with pre/post command hooks
+
+---
+
+**Documentation**: https://kiro.dev/docs/cli/
+**ACP Details**: https://kiro.dev/docs/cli/acp/
+'''
+
+[actions."*".install]
+command = "curl -fsSL https://cli.kiro.dev/install | bash"
+description = "Install Kiro CLI"
