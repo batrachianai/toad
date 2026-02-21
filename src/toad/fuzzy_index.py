@@ -83,7 +83,7 @@ class FuzzyIndex:
 
         """
         query = query.casefold()
-        if len(query) == 1:
+        if len(query) <= 2:
             slash_query = f"/{query}"
             candidates = list(
                 islice(
@@ -92,7 +92,8 @@ class FuzzyIndex:
                         for path, normalized_path in zip(
                             self._paths, self._normalized_paths
                         )
-                        if normalized_path.startswith((query, slash_query))
+                        if normalized_path.startswith(query)
+                        or slash_query in normalized_path
                     ),
                     None,
                     100,
@@ -107,7 +108,7 @@ class FuzzyIndex:
                         for path, normalized_path in zip(
                             self._paths, self._normalized_paths
                         )
-                        if query in normalized_path
+                        if query in normalized_path or slash_query in normalized_path
                     ),
                     None,
                     100,
@@ -115,8 +116,8 @@ class FuzzyIndex:
             )
             return candidates
 
-        if len(query) <= 3:
-            min_trigram_overlap = 0.1
+        if len(query) == 3:
+            min_trigram_overlap /= 2
 
         index = self._index
         query_trigrams = self._extract_trigrams(query)
