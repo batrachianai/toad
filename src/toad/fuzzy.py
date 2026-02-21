@@ -70,6 +70,7 @@ class FuzzySearch:
         Returns:
             Score.
         """
+
         first_letters = self.get_first_letters(candidate)
         # This is a heuristic, and can be tweaked for better results
         # Boost first letter matches
@@ -95,8 +96,8 @@ class FuzzySearch:
         position = 0
 
         if not self.case_sensitive:
-            candidate = candidate.lower()
-            query = query.lower()
+            candidate = candidate.casefold()
+            query = query.casefold()
 
         score = self.score
 
@@ -135,6 +136,5 @@ class FuzzySearch:
                         get_offsets(new_offsets, positions_index + 1)
 
         get_offsets([], 0)
-
         for offsets in possible_offsets:
             yield score(candidate, offsets), offsets

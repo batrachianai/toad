@@ -27,9 +27,11 @@ from textual import widgets
 from textual.widgets import OptionList, Input, DirectoryTree
 from textual.widgets.option_list import Option
 
+from textual._profile import timer
 
 from toad import directory
 from toad.fuzzy import FuzzySearch
+from toad.fuzzy_index import FuzzyIndex
 from toad.messages import Dismiss, InsertPath, PromptSuggestion
 from toad.path_filter import PathFilter
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
@@ -72,8 +74,12 @@ class PathFuzzySearch(FuzzySearch):
             last_offset = offset
 
         # Boost to favor less groups
+
         normalized_groups = (offset_count - (groups - 1)) / offset_count
         score *= 1 + (normalized_groups * normalized_groups)
+
+        if positions[0] > candidate.rfind("/"):
+            score *= 2
         return score
 
 
@@ -153,6 +159,7 @@ class PathSearch(containers.VerticalGroup):
     def __init__(self, root: Path) -> None:
         super().__init__()
         self.root = root
+        self.fuzzy_index = FuzzyIndex()
 
     def compose(self) -> ComposeResult:
         with widgets.ContentSwitcher(initial="path-search-fuzzy"):
@@ -201,12 +208,14 @@ class PathSearch(containers.VerticalGroup):
 
         fuzzy_search = self.fuzzy_search
         fuzzy_search.cache.grow(len(self.paths))
+        display_paths = await self.fuzzy_index.search(search)
+
         scored_paths: list[tuple[float, Sequence[int], str]] = [
             (
                 *fuzzy_search.match(search, path),
                 path,
             )
-            for path in self.display_paths
+            for path in display_paths
         ]
 
         scored_paths = sorted(
@@ -372,7 +381,9 @@ class PathSearch(containers.VerticalGroup):
         content = content.highlight_regex(r"\.[^/]*$", style="italic")
         return content
 
-    def watch_paths(self, paths: list[Path]) -> None:
+    @work
+    async def watch_paths(self, paths: list[Path]) -> None:
+
         self.option_list.highlighted = None
 
         def path_display(path: Path) -> str:
@@ -385,7 +396,14 @@ class PathSearch(containers.VerticalGroup):
             else:
                 return str(path.relative_to(self.root))
 
-        self.display_paths = sorted(map(path_display, paths), key=str.lower)
+        def make_display_paths() -> list[str]:
+            display_paths = sorted(map(path_display, paths), key=str.lower)
+            display_paths.sort(key=lambda path: path.count("/"))
+            return display_paths
+
+        self.display_paths = await asyncio.to_thread(make_display_paths)
+
+        await self.fuzzy_index.update_paths(self.display_paths)
 
         self.option_list.set_options(
             [
