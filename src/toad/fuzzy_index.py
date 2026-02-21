@@ -70,7 +70,7 @@ class FuzzyIndex:
     def _find_candidates(
         self,
         query: str,
-        min_trigram_overlap: float = 0.3,
+        min_trigram_overlap: float = 0.2,
     ) -> list[tuple[str, str]]:
         """Return the indices of paths that share enough trigrams with the query.
 
@@ -137,7 +137,7 @@ class FuzzyIndex:
                     if count >= minimum_shared_trigrams
                 ),
                 None,
-                10000,
+                1000,
             )
         )
         candidates = list(unique_candidates.keys())
@@ -161,7 +161,7 @@ class FuzzyIndex:
 
         scores: list[tuple[float, str]] = []
 
-        TOP_COUNT = 100
+        TOP_COUNT = 1000
 
         async with self._lock:
             for path, normalized_path in self._find_candidates(normalized_query):
@@ -186,6 +186,10 @@ class FuzzyIndex:
                         for character in normalized_path
                     ]
                 )
+                if normalized_path.endswith(normalized_query):
+                    score *= 2
+                if normalized_path.endswith(f"/{normalized_query}"):
+                    score *= 2
                 scores.append((score, path))
 
             scores.sort(reverse=True)
