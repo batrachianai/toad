@@ -1,22 +1,10 @@
-"""
-Fuzzy matcher.
-
-This class is used by the [command palette](/guide/command_palette) to match search terms.
-
-"""
-
-from __future__ import annotations
-
 from functools import lru_cache
 from operator import itemgetter
-from re import finditer
+import re
 from typing import Iterable, Sequence
 
 
-from textual.cache import LRUCache
-
-
-class FuzzySearch:
+class PathFuzzySearch:
     """Performs a fuzzy search.
 
     Unlike a regex solution, this will finds all possible matches.
@@ -33,9 +21,6 @@ class FuzzySearch:
         """
 
         self.case_sensitive = case_sensitive
-        self.cache: LRUCache[tuple[str, str], tuple[float, Sequence[int]]] = LRUCache(
-            cache_size
-        )
 
     def match(self, query: str, candidate: str) -> tuple[float, Sequence[int]]:
         """Match against a query.
@@ -47,19 +32,19 @@ class FuzzySearch:
         Returns:
             A pair of (score, tuple of offsets). `(0, ())` for no result.
         """
-
-        cache_key = (query, candidate)
-        if cache_key in self.cache:
-            return self.cache[cache_key]
         default: tuple[float, Sequence[int]] = (0.0, [])
         result = max(self._match(query, candidate), key=itemgetter(0), default=default)
-        self.cache[cache_key] = result
         return result
 
     @classmethod
     @lru_cache(maxsize=1024)
     def get_first_letters(cls, candidate: str) -> frozenset[int]:
-        return frozenset({match.start() for match in finditer(r"\w+", candidate)})
+        return frozenset(
+            {
+                0,
+                *[match.start() + 1 for match in re.finditer(r"/", candidate)],
+            }
+        )
 
     def score(self, candidate: str, positions: Sequence[int]) -> float:
         """Score a search.
@@ -70,7 +55,6 @@ class FuzzySearch:
         Returns:
             Score.
         """
-
         first_letters = self.get_first_letters(candidate)
         # This is a heuristic, and can be tweaked for better results
         # Boost first letter matches
@@ -87,6 +71,9 @@ class FuzzySearch:
         # Boost to favor less groups
         normalized_groups = (offset_count - (groups - 1)) / offset_count
         score *= 1 + (normalized_groups * normalized_groups)
+
+        if positions[0] > candidate.rfind("/"):
+            score *= 2
         return score
 
     def _match(
@@ -138,3 +125,17 @@ class FuzzySearch:
         get_offsets([], 0)
         for offsets in possible_offsets:
             yield score(candidate, offsets), offsets
+
+
+_fuzzy_search = PathFuzzySearch(case_sensitive=False)
+
+
+def match_path(query_path: tuple[str, str]) -> tuple[float, Sequence[int], str]:
+    global _fuzzy_search
+    query, path = query_path
+    score, indices = _fuzzy_search.match(query, path)
+    return (
+        score,
+        tuple(indices),
+        path,
+    )

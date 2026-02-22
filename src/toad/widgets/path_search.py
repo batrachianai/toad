@@ -2,11 +2,12 @@ from __future__ import annotations
 
 
 import asyncio
-from functools import lru_cache
+import concurrent.futures
+
 from operator import itemgetter
 import os
 from pathlib import Path
-import re2 as re
+
 from typing import Sequence
 
 
@@ -19,6 +20,7 @@ from textual import containers
 from textual import events
 from textual.actions import SkipAction
 
+from textual.cache import LRUCache
 from textual.reactive import var, Initialize
 from textual.content import Content, Span
 from textual.strip import Strip
@@ -30,57 +32,12 @@ from textual.widgets.option_list import Option
 from textual._profile import timer
 
 from toad import directory
-from toad.fuzzy import FuzzySearch
 from toad.fuzzy_index import FuzzyIndex
 from toad.messages import Dismiss, InsertPath, PromptSuggestion
 from toad.path_filter import PathFilter
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
-
-
-class PathFuzzySearch(FuzzySearch):
-    @classmethod
-    @lru_cache(maxsize=1024)
-    def get_first_letters(cls, candidate: str) -> frozenset[int]:
-        return frozenset(
-            {
-                0,
-                *[match.start() + 1 for match in re.finditer(r"/", candidate)],
-            }
-        )
-
-    def score(self, candidate: str, positions: Sequence[int]) -> float:
-        """Score a search.
-
-        Args:
-            search: Search object.
-
-        Returns:
-            Score.
-        """
-        first_letters = self.get_first_letters(candidate)
-        # This is a heuristic, and can be tweaked for better results
-        # Boost first letter matches
-        offset_count = len(positions)
-        score: float = offset_count + len(first_letters.intersection(positions))
-
-        # if 0 in first_letters:
-        #     score += 1
-
-        groups = 1
-        last_offset, *offsets = positions
-        for offset in offsets:
-            if offset != last_offset + 1:
-                groups += 1
-            last_offset = offset
-
-        # Boost to favor less groups
-
-        normalized_groups = (offset_count - (groups - 1)) / offset_count
-        score *= 1 + (normalized_groups * normalized_groups)
-
-        if positions[0] > candidate.rfind("/"):
-            score *= 2
-        return score
+from toad._path_fuzzy_search import PathFuzzySearch
+from toad._path_match import match_path
 
 
 class FuzzyInput(Input):
@@ -160,6 +117,10 @@ class PathSearch(containers.VerticalGroup):
         super().__init__()
         self.root = root
         self.fuzzy_index = FuzzyIndex()
+        self.pool = concurrent.futures.InterpreterPoolExecutor()
+        self.search_cache: LRUCache[str, list[tuple[float, Sequence[int], str]]] = (
+            LRUCache(1024)
+        )
 
     def compose(self) -> ComposeResult:
         with widgets.ContentSwitcher(initial="path-search-fuzzy"):
@@ -196,6 +157,19 @@ class PathSearch(containers.VerticalGroup):
     def action_switch_picker(self) -> None:
         self.show_tree_picker = not self.show_tree_picker
 
+    def fuzzy_match_paths(
+        self, search: str, paths: list[str]
+    ) -> list[tuple[float, Sequence[int], str]]:
+
+        scores = list(
+            self.pool.map(
+                match_path,
+                [(search, path) for path in paths],
+                chunksize=10,
+            )
+        )
+        return scores
+
     async def search(self, search: str) -> None:
         if not search:
             self.option_list.set_options(
@@ -206,17 +180,25 @@ class PathSearch(containers.VerticalGroup):
             )
             return
 
-        fuzzy_search = self.fuzzy_search
-        fuzzy_search.cache.grow(len(self.paths))
+        # fuzzy_search = self.fuzzy_search
+        # fuzzy_search.cache.grow(len(self.paths))
         display_paths = await self.fuzzy_index.search(search)
 
-        scored_paths: list[tuple[float, Sequence[int], str]] = [
-            (
-                *fuzzy_search.match(search, path),
-                path,
-            )
-            for path in display_paths
-        ]
+        if len(display_paths) > 40:
+            if (scored_paths := self.search_cache.get(search)) is None:
+                scored_paths = await asyncio.to_thread(
+                    self.fuzzy_match_paths, search, display_paths
+                )
+                self.search_cache[search] = scored_paths
+        else:
+            fuzzy_search = self.fuzzy_search
+            scored_paths: list[tuple[float, Sequence[int], str]] = [
+                (
+                    *fuzzy_search.match(search, path),
+                    path,
+                )
+                for path in display_paths
+            ]
 
         scored_paths = sorted(
             [score for score in scored_paths if score[0]],
