@@ -2,11 +2,12 @@ from __future__ import annotations
 
 
 import asyncio
-from functools import lru_cache
+import concurrent.futures
+
 from operator import itemgetter
 import os
 from pathlib import Path
-import re2 as re
+
 from typing import Sequence
 
 
@@ -19,6 +20,7 @@ from textual import containers
 from textual import events
 from textual.actions import SkipAction
 
+from textual.cache import LRUCache
 from textual.reactive import var, Initialize
 from textual.content import Content, Span
 from textual.strip import Strip
@@ -27,54 +29,21 @@ from textual import widgets
 from textual.widgets import OptionList, Input, DirectoryTree
 from textual.widgets.option_list import Option
 
-
 from toad import directory
-from toad.fuzzy import FuzzySearch
+from toad.fuzzy_index import FuzzyIndex
 from toad.messages import Dismiss, InsertPath, PromptSuggestion
 from toad.path_filter import PathFilter
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
+from toad._path_fuzzy_search import PathFuzzySearch
+from toad._path_match import match_path
 
 
-class PathFuzzySearch(FuzzySearch):
-    @classmethod
-    @lru_cache(maxsize=1024)
-    def get_first_letters(cls, candidate: str) -> frozenset[int]:
-        return frozenset(
-            {
-                0,
-                *[match.start() + 1 for match in re.finditer(r"/", candidate)],
-            }
-        )
+class FuzzyPathOptionList(OptionList):
 
-    def score(self, candidate: str, positions: Sequence[int]) -> float:
-        """Score a search.
+    def get_loading_widget(self) -> Widget:
+        from textual.widgets import LoadingIndicator
 
-        Args:
-            search: Search object.
-
-        Returns:
-            Score.
-        """
-        first_letters = self.get_first_letters(candidate)
-        # This is a heuristic, and can be tweaked for better results
-        # Boost first letter matches
-        offset_count = len(positions)
-        score: float = offset_count + len(first_letters.intersection(positions))
-
-        # if 0 in first_letters:
-        #     score += 1
-
-        groups = 1
-        last_offset, *offsets = positions
-        for offset in offsets:
-            if offset != last_offset + 1:
-                groups += 1
-            last_offset = offset
-
-        # Boost to favor less groups
-        normalized_groups = (offset_count - (groups - 1)) / offset_count
-        score *= 1 + (normalized_groups * normalized_groups)
-        return score
+        return LoadingIndicator()
 
 
 class FuzzyInput(Input):
@@ -139,20 +108,25 @@ class PathSearch(containers.VerticalGroup):
 
     root: var[Path] = var(Path("./"))
     paths: var[list[Path]] = var(list)
-    highlighted_paths: var[list[Content]] = var(list)
+    display_paths: var[list[str]] = var(list)
     filtered_path_indices: var[list[int]] = var(list)
     loaded = var(False)
     filter = var("")
     fuzzy_search: var[FuzzySearch] = var(Initialize(get_fuzzy_search))
     show_tree_picker: var[bool] = var(False)
 
-    option_list = getters.query_one(OptionList)
+    option_list = getters.query_one(FuzzyPathOptionList)
     tree_view = getters.query_one(ProjectDirectoryTree)
     input = getters.query_one(Input)
 
     def __init__(self, root: Path) -> None:
         super().__init__()
         self.root = root
+        self.fuzzy_index = FuzzyIndex()
+        self.pool = concurrent.futures.InterpreterPoolExecutor()
+        self.search_cache: LRUCache[str, list[tuple[float, Sequence[int], str]]] = (
+            LRUCache(1024)
+        )
 
     def compose(self) -> ComposeResult:
         with widgets.ContentSwitcher(initial="path-search-fuzzy"):
@@ -160,7 +134,7 @@ class PathSearch(containers.VerticalGroup):
                 yield FuzzyInput(
                     compact=True, placeholder="fuzzy search \t[r]▌tab▐[/r] tree view"
                 )
-                yield OptionList()
+                yield FuzzyPathOptionList()
             with containers.VerticalGroup(id="path-search-tree"):
                 yield widgets.Static(
                     Content.from_markup(
@@ -189,30 +163,59 @@ class PathSearch(containers.VerticalGroup):
     def action_switch_picker(self) -> None:
         self.show_tree_picker = not self.show_tree_picker
 
+    def fuzzy_match_paths(
+        self, search: str, paths: list[str]
+    ) -> list[tuple[float, Sequence[int], str]]:
+
+        scores = list(
+            self.pool.map(
+                match_path,
+                [(search, path) for path in paths],
+                chunksize=10,
+            )
+        )
+        return scores
+
     async def search(self, search: str) -> None:
         if not search:
             self.option_list.set_options(
                 [
-                    Option(highlighted_path, highlighted_path.plain)
-                    for highlighted_path in self.highlighted_paths[:100]
+                    Option(self.highlight_path(path), path)
+                    for path in self.display_paths[:100]
                 ],
             )
             return
 
-        fuzzy_search = self.fuzzy_search
-        fuzzy_search.cache.grow(len(self.paths))
-        scores: list[tuple[float, Sequence[int], Content]] = [
-            (
-                *fuzzy_search.match(search, highlighted_path.plain),
-                highlighted_path,
-            )
-            for highlighted_path in self.highlighted_paths
-        ]
+        # fuzzy_search = self.fuzzy_search
+        # fuzzy_search.cache.grow(len(self.paths))
+        display_paths = await self.fuzzy_index.search(search)
 
-        scores = sorted(
-            [score for score in scores if score[0]], key=itemgetter(0), reverse=True
+        if len(display_paths) > 40:
+            if (scored_paths := self.search_cache.get(search)) is None:
+                scored_paths = await asyncio.to_thread(
+                    self.fuzzy_match_paths, search, display_paths
+                )
+                self.search_cache[search] = scored_paths
+        else:
+            fuzzy_search = self.fuzzy_search
+            scored_paths: list[tuple[float, Sequence[int], str]] = [
+                (
+                    *fuzzy_search.match(search, path),
+                    path,
+                )
+                for path in display_paths
+            ]
+
+        scored_paths = sorted(
+            [score for score in scored_paths if score[0]],
+            key=itemgetter(0),
+            reverse=True,
         )
-        scores = scores[:20]
+
+        scores = [
+            (score, highlights, self.highlight_path(path))
+            for score, highlights, path in scored_paths[:20]
+        ]
 
         def highlight_offsets(path: Content, offsets: Sequence[int]) -> Content:
             return path.add_spans(
@@ -335,28 +338,27 @@ class PathSearch(containers.VerticalGroup):
 
     @work(exclusive=True)
     async def refresh_paths(self):
-        self.loading = True
-        root = self.root
 
+        self.option_list.set_loading(True)
+        root = self.root
         try:
             path_filter = await asyncio.to_thread(self.get_path_filter, root)
             self.tree_view.path_filter = path_filter
             self.tree_view.clear()
-            await self.tree_view.reload()
+            self.tree_view.reload()
             paths = await directory.scan(
                 root, path_filter=path_filter, add_directories=True
             )
 
-            paths = [path.absolute() for path in paths]
+            def make_absolute() -> list[Path]:
+                return [path.absolute() for path in paths]
+
+            paths = await asyncio.to_thread(make_absolute)
             self.root = root
             self.paths = paths
-        finally:
-            self.loading = False
-
-    def get_loading_widget(self) -> Widget:
-        from textual.widgets import LoadingIndicator
-
-        return LoadingIndicator()
+        except Exception:
+            self.option_list.set_loading(False)
+            raise
 
     def highlight_path(self, path: str) -> Content:
         content = Content.styled(path, "dim $text")
@@ -366,7 +368,9 @@ class PathSearch(containers.VerticalGroup):
         content = content.highlight_regex(r"\.[^/]*$", style="italic")
         return content
 
-    def watch_paths(self, paths: list[Path]) -> None:
+    @work
+    async def watch_paths(self, paths: list[Path]) -> None:
+
         self.option_list.highlighted = None
 
         def path_display(path: Path) -> str:
@@ -379,14 +383,22 @@ class PathSearch(containers.VerticalGroup):
             else:
                 return str(path.relative_to(self.root))
 
-        display_paths = sorted(map(path_display, paths), key=str.lower)
-        self.highlighted_paths = [self.highlight_path(path) for path in display_paths]
+        def make_display_paths() -> list[str]:
+            display_paths = sorted(map(path_display, paths), key=str.lower)
+            display_paths.sort(key=lambda path: path.count("/"))
+            return display_paths
+
+        self.display_paths = await asyncio.to_thread(make_display_paths)
+
+        await self.fuzzy_index.update_paths(self.display_paths)
+
         self.option_list.set_options(
             [
-                Option(highlighted_path, id=highlighted_path.plain)
-                for highlighted_path in self.highlighted_paths
-            ][:100]
+                Option(self.highlight_path(path), id=path)
+                for path in self.display_paths[:100]
+            ]
         )
         with self.option_list.prevent(OptionList.OptionHighlighted):
             self.option_list.highlighted = 0
+        self.call_after_refresh(self.option_list.set_loading, False)
         self.post_message(PromptSuggestion(""))

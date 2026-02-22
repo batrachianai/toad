@@ -313,7 +313,7 @@ Prompt {
             margin: 0 1;
             padding: 0 1;
         }
-        OptionList {
+        FuzzyPathOptionList {
             border: none;
             height: 1fr;           
             padding: 0;
