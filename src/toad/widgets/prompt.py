@@ -433,7 +433,7 @@ class Prompt(containers.VerticalGroup):
     multi_line = var(False)
     show_path_search = var(False, toggle_class="-show-path-search", bindings=True)
     show_slash_complete = var(False, toggle_class="-show-slash-complete", bindings=True)
-    project_path = var(Path())
+    project_path = var(Path, init=False)
     working_directory = var("")
     agent_info = var(Content(""))
     _ask: var[Ask | None] = var(None)
@@ -447,7 +447,6 @@ class Prompt(containers.VerticalGroup):
 
     def __init__(
         self,
-        project_path: Path,
         *,
         name: str | None = None,
         id: str | None = None,
@@ -458,7 +457,6 @@ class Prompt(containers.VerticalGroup):
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self.ask_queue: list[Ask] = []
         self.complete_callback = complete_callback
-        self.project_path = project_path
 
     @property
     def text(self) -> str:
@@ -481,9 +479,10 @@ class Prompt(containers.VerticalGroup):
             self.query_one(ModeInfo).with_tooltip(tooltip).update(mode.name)
         self.watch_modes(self.modes)
 
-    async def watch_project_path(self) -> None:
+    async def watch_project_path(self, old_path: Path, new_path: Path) -> None:
         """Initial refresh of paths."""
-        self.call_later(self.path_search.refresh_paths)
+        if old_path != new_path:
+            self.call_later(self.path_search.refresh_paths)
 
     def ask(self, ask: Ask) -> None:
         """Replace the textarea prompt with a menu of options.

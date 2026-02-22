@@ -497,9 +497,7 @@ class Conversation(containers.Vertical):
                     yield Cursor()
                 yield Contents(id="contents")
         yield Flash()
-        yield Prompt(
-            self.project_path, complete_callback=self.shell_complete
-        ).data_bind(
+        yield Prompt(complete_callback=self.shell_complete).data_bind(
             project_path=Conversation.project_path,
             working_directory=Conversation.working_directory,
             agent_info=Conversation.agent_info,

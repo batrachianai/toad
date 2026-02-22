@@ -121,6 +121,7 @@ class PathSearch(containers.VerticalGroup):
 
     def __init__(self, root: Path) -> None:
         super().__init__()
+        self.set_reactive(PathSearch.root, root)
         self.root = root
         self.fuzzy_index = FuzzyIndex()
         self.pool = concurrent.futures.InterpreterPoolExecutor()
@@ -267,14 +268,21 @@ class PathSearch(containers.VerticalGroup):
             if event.widget == self.input:
                 self.post_message(Dismiss(self))
 
+    @classmethod
+    def make_relative(cls, path: Path, root: Path) -> Path:
+        return path.resolve().relative_to(root.resolve())
+
     @on(DirectoryTree.NodeHighlighted)
-    def on_node_highlighted(self, event: DirectoryTree.NodeHighlighted) -> None:
+    async def on_node_highlighted(self, event: DirectoryTree.NodeHighlighted) -> None:
         event.stop()
 
         dir_entry = event.node.data
         if dir_entry is not None:
             try:
-                path = Path(dir_entry.path).resolve().relative_to(self.root.resolve())
+                # path = Path(dir_entry.path).resolve().relative_to(self.root.resolve())
+                path = await asyncio.to_thread(
+                    self.make_relative, dir_entry.path, self.root
+                )
             except ValueError:
                 # Being defensive here, shouldn't occur
                 return
@@ -282,13 +290,16 @@ class PathSearch(containers.VerticalGroup):
             self.post_message(PromptSuggestion(tree_path))
 
     @on(DirectoryTree.FileSelected)
-    def on_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+    async def on_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         event.stop()
 
         dir_entry = event.node.data
         if dir_entry is not None:
             try:
-                path = Path(dir_entry.path).resolve().relative_to(self.root.resolve())
+                path = await asyncio.to_thread(
+                    self.make_relative, dir_entry.path, self.root
+                )
+                # path = Path(dir_entry.path).resolve().relative_to(self.root.resolve())
             except ValueError:
                 return
             tree_path = str(path)
@@ -338,7 +349,6 @@ class PathSearch(containers.VerticalGroup):
 
     @work(exclusive=True)
     async def refresh_paths(self):
-
         self.option_list.set_loading(True)
         root = self.root
         try:
@@ -350,10 +360,19 @@ class PathSearch(containers.VerticalGroup):
                 root, path_filter=path_filter, add_directories=True
             )
 
-            def make_absolute() -> list[Path]:
+            def make_absolute(paths: list[Path]) -> list[Path]:
+                """Make all paths absolute.
+
+                Args:
+                    paths: A list of paths.
+
+                Returns:
+                    List of absolute paths,
+
+                """
                 return [path.absolute() for path in paths]
 
-            paths = await asyncio.to_thread(make_absolute)
+            paths = await asyncio.to_thread(make_absolute, paths)
             self.root = root
             self.paths = paths
         except Exception:
@@ -390,7 +409,7 @@ class PathSearch(containers.VerticalGroup):
 
         self.display_paths = await asyncio.to_thread(make_display_paths)
 
-        await self.fuzzy_index.update_paths(self.display_paths)
+        self._update_paths(self.display_paths)
 
         self.option_list.set_options(
             [
@@ -400,5 +419,15 @@ class PathSearch(containers.VerticalGroup):
         )
         with self.option_list.prevent(OptionList.OptionHighlighted):
             self.option_list.highlighted = 0
-        self.call_after_refresh(self.option_list.set_loading, False)
+
         self.post_message(PromptSuggestion(""))
+
+    @work
+    async def _update_paths(self, paths: list[str]) -> None:
+        """Update the paths index.
+
+        Args:
+            paths: A list of paths.
+        """
+        await self.fuzzy_index.update_paths(paths)
+        self.call_after_refresh(self.option_list.set_loading, False)
