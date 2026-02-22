@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-import re as re
+import re
 from typing import Sequence
 
 from rich.text import Text

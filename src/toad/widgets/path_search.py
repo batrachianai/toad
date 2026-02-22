@@ -29,8 +29,6 @@ from textual import widgets
 from textual.widgets import OptionList, Input, DirectoryTree
 from textual.widgets.option_list import Option
 
-from textual._profile import timer
-
 from toad import directory
 from toad.fuzzy_index import FuzzyIndex
 from toad.messages import Dismiss, InsertPath, PromptSuggestion
@@ -38,6 +36,14 @@ from toad.path_filter import PathFilter
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
 from toad._path_fuzzy_search import PathFuzzySearch
 from toad._path_match import match_path
+
+
+class FuzzyPathOptionList(OptionList):
+
+    def get_loading_widget(self) -> Widget:
+        from textual.widgets import LoadingIndicator
+
+        return LoadingIndicator()
 
 
 class FuzzyInput(Input):
@@ -109,7 +115,7 @@ class PathSearch(containers.VerticalGroup):
     fuzzy_search: var[FuzzySearch] = var(Initialize(get_fuzzy_search))
     show_tree_picker: var[bool] = var(False)
 
-    option_list = getters.query_one(OptionList)
+    option_list = getters.query_one(FuzzyPathOptionList)
     tree_view = getters.query_one(ProjectDirectoryTree)
     input = getters.query_one(Input)
 
@@ -128,7 +134,7 @@ class PathSearch(containers.VerticalGroup):
                 yield FuzzyInput(
                     compact=True, placeholder="fuzzy search \t[r]▌tab▐[/r] tree view"
                 )
-                yield OptionList()
+                yield FuzzyPathOptionList()
             with containers.VerticalGroup(id="path-search-tree"):
                 yield widgets.Static(
                     Content.from_markup(
@@ -332,28 +338,27 @@ class PathSearch(containers.VerticalGroup):
 
     @work(exclusive=True)
     async def refresh_paths(self):
-        self.loading = True
-        root = self.root
 
+        self.option_list.set_loading(True)
+        root = self.root
         try:
             path_filter = await asyncio.to_thread(self.get_path_filter, root)
             self.tree_view.path_filter = path_filter
             self.tree_view.clear()
-            await self.tree_view.reload()
+            self.tree_view.reload()
             paths = await directory.scan(
                 root, path_filter=path_filter, add_directories=True
             )
 
-            paths = [path.absolute() for path in paths]
+            def make_absolute() -> list[Path]:
+                return [path.absolute() for path in paths]
+
+            paths = await asyncio.to_thread(make_absolute)
             self.root = root
             self.paths = paths
-        finally:
-            self.loading = False
-
-    def get_loading_widget(self) -> Widget:
-        from textual.widgets import LoadingIndicator
-
-        return LoadingIndicator()
+        except Exception:
+            self.option_list.set_loading(False)
+            raise
 
     def highlight_path(self, path: str) -> Content:
         content = Content.styled(path, "dim $text")
@@ -395,4 +400,5 @@ class PathSearch(containers.VerticalGroup):
         )
         with self.option_list.prevent(OptionList.OptionHighlighted):
             self.option_list.highlighted = 0
+        self.call_after_refresh(self.option_list.set_loading, False)
         self.post_message(PromptSuggestion(""))

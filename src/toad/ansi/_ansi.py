@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import io
 from itertools import accumulate
-import re as re
+import re
 
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Awaitable, Callable, Iterable, Literal, Mapping, NamedTuple
+from typing import Awaitable, Callable, Iterable, Literal, Mapping, NamedTuple
 
 import rich.repr
 
