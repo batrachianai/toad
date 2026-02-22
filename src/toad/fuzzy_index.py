@@ -7,6 +7,11 @@ from operator import itemgetter
 
 
 class FuzzyIndex:
+    """An index for path searching.
+
+    This reduces the number of paths that need to be considered by the relativley expensive scoring function.
+
+    """
 
     def __init__(self) -> None:
         self._paths: list[str] = []
@@ -145,12 +150,24 @@ class FuzzyIndex:
 
     @classmethod
     def make_weights(cls, path: str) -> dict[int, float]:
+        """Assign relative weights to positions with a path.
+
+        Initial characters are weighted more highly, and the last component
+        is weighted higher still.
+
+        Args:
+            path: A path string.
+
+        Returns:
+            A mapping of string indices to relative weights.
+        """
         weights: dict[int, float] = dict.fromkeys(
             range(path.rfind("/") + 1, len(path)), 1.0
-        )
+        ) | {0: 1.0}
+
         index = path.find("/", None, -1)
         while index != -1:
-            weights[index + 1] = weights.setdefault(index + 1, 1.0) + 1
+            weights[index + 1] = weights.setdefault(index + 1, 1.0) + 1.0
             index = path.find("/", index + 1, -1)
         return weights
 
