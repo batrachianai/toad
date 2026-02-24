@@ -438,7 +438,10 @@ class StoreScreen(Screen):
         shuffle(recommended_agents)
         if recommended_agents:
             with containers.VerticalGroup(id="sponsored-agents", classes="recommended"):
-                yield widgets.Static("Recommended", classes="heading")
+                yield widgets.Static(
+                    "[$text-warning u]Recommended[/] [$text-secondary 100% i]Best of the bunch",
+                    classes="heading",
+                )
                 with AgentGridSelect(classes="agents-picker", min_column_width=40):
                     for agent in recommended_agents:
                         yield AgentItem(agent)
@@ -449,17 +452,27 @@ class StoreScreen(Screen):
 
         coding_agents = [agent for agent in ordered_agents if agent["type"] == "coding"]
         if coding_agents:
-            yield widgets.Static("Coding agents", classes="heading")
-            with AgentGridSelect(classes="agents-picker", min_column_width=40):
-                for agent in coding_agents:
-                    yield AgentItem(agent)
+            yield widgets.Static(
+                "[$text-warning u]Coding agents[/] [$text-secondary i]Build software with AI",
+                classes="heading",
+            )
+            with containers.VerticalGroup():
+                with AgentGridSelect(classes="agents-picker", min_column_width=40):
+                    for agent in coding_agents:
+                        yield AgentItem(agent)
 
-        chat_bots = [agent for agent in ordered_agents if agent["type"] == "chat"]
+        chat_bots = [
+            agent for agent in ordered_agents if agent["type"] in {"chat", "assistant"}
+        ]
         if chat_bots:
-            yield widgets.Static("Chat & more", classes="heading")
-            with AgentGridSelect(classes="agents-picker", min_column_width=40):
-                for agent in chat_bots:
-                    yield AgentItem(agent)
+            yield widgets.Static(
+                "[$text-warning u]Chat & Assistants[/] [$text-secondary 100% i]Biddi-biddi-biddi",
+                classes="heading",
+            )
+            with containers.VerticalGroup():
+                with AgentGridSelect(classes="agents-picker", min_column_width=40):
+                    for agent in chat_bots:
+                        yield AgentItem(agent)
 
     def move_focus(self, direction: Literal[-1] | Literal[+1]) -> None:
         if isinstance(self.focused, GridSelect):

@@ -1887,6 +1887,8 @@ class Conversation(containers.Vertical):
                 self.flash(f"Renamed session to [b]'{name}'", style="success")
             return True
         elif command == "toad:session-close":
+            if self.turn == "agent" and self.agent is not None:
+                await self.agent.cancel()
             if self.screen.id is not None:
                 self.post_message(messages.SessionClose(self.screen.id))
                 return True

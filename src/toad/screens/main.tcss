@@ -313,7 +313,7 @@ Prompt {
             margin: 0 1;
             padding: 0 1;
         }
-        FuzzyPathOptionList {
+        OptionList,FuzzyPathOptionList {
             border: none;
             height: 1fr;           
             padding: 0;
@@ -322,8 +322,7 @@ Prompt {
             text-wrap: nowrap;
             text-overflow: ellipsis;  
             & > .option-list--option {
-                padding: 0 1;    
-         
+                padding: 0 1;             
             }
         }
         DirectoryTree {

@@ -13,9 +13,7 @@ StoreScreen {
 
     .heading {
         margin: 0 0 0 0;
-        padding: 1 1 0 2;        
-        text-style: underline;
-        color: $text-primary;
+        padding: 1 1 0 2;                
     }
     .sponsor-me {        
         padding: 0 1;
@@ -89,18 +87,33 @@ StoreScreen {
 
     }
 
-    #sponsored-agents {         
-        GridSelect {
-            margin:0 1;
-            grid-gutter: 1;
-            keyline: thin $foreground 10%;
-        }
+
+    GridSelect {
+        
+        margin: 0 1;
+        border: round $secondary 50%;
+        keyline: none
     }
-   
+
+    #sponsored-agents {
+        GridSelect {            
+            border: none;
+            grid-gutter: 1;
+            keyline: heavy $secondary;
+        }
+        
+    }
+
+    Launcher GridSelect {
+        keyline: none;
+        margin: 0;
+        border: none;
+    }
+    
     AgentItem {
         height: auto;             
         border: tall transparent;
-        padding: 0 1;        
+        padding: 0 1    ;        
         &:hover {
             background: $panel;
         }

@@ -1,0 +1,32 @@
+# Schema defined in agent_schema.py
+# https://docs.openclaw.ai/cli/acp
+
+# Could not get Openclaw ACP to work
+active = false
+
+identity = "openclaw.ai"
+name = "OpenClaw"
+short_name = "openclaw"
+url = "https://openclaw.ai/"
+protocol = "acp"
+author_name = "Peter Steinberger"
+author_url = "https://openclaw.ai/"
+publisher_name = "Will McGugan"
+publisher_url = "https://willmcgugan.github.io/"
+type = "assistant"
+description = "The AI that actually does things."
+tags = []
+run_command."*" = "openclaw acp"
+
+
+help = '''
+# OpenClaw
+
+Clears your inbox, sends emails, manages your calendar, checks you in for flights.
+All from WhatsApp, Telegram, or any chat app you already use.
+'''
+
+
+[actions."*".install]
+command = "curl -fsSL https://openclaw.ai/install.sh | bash"
+description = "Install OpenClaw"

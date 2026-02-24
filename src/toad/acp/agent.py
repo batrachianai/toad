@@ -735,8 +735,37 @@ class Agent(AgentBase):
 
         """
         with self.request():
+            print(1, prompt)
             session_prompt = api.session_prompt(prompt, self.session_id)
-        result = await session_prompt.wait()
+        try:
+            result = await session_prompt.wait()
+            print(2, result)
+        except jsonrpc.APIError as error:
+            details = ""
+            match error.data:
+                case {"details": details}:
+                    pass
+
+            self.post_message(
+                AgentFail(
+                    "Failed to send prompt" or error.message,
+                    (
+                        str(details)
+                        if details
+                        else f"{self._agent_data['name']} returned an error"
+                    ),
+                )
+            )
+            return None
+        except jsonrpc.JSONRPCError as error:
+            self.post_message(
+                AgentFail(
+                    "Failed to send prompt" or error.message,
+                    (error.message or f"{self._agent_data['name']} returned an error"),
+                )
+            )
+            return None
+
         assert result is not None
         return result.get("stopReason")
 
