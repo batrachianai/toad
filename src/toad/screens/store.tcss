@@ -87,21 +87,10 @@ StoreScreen {
 
     }
 
-
-    GridSelect {
-        
+    GridSelect {        
         margin: 0 1;
         border: round $secondary 50%;
         keyline: none
-    }
-
-    #sponsored-agents {
-        GridSelect {            
-            border: none;
-            grid-gutter: 1;
-            keyline: heavy $secondary;
-        }
-        
     }
 
     Launcher GridSelect {

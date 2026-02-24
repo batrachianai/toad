@@ -694,7 +694,7 @@ class ToadApp(App, inherit_bindings=False):
                     border_style="dim green",
                     title="🐸 [bold green not dim]Update available![/] 🐸",
                     expand=False,
-                    padding=(1, 4),
+                    padding=(1, 2),
                 )
             )
             console.print(f"Please visit {version_meta.visit_url}")
