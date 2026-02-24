@@ -124,9 +124,9 @@ class Plan(containers.Grid):
         if status == "completed":
             return Content.from_markup("[$text-primary] ✔ ")
         elif status == "pending":
-            return Content.styled("⏳")
+            return Content.styled("⏳ ")
         elif status == "in_progress":
-            return Content.from_markup("👉")
+            return Content.from_markup("👉 ")
         return Content()
 
 
