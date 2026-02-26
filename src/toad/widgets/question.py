@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from textual.app import ComposeResult
+from textual import getters
 from textual import events, on
 from textual.binding import Binding
 from textual import containers
@@ -170,11 +171,14 @@ class Question(containers.VerticalGroup, can_focus=True):
         }
         #question-container {
             margin-bottom: 1;
-        }
+        }        
 
-        &.-blink Option.-active #caret {
+        
+
+        #option-container.-blink Option.-active #caret {
             opacity: 0.2;
         }
+
         &:blur {
             #index {
                 opacity: 0.3;
@@ -192,6 +196,8 @@ class Question(containers.VerticalGroup, can_focus=True):
     selection: reactive[int] = reactive(0, init=False)
     selected: var[bool] = var(False, toggle_class="-selected")
     blink: var[bool] = var(False)
+
+    option_container = getters.query_one("#option-container", containers.VerticalGroup)
 
     DEFAULT_KINDS = {
         "allow_once": "a",
@@ -293,7 +299,7 @@ class Question(containers.VerticalGroup, can_focus=True):
         return True
 
     def watch_blink(self, blink: bool) -> None:
-        self.set_class(blink, "-blink")
+        self.option_container.set_class(blink, "-blink")
 
     def action_selection_up(self) -> None:
         self._reset_blink()

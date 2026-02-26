@@ -1,12 +1,7 @@
-from pathlib import Path
-
 from textual.reactive import var
-from textual import work
 from textual.widget import Widget
 from textual.widgets import Markdown
 from textual.widgets.markdown import MarkdownStream
-
-from toad import messages
 
 
 SYSTEM = """\
@@ -17,6 +12,7 @@ When asked for a table do not wrap it in a code fence.
 
 
 class AgentResponse(Markdown):
+    DEFAULT_CLASSES = "block"
     block_cursor_offset = var(-1)
 
     def __init__(self, markdown: str | None = None) -> None:

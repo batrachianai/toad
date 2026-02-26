@@ -1,5 +1,5 @@
 
-Note,MarkdownNote {
+Note,MarkdownNote {    
     padding: 0 1 0 0;
     &.about MarkdownTable {
         # Make the tables compact in /about
@@ -123,13 +123,13 @@ Conversation {
         }
     }        
 
-    AgentResponse {           
+    AgentResponse {         
         min-height: 1;        
         padding: 0 1 0 0;       
         overflow-x: auto;
         scrollbar-size-horizontal: 0;
         layout: stream;
-        MarkdownBlock:last-child {
+        & > MarkdownBlock:last-child {            
             margin-bottom: 0;
         }
     }
@@ -175,7 +175,8 @@ Conversation {
     }
 
     ToolCall {    
-        margin: 0;    
+        # margin: 0 0 0 0 !important;    
+        margin: 0 !important;        
         padding: 0 0 0 1;        
         width: 1fr;
         layout: stream;
@@ -189,11 +190,24 @@ Conversation {
             display: none;
         }
         &.-has-content #tool-content {
-            margin-top: 1;                        
+            margin-top: 0;    
+            
+            Markdown {
+                layout: stream;
+                padding: 0;
+                & > MarkdownBlock {
+                    # &:last-of-type {
+                    #     margin: 1 0;
+                    # }
+                    margin: 1 0 0 0;
+                }
+                # margin: 0;
+            }                  
         }
         &.-expanded {
             #tool-content {
                 display: block;
+                margin-bottom: 1; 
             }
         }
 
@@ -261,7 +275,7 @@ Conversation {
                   
     }
          
-    UserInput {
+    UserInput {        
         border-left: blank $secondary;
         background: $secondary 15%;
         padding: 1 1 1 0;   
@@ -297,8 +311,8 @@ Welcome {
 }
 
 
-ACPToolCallContent {
-    Markdown {
+ACPToolCallContent {    
+    Markdown {        
         margin: 0;
         padding-left: 0;
         MarkdownBlock:last-of-type {
@@ -368,19 +382,24 @@ Prompt {
     }
 
     Question {
+        
         display: none;
         #title {
             width: 1fr;            
         }
         height: auto;                
-        
+        # height: 1fr;
+        # max-height: 50vh;
+        # overflow: hidden auto;
 
         #contents {
-            margin-top: 0;
+            
+            margin-top: 0;            
             height: auto;            
-            overflow: auto;
+            overflow: hidden auto;
             max-height: 50vh;  
             margin-bottom: 1;
+            
             
             DiffView {
                 .diff-group {                    
@@ -392,6 +411,7 @@ Prompt {
             }
             & > * {                
                 # height: 0;
+                padding-right: 1;
                 margin: 1 0 0 0;
             } 
                      
@@ -401,7 +421,8 @@ Prompt {
         }
         #option-container {
             # margin-top: 1;
-            dock: bottom;
+            split: bottom;
+            height: auto;
         }
     }
     &.-mode-ask {

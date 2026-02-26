@@ -155,10 +155,15 @@ class ToolCall(containers.VerticalGroup):
 
         expand_icon: Content = Content()
         if self.has_content:
-            expand_icon = Content("▼ " if self.expanded else "▶ ")
+            expand_icon = Content.from_markup(
+                "[$text-secondary]▼ " if self.expanded else "[$text-secondary]▶ "
+            )
         else:
-            expand_icon = Content.styled("▶ ", "$text 20%")
-            expand_icon = Content("")
+            expand_icon = Content.from_markup(
+                "[$text-secondary 30%]▼ "
+                if self.expanded
+                else "[$text-secondary 30%]▶ "
+            )
 
         header = Content.assemble(expand_icon, "🔧 ", (title, "$text-secondary"))
 
