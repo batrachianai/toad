@@ -2,7 +2,7 @@
 # https://docs.openclaw.ai/cli/acp
 
 # Could not get Openclaw ACP to work
-active = false
+active = true
 
 identity = "openclaw.ai"
 name = "OpenClaw"
@@ -14,7 +14,7 @@ author_url = "https://openclaw.ai/"
 publisher_name = "Will McGugan"
 publisher_url = "https://willmcgugan.github.io/"
 type = "assistant"
-description = "The AI that actually does things."
+description = "The AI that actually does things. [bold $text-warning]⚠️ Experimental[/]"
 tags = []
 run_command."*" = "openclaw acp"
 
@@ -24,6 +24,11 @@ help = '''
 
 Clears your inbox, sends emails, manages your calendar, checks you in for flights.
 All from WhatsApp, Telegram, or any chat app you already use.
+
+---
+This agent is currently experimental.
+Post on [Discussions](https://github.com/batrachianai/toad/discussions) if you have any issues.
+
 '''
 
 

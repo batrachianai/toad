@@ -450,17 +450,6 @@ class StoreScreen(Screen):
                         classes="sponsor-me",
                     )
 
-        coding_agents = [agent for agent in ordered_agents if agent["type"] == "coding"]
-        if coding_agents:
-            yield widgets.Static(
-                "[$text-warning u]Coding agents[/] [$text-secondary i]Build software with AI",
-                classes="heading",
-            )
-            with containers.VerticalGroup():
-                with AgentGridSelect(classes="agents-picker", min_column_width=40):
-                    for agent in coding_agents:
-                        yield AgentItem(agent)
-
         chat_bots = [
             agent for agent in ordered_agents if agent["type"] in {"chat", "assistant"}
         ]
@@ -472,6 +461,17 @@ class StoreScreen(Screen):
             with containers.VerticalGroup():
                 with AgentGridSelect(classes="agents-picker", min_column_width=40):
                     for agent in chat_bots:
+                        yield AgentItem(agent)
+
+        coding_agents = [agent for agent in ordered_agents if agent["type"] == "coding"]
+        if coding_agents:
+            yield widgets.Static(
+                "[$text-warning u]Coding agents[/] [$text-secondary i]Build software with AI",
+                classes="heading",
+            )
+            with containers.VerticalGroup():
+                with AgentGridSelect(classes="agents-picker", min_column_width=40):
+                    for agent in coding_agents:
                         yield AgentItem(agent)
 
     def move_focus(self, direction: Literal[-1] | Literal[+1]) -> None:
