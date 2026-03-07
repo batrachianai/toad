@@ -554,6 +554,14 @@ class Agent(AgentBase):
             assert isinstance(agent_data, dict)
             tasks.add(asyncio.create_task(call_jsonrpc(agent_data)))
 
+        # Cancel all remaining tasks and wait for them to finish
+        for task in tasks:
+            task.cancel()
+        
+        # Wait for all tasks to complete cancellation
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         if process.returncode:
             assert process.stderr is not None
             fail_details = (await process.stderr.read()).decode("utf-8", "replace")
@@ -577,6 +585,26 @@ class Agent(AgentBase):
                 self._process.terminate()
             except OSError:
                 pass
+
+        # Cancel the main task and agent task
+        if self._task is not None:
+            self._task.cancel()
+        if self._agent_task is not None:
+            self._agent_task.cancel()
+
+        # Wait for tasks to complete cancellation
+        tasks_to_wait = []
+        if self._task is not None:
+            tasks_to_wait.append(self._task)
+        if self._agent_task is not None:
+            tasks_to_wait.append(self._agent_task)
+        
+        if tasks_to_wait:
+            await asyncio.gather(*tasks_to_wait, return_exceptions=True)
+        
+        # Clear task references
+        self._task = None
+        self._agent_task = None
 
     async def run(self) -> None:
         """The main logic of the Agent."""

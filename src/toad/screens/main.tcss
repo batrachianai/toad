@@ -190,7 +190,7 @@ Conversation {
             display: none;
         }
         &.-has-content #tool-content {            
-            margin: 1 1 0 0;            
+            margin: 1 1 1 0;            
             DiffView {
                 margin: 0 1 1 0;                                              
                 &:last-of-type {
@@ -211,13 +211,20 @@ Conversation {
             #tool-content {
                 display: block;                
             }
+            ToolCallHeader {
+                text-wrap: wrap;
+                text-overflow: fold;
+            }
         }
-
-        ToolCallHeader {     
+        
+        ToolCallHeader {  
+            color: $text-secondary;   
             pointer: pointer;       
             width: auto;
             max-width: 1fr;   
-            margin: 0 1 0 0;         
+            margin: 0 1 0 0;    
+            text-wrap: nowrap;
+            text-overflow: ellipsis;
         }        
     }
     padding-left: 1;  

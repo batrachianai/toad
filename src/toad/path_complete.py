@@ -1,7 +1,7 @@
 import asyncio
 import os
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal
 
 
 def longest_common_prefix(strings: list[str]) -> str:
@@ -46,11 +46,15 @@ class DirectoryReadTask:
             self.directory_listing.append(path)
 
     def start(self) -> None:
-        asyncio.create_task(self.run(), name=f"DirectoryReadTask({str(self.path)!r})")
+        self._task = asyncio.create_task(
+            self.run(), name=f"DirectoryReadTask({str(self.path)!r})"
+        )
 
     async def run(self):
-        await asyncio.to_thread(self.read)
-        self.done_event.set()
+        try:
+            await asyncio.to_thread(self.read)
+        finally:
+            self.done_event.set()
 
     async def wait(self) -> list[Path]:
         await self.done_event.wait()

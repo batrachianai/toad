@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual import getters
 
 from textual.content import Content
-from textual.reactive import var
+from textual.reactive import reactive, var
 from textual.css.query import NoMatches
 from textual import containers
 from textual.widgets import Static, Markdown
@@ -64,6 +64,7 @@ class ToolCall(containers.VerticalGroup):
     app = getters.app(ToadApp)
     has_content: var[bool] = var(False, toggle_class="-has-content")
     expanded: var[bool] = var(False, toggle_class="-expanded")
+    tool_call: var[protocol.ToolCall | None] = var(None)
 
     def __init__(
         self,
@@ -72,17 +73,17 @@ class ToolCall(containers.VerticalGroup):
         id: str | None = None,
         classes: str | None = None,
     ) -> None:
-        self._tool_call = tool_call
+        self.set_reactive(ToolCall.tool_call, tool_call)
         super().__init__(id=id, classes=classes)
 
-    @property
-    def tool_call(self) -> protocol.ToolCall:
-        return self._tool_call
+    async def update_tool_call(self, tool_call: protocol.ToolCall) -> None:
+        """Update the tool call and recompose the widget.
 
-    @tool_call.setter
-    def tool_call(self, tool_call: protocol.ToolCall):
-        self._tool_call = tool_call
-        self.refresh(recompose=True)
+        Args:
+            tool_call: New Tool call data.
+        """
+        self.tool_call = tool_call
+        await self.recompose()
 
     def get_block_menu(self) -> Iterable[MenuItem]:
         if self.expanded:
@@ -112,30 +113,36 @@ class ToolCall(containers.VerticalGroup):
         return self.expanded
 
     def compose(self) -> ComposeResult:
-        tool_call = self._tool_call
+        tool_call = self.tool_call
+        assert tool_call is not None
         content: list[protocol.ToolCallContent] = tool_call.get("content", None) or []
-        title = tool_call.get("title", "title")
+
+        self.set_class(tool_call.get("status") == "failed", "-failed")
 
         self.has_content = False
         content_update = list(self._compose_content(content))
 
-        yield (header := ToolCallHeader(self.tool_call_header_content, markup=False))
-        header.tooltip = title
+        yield ToolCallHeader(self.tool_call_header_content, markup=False).with_tooltip(
+            "Expand to see full title"
+        )
         with containers.VerticalGroup(id="tool-content"):
             yield from content_update
+        self.check_expand()
 
-        self.call_after_refresh(self.check_expand)
+    def on_mount(self) -> None:
+        self.check_expand()
 
     def check_expand(self) -> None:
         """Check if the tool call should auto-expand."""
         if not self.has_content:
             return
-        tool_call = self._tool_call
+        tool_call = self.tool_call
+        assert tool_call is not None
         if tool_call.get("kind", "") == "read":
             # Don't auto expand reads, as it can generate a lot of noise
             return
         tool_call_expand = self.app.settings.get("tools.expand", str, expand=False)
-        status = self._tool_call.get("status")
+        status = tool_call.get("status")
         if tool_call_expand == "always":
             self.expanded = True
         elif tool_call_expand != "never" and status is not None:
@@ -148,7 +155,8 @@ class ToolCall(containers.VerticalGroup):
 
     @property
     def tool_call_header_content(self) -> Content:
-        tool_call = self._tool_call
+        tool_call = self.tool_call
+        assert tool_call is not None
         _kind = tool_call.get("kind", "tool")
         title = tool_call.get("title", "title")
         status = tool_call.get("status", "pending")
@@ -165,7 +173,7 @@ class ToolCall(containers.VerticalGroup):
                 else "[$text-secondary 30%]▶ "
             )
 
-        header = Content.assemble(expand_icon, "🔧 ", (title, "$text-secondary"))
+        header = Content.assemble(expand_icon, "🔧 ", title)
 
         if status == "pending":
             header += Content.assemble(" ⌛")
@@ -191,11 +199,11 @@ class ToolCall(containers.VerticalGroup):
         else:
             self.call_after_refresh(conversation.cursor.update_follow)
 
-    def watch_has_content(self) -> None:
-        try:
-            self.query_one(ToolCallHeader).update(self.tool_call_header_content)
-        except NoMatches:
-            pass
+    # def watch_has_content(self) -> None:
+    #     try:
+    #         self.query_one(ToolCallHeader).update(self.tool_call_header_content)
+    #     except NoMatches:
+    #         pass
 
     @on(events.Click, "ToolCallHeader")
     def on_click_tool_call_header(self, event: events.Click) -> None:
@@ -219,6 +227,7 @@ class ToolCall(containers.VerticalGroup):
                 # For now I will attempt a heuristic to guess what the content actually contains
                 # https://agentclientprotocol.com/protocol/schema#param-text
                 case {"type": "text", "text": text}:
+                    assert isinstance(text, str)
                     if "\x1b" in text:
                         parsed_ansi_text = Text.from_ansi(text)
                         yield TextContent(Content.from_rich_text(parsed_ansi_text))

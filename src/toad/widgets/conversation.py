@@ -656,7 +656,7 @@ class Conversation(containers.Vertical):
         if self._agent_response is None:
             if fragment.strip():
                 self._agent_response = agent_response = AgentResponse(fragment)
-                await self.post(agent_response)
+                await self.post(agent_response, new_block=False)
         else:
             await self._agent_response.append_fragment(fragment)
         return self._agent_response
@@ -668,7 +668,7 @@ class Conversation(containers.Vertical):
         if self._agent_thought is None:
             if thought_fragment.strip():
                 self._agent_thought = AgentThought(thought_fragment)
-                await self.post(self._agent_thought)
+                await self.post(self._agent_thought, new_block=False)
         else:
             await self._agent_thought.append_fragment(thought_fragment)
         return self._agent_thought
@@ -999,9 +999,10 @@ class Conversation(containers.Vertical):
                 tool_id, ToolCall
             )
         except NoMatches:
-            await self.post(ToolCall(tool_call, id=message.tool_id))
+            await self.post(ToolCall(tool_call, id=message.tool_id), new_block=True)
         else:
-            existing_tool_call.tool_call = tool_call
+            if existing_tool_call is not None:
+                await existing_tool_call.update_tool_call(tool_call)
 
     @on(acp_messages.AvailableCommandsUpdate)
     async def on_acp_available_commands_update(
@@ -1477,8 +1478,18 @@ class Conversation(containers.Vertical):
                 break
             widget = parent
 
+    def new_block(self) -> None:
+        """Start a new block for agent response."""
+        self._agent_thought = None
+        self._agent_response = None
+
     async def post[WidgetType: Widget](
-        self, widget: WidgetType, *, anchor: bool = True, loading: bool = False
+        self,
+        widget: WidgetType,
+        *,
+        anchor: bool = True,
+        loading: bool = False,
+        new_block: bool = True,
     ) -> WidgetType:
         """Post a widget to the converstaion.
 
@@ -1486,12 +1497,15 @@ class Conversation(containers.Vertical):
             widget: Widget to post.
             anchor: Anchor to bottom of view?
             loading: Set the widget to an initial loading state?
+            new_block: Start a new block?
 
         Returns:
             The widget that was mounted.
         """
         if self._loading is not None:
             await self._loading.remove()
+        if new_block and not loading:
+            self.new_block()
         if not self.contents.is_attached:
             return widget
         await self.contents.mount(widget)
