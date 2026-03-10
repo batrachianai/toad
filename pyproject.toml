@@ -1,11 +1,11 @@
 [project]
 name = "batrachian-toad"
-version = "0.6.8"
+version = "0.6.9"
 description = "A unified experience for AI in your terminal."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "textual[syntax]>=8.0.1",
+    "textual[syntax]>=8.1.1",
     "click>=8.2.1",
     "gitpython>=3.1.44",
     "tree-sitter>=0.24.0",
@@ -34,7 +34,7 @@ members = [
 
 [tool.uv.sources]
 #textual-serve = { path = "../textual-serve", editable = true }
-# textual = { path = "../textual", editable = true }
+#textual = { path = "../textual", editable = true }
 #textual-dev = { path = "../textual-dev", editable = true }
 #rich = { path = "../rich", editable = true }
 
