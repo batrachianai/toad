@@ -308,6 +308,8 @@ class ToadApp(App, inherit_bindings=False):
 
         super().__init__()
         self.project_dir = Path(project_dir or "./").expanduser().resolve()
+        self.start_time = monotonic()
+        """Time app was started."""
 
     @property
     def config_path(self) -> Path:

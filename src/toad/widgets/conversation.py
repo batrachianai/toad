@@ -1755,6 +1755,7 @@ class Conversation(containers.Vertical):
             MenuItem("Open as S[u]V[/]G", "export_to_svg", "v"),
         ]
 
+        print(repr(block))
         if block.allow_maximize:
             menu_options.append(MenuItem("[u]M[/u]aximize", "maximize_block", "m"))
 
@@ -1927,14 +1928,20 @@ class Conversation(containers.Vertical):
                 )
                 return True
         elif command == "toad:testimonial":
-            testimonial = (
-                parameters
-                or "Try Toad, the Universal interface for AI in your terminal"
-            )
+            if self.agent_title is not None:
+                default_testimonial = (
+                    f"I'm running {self.agent_title} in the terminal with Toad."
+                )
+            else:
+                default_testimonial = (
+                    "Try Toad, the universal interface for AI in your terminal"
+                )
+
+            testimonial = parameters or default_testimonial
             from toad.twitter import open_tweet_intent
 
             open_tweet_intent(
-                f"{testimonial}\n",
+                testimonial,
                 url="https://github.com/textualize/toad",
                 via="willmcgugan",
                 hashtags=["ai"],

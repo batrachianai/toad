@@ -3,6 +3,8 @@ from textual.widget import Widget
 from textual.widgets import Markdown
 from textual.widgets.markdown import MarkdownStream
 
+from toad.conversation_markdown import ConversationMarkdown
+
 
 SYSTEM = """\
 If asked to output code add inline documentation in the google style format, and always use type hinting where appropriate.
@@ -11,7 +13,7 @@ When asked for a table do not wrap it in a code fence.
 """
 
 
-class AgentResponse(Markdown):
+class AgentResponse(ConversationMarkdown):
     DEFAULT_CLASSES = "block"
     block_cursor_offset = var(-1)
 
