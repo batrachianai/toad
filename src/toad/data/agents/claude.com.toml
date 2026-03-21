@@ -15,7 +15,7 @@ description = "Unleash Claude’s raw power directly in your terminal."
 tags = []
 run_command."*" = "claude-code-acp"
 
-help = '''
+help = ‘’’
 # Claude Code
 
 Built for developers
@@ -26,10 +26,29 @@ Your tools.
 Your workflow.
 Your codebase, evolving at thought speed.
 
---- 
+## Panel Commands
+
+Claude Code can control Toad’s side panels via the `/panel` slash command:
+
+- `/panel <panel_id>` — open a panel (e.g. `/panel github`)
+- `/panel <panel_id> close` — close a panel
+- `/panel list` — list available panels
+
+When the user asks to see project state, issues, or PRs, use `/panel github` to open the GitHub panel. Use `/panel github close` when they ask to hide or close it.
+
+---
 [ACP adapter for Claude Code](https://github.com/zed-industries/claude-code-acp) by Zed Industries.
 
-'''
+‘’’
+
+welcome = ‘’’
+You are running inside Toad, a terminal UI with side panels. You can control panels with the `/panel` command:
+- `/panel github` — open the GitHub panel (issues, PRs, project state)
+- `/panel github close` — close it
+- `/panel list` — list available panels
+
+When the user asks about project state or wants to see issues/PRs, open the GitHub panel with `/panel github`.
+‘’’
 
 
 [actions."*".install]

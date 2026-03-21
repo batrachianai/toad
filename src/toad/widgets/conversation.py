@@ -3,6 +3,7 @@ from __future__ import annotations
 from asyncio import Future
 import asyncio
 
+import re
 from contextlib import suppress
 from functools import partial
 from itertools import filterfalse
@@ -932,11 +933,42 @@ class Conversation(containers.Vertical):
     async def on_update_status_line(self, message: acp_messages.UpdateStatusLine):
         self.status = message.status_line
 
+    _PANEL_COMMAND_RE = re.compile(
+        r"^/panel\s+(\S+)(?:\s+(close))?\s*$", re.MULTILINE
+    )
+
+    def _intercept_panel_commands(self, text: str) -> str:
+        """Scan agent response text for /panel commands.
+
+        Emits OpenPanel/ClosePanel messages and strips the matched
+        lines so they are not displayed to the user.
+        """
+
+        def _emit_panel(match: re.Match[str]) -> str:
+            panel_id = match.group(1)
+            if panel_id == "list":
+                self.flash(
+                    "Available panels: github", style="default"
+                )
+            elif match.group(2) == "close":
+                self.post_message(
+                    acp_messages.ClosePanel(panel_id)
+                )
+            else:
+                self.post_message(
+                    acp_messages.OpenPanel(panel_id)
+                )
+            return ""
+
+        return self._PANEL_COMMAND_RE.sub(_emit_panel, text)
+
     @on(acp_messages.Update)
     async def on_acp_agent_message(self, message: acp_messages.Update):
         message.stop()
         self._agent_thought = None
-        await self.post_agent_response(message.text)
+        filtered_text = self._intercept_panel_commands(message.text)
+        if filtered_text.strip():
+            await self.post_agent_response(filtered_text)
 
     @on(acp_messages.UserMessage)
     async def on_acp_user_message(self, message: acp_messages.UserMessage):
@@ -1347,6 +1379,11 @@ class Conversation(containers.Vertical):
                 "/toad:testimonial",
                 "Tweet a testimonial regarding Toad",
                 "<what you think of toad>",
+            ),
+            SlashCommand(
+                "/panel",
+                "Open or close a sidebar panel",
+                "<panel_id> [close]",
             ),
         ]
 
@@ -1946,6 +1983,18 @@ class Conversation(containers.Vertical):
                 via="willmcgugan",
                 hashtags=["ai"],
             )
+            return True
+        elif command == "panel":
+            parts = parameters.strip().split()
+            if not parts or parts[0] == "list":
+                self.flash("Available panels: github", style="default")
+                return True
+            panel_id = parts[0]
+            action = parts[1] if len(parts) > 1 else "open"
+            if action == "close":
+                self.post_message(acp_messages.ClosePanel(panel_id))
+            else:
+                self.post_message(acp_messages.OpenPanel(panel_id))
             return True
 
         return False
