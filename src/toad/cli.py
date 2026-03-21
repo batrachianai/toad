@@ -88,6 +88,14 @@ def main(ctx, version):
 # @click.pass_context
 @main.command("run")
 @click.argument("project_dir", metavar="PATH", required=False, default=".")
+@click.option(
+    "-d",
+    "--project-dir",
+    "project_dir_option",
+    metavar="PATH",
+    default=None,
+    help="Project directory (overrides positional PATH)",
+)
 @click.option("-a", "--agent", metavar="AGENT", default="")
 @click.option(
     "-p",
@@ -117,11 +125,14 @@ def run(
     host: str,
     serve: bool,
     project_dir: str = ".",
+    project_dir_option: str | None = None,
     agent: str = "1",
     public_url: str | None = None,
 ):
     """Run an installed agent (same as `toad PATH`)."""
 
+    if project_dir_option is not None:
+        project_dir = project_dir_option
     check_directory(project_dir)
 
     if agent:

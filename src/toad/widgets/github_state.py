@@ -13,7 +13,7 @@ from textual.widgets import Static, TabbedContent, TabPane
 from toad.widgets.github_views.fetch import (
     RepoInfo,
     check_auth,
-    detect_repo,
+    detect_repo_from_path,
 )
 from toad.widgets.github_views.issues import IssuesView
 from toad.widgets.github_views.plans import PlansView
@@ -47,10 +47,12 @@ class GitHubStateWidget(Widget, can_focus=True):
     def __init__(
         self,
         repo: RepoInfo | None = None,
+        project_path: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._repo = repo
+        self._project_path = project_path
 
     def compose(self) -> ComposeResult:
         with TabbedContent("Timeline", "Issues", "Plans", "PRs"):
@@ -63,7 +65,12 @@ class GitHubStateWidget(Widget, can_focus=True):
         """Detect repo and load initial data."""
         if self._repo is None:
             try:
-                self._repo = await detect_repo()
+                if self._project_path:
+                    self._repo = await detect_repo_from_path(
+                        self._project_path
+                    )
+                else:
+                    self._repo = await detect_repo_from_path(".")
             except Exception as exc:
                 log.warning("Could not detect repo: %s", exc)
                 self._show_error(

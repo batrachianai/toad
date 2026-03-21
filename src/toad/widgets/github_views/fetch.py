@@ -7,6 +7,7 @@ import json
 import logging
 import shutil
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -90,6 +91,82 @@ async def detect_repo() -> RepoInfo:
     nwo: str = data["nameWithOwner"]
     owner, repo = nwo.split("/", 1)
     return RepoInfo(owner=owner, repo=repo)
+
+
+def _read_repo_from_dega_core(project_dir: Path) -> RepoInfo | None:
+    """Read github.repo from dega-core.yaml in a project directory."""
+    yaml_path = project_dir / "dega-core.yaml"
+    if not yaml_path.is_file():
+        return None
+    try:
+        import yaml  # noqa: PLC0415
+
+        data = yaml.safe_load(yaml_path.read_text())
+    except Exception:
+        log.debug("failed to parse %s", yaml_path, exc_info=True)
+        return None
+    nwo = (data or {}).get("github", {}).get("repo")
+    if not nwo or "/" not in nwo:
+        return None
+    owner, repo = nwo.split("/", 1)
+    return RepoInfo(owner=owner, repo=repo)
+
+
+async def _detect_repo_from_git(project_dir: Path) -> RepoInfo:
+    """Detect owner/repo from git remote of a specific directory."""
+    if GH_BIN is None:
+        raise GitHubFetchError(
+            "gh CLI not found on PATH. Install from https://cli.github.com/"
+        )
+    proc = await asyncio.create_subprocess_exec(
+        GH_BIN,
+        "repo",
+        "view",
+        "--json",
+        "nameWithOwner",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=str(project_dir),
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(), timeout=15
+        )
+    except TimeoutError as exc:
+        proc.kill()
+        await proc.wait()
+        raise GitHubFetchError(
+            f"gh repo view timed out for {project_dir}"
+        ) from exc
+    if proc.returncode != 0:
+        err = stderr.decode(errors="replace").strip()
+        raise GitHubFetchError(
+            f"gh repo view failed in {project_dir}: {err}"
+        )
+    data = json.loads(stdout.decode(errors="replace"))
+    nwo: str = data["nameWithOwner"]
+    owner, repo = nwo.split("/", 1)
+    return RepoInfo(owner=owner, repo=repo)
+
+
+async def detect_repo_from_path(project_dir: str | Path) -> RepoInfo:
+    """Detect owner/repo for a project directory.
+
+    Resolution order:
+    1. dega-core.yaml github.repo in the project directory
+    2. git remote of the project directory (via gh repo view)
+    """
+    path = Path(project_dir).resolve()
+    if not path.is_dir():
+        raise GitHubFetchError(f"project directory not found: {path}")
+
+    repo_info = _read_repo_from_dega_core(path)
+    if repo_info is not None:
+        log.info("repo from dega-core.yaml: %s", repo_info.nwo)
+        return repo_info
+
+    log.info("no dega-core.yaml github.repo, falling back to git remote")
+    return await _detect_repo_from_git(path)
 
 
 async def fetch_issues(

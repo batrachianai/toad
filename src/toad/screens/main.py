@@ -150,10 +150,6 @@ class MainScreen(Screen, can_focus=False):
                     ),
                     flex=True,
                 ),
-                SideBar.Panel(
-                    "GitHub",
-                    GitHubStateWidget(id="github_state"),
-                ),
             )
             yield Conversation(
                 self.project_path,
@@ -267,15 +263,32 @@ class MainScreen(Screen, can_focus=False):
         self.side_bar.query_one("Collapsible CollapsibleTitle").focus()
 
     def action_toggle_github(self) -> None:
-        """Toggle the GitHub panel open/closed and focus it."""
+        """Toggle the GitHub panel open/closed and focus it.
+
+        On first toggle, dynamically mounts the panel into the sidebar
+        with the current project_path so it resolves the correct repo.
+        """
         collapsibles = self.side_bar.query(SideBarCollapsible)
         for collapsible in collapsibles:
             if collapsible.title == "GitHub":
                 collapsible.collapsed = not collapsible.collapsed
                 if not collapsible.collapsed:
-                    github_widget = self.query_one("#github_state", GitHubStateWidget)
+                    github_widget = self.query_one(
+                        "#github_state", GitHubStateWidget
+                    )
                     github_widget.focus()
-                break
+                return
+
+        collapsible = SideBarCollapsible(
+            GitHubStateWidget(
+                project_path=str(self.project_path),
+                id="github_state",
+            ),
+            title="GitHub",
+            collapsed=False,
+            classes="-fixed",
+        )
+        self.side_bar.mount(collapsible)
 
     def action_focus_prompt(self) -> None:
         self.conversation.focus_prompt()
