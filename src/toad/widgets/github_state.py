@@ -1,4 +1,4 @@
-"""GitHubStateWidget — TabbedContent wrapping 4 GitHub data views."""
+"""GitHubStateWidget — PM dashboard: status overview, timeline, detail tabs."""
 
 from __future__ import annotations
 
@@ -7,8 +7,9 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.containers import VerticalScroll
 from textual.widget import Widget
-from textual.widgets import Static, TabbedContent, TabPane
+from textual.widgets import Collapsible, Static, TabbedContent, TabPane
 
 from toad.widgets.github_views.fetch import (
     RepoInfo,
@@ -18,13 +19,14 @@ from toad.widgets.github_views.fetch import (
 from toad.widgets.github_views.issues import IssuesView
 from toad.widgets.github_views.plans import PlansView
 from toad.widgets.github_views.prs import PRsView
+from toad.widgets.github_views.status_overview import StatusOverview
 from toad.widgets.github_views.timeline import TimelineView
 
 log = logging.getLogger(__name__)
 
 
 class GitHubStateWidget(Widget, can_focus=True):
-    """GitHub project state panel with Timeline, Issues, Plans, and PRs tabs."""
+    """GitHub project state — PM dashboard layout."""
 
     BINDINGS = [
         Binding("r", "refresh", "Refresh", show=True),
@@ -34,13 +36,26 @@ class GitHubStateWidget(Widget, can_focus=True):
     GitHubStateWidget {
         height: 1fr;
     }
-    GitHubStateWidget TabbedContent {
+    GitHubStateWidget VerticalScroll {
         height: 1fr;
     }
     GitHubStateWidget .gh-error {
         color: $error;
         text-style: italic;
         padding: 1;
+    }
+    GitHubStateWidget .section-label {
+        color: $text-muted;
+        text-style: bold;
+        padding: 1 1 0 1;
+    }
+    GitHubStateWidget Collapsible {
+        padding: 0 1;
+    }
+    GitHubStateWidget TabbedContent {
+        height: auto;
+        min-height: 10;
+        max-height: 30;
     }
     """
 
@@ -55,22 +70,25 @@ class GitHubStateWidget(Widget, can_focus=True):
         self._project_path = project_path
 
     def compose(self) -> ComposeResult:
-        with TabbedContent("Timeline", "Issues", "Plans", "PRs"):
-            yield TabPane("Timeline", TimelineView(id="gh-timeline"))
-            yield TabPane("Issues", IssuesView(id="gh-issues"))
-            yield TabPane("Plans", PlansView(id="gh-plans"))
-            yield TabPane("PRs", PRsView(id="gh-prs"))
+        with VerticalScroll():
+            yield StatusOverview(id="gh-status-overview")
+            yield TimelineView(id="gh-timeline")
+            with Collapsible(title="Detail Tables", collapsed=True):
+                with TabbedContent("Issues", "Plans", "PRs"):
+                    yield TabPane(
+                        "Issues", IssuesView(id="gh-issues")
+                    )
+                    yield TabPane(
+                        "Plans", PlansView(id="gh-plans")
+                    )
+                    yield TabPane("PRs", PRsView(id="gh-prs"))
 
     async def on_mount(self) -> None:
         """Detect repo and load initial data."""
         if self._repo is None:
             try:
-                if self._project_path:
-                    self._repo = await detect_repo_from_path(
-                        self._project_path
-                    )
-                else:
-                    self._repo = await detect_repo_from_path(".")
+                path = self._project_path or "."
+                self._repo = await detect_repo_from_path(path)
             except Exception as exc:
                 log.warning("Could not detect repo: %s", exc)
                 self._show_error(
@@ -87,21 +105,21 @@ class GitHubStateWidget(Widget, can_focus=True):
         await self._load_all()
 
     async def _load_all(self) -> None:
-        """Load data into all 4 views."""
+        """Load data into all views."""
         if self._repo is None:
             return
 
+        overview = self.query_one("#gh-status-overview", StatusOverview)
         timeline = self.query_one("#gh-timeline", TimelineView)
         plans = self.query_one("#gh-plans", PlansView)
         prs = self.query_one("#gh-prs", PRsView)
+        issues = self.query_one("#gh-issues", IssuesView)
 
+        await overview.load(self._repo)
         await timeline.load(self._repo)
         await plans.load(self._repo)
         await prs.load(self._repo)
 
-        # IssuesView fetches on mount via its own on_mount handler,
-        # but we need to set the repo first
-        issues = self.query_one("#gh-issues", IssuesView)
         issues._repo = self._repo
         await issues.fetch_and_render()
 
@@ -115,7 +133,7 @@ class GitHubStateWidget(Widget, can_focus=True):
         await self._load_all()
 
     def _show_error(self, message: str) -> None:
-        """Display an error message, hiding the tabbed content."""
-        tabbed = self.query_one(TabbedContent)
-        tabbed.display = False
+        """Display an error message, hiding the main content."""
+        scroll = self.query_one(VerticalScroll)
+        scroll.display = False
         self.mount(Static(message, classes="gh-error"))

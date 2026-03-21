@@ -1,4 +1,4 @@
-"""Timeline DataTable — recent repository events from GitHub."""
+"""Timeline — chronological plan lifecycle events with colored badges."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.widgets import DataTable, Static
 
@@ -13,32 +14,41 @@ from toad.widgets.github_views.fetch import (
     GitHubAuthError,
     GitHubFetchError,
     RepoInfo,
-    fetch_events,
+    fetch_all_plan_issues,
 )
 
 log = logging.getLogger(__name__)
 
-EVENT_LABELS: dict[str, str] = {
-    "PushEvent": "Push",
-    "PullRequestEvent": "PR",
-    "IssuesEvent": "Issue",
-    "IssueCommentEvent": "Comment",
-    "CreateEvent": "Create",
-    "DeleteEvent": "Delete",
-    "WatchEvent": "Star",
-    "ForkEvent": "Fork",
-    "ReleaseEvent": "Release",
-    "PullRequestReviewEvent": "Review",
-    "PullRequestReviewCommentEvent": "Review comment",
+LABEL_COLORS: dict[str, str] = {
+    "plan:draft": "bright_black",
+    "plan:active": "green",
+    "plan:pr-review": "dodger_blue",
+    "plan:completed": "medium_purple",
+    "plan:failed": "red",
 }
+
+
+def _plan_label(issue: dict[str, Any]) -> str | None:
+    """Extract the first plan:* label name from an issue."""
+    for lbl in issue.get("labels", []):
+        name = lbl.get("name", "")
+        if name.startswith("plan:"):
+            return name
+    return None
+
+
+def _label_badge(label: str) -> Text:
+    """Build a Rich Text badge with the label's color."""
+    color = LABEL_COLORS.get(label, "white")
+    return Text(label, style=color)
 
 
 def _relative_time(iso_ts: str) -> str:
     """Convert an ISO 8601 timestamp to a human-friendly relative string."""
     try:
         dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
-    except ValueError, AttributeError:
-        return iso_ts[:16] if iso_ts else "?"
+    except (ValueError, AttributeError):
+        return iso_ts[:10] if iso_ts else "?"
     delta = datetime.now(tz=timezone.utc) - dt
     seconds = int(delta.total_seconds())
     if seconds < 60:
@@ -53,48 +63,8 @@ def _relative_time(iso_ts: str) -> str:
     return f"{days}d ago"
 
 
-def _summarize_event(event: dict[str, Any]) -> str:
-    """Build a one-line summary from a GitHub event payload."""
-    etype = event.get("type", "")
-    payload = event.get("payload", {})
-    action = payload.get("action", "")
-
-    if etype == "PushEvent":
-        count = payload.get("size", 0)
-        ref = event.get("payload", {}).get("ref", "")
-        branch = ref.rsplit("/", 1)[-1] if ref else "?"
-        noun = "commit" if count == 1 else "commits"
-        return f"{count} {noun} to {branch}"
-
-    if etype in ("PullRequestEvent", "IssuesEvent"):
-        item = payload.get("pull_request") or payload.get("issue") or {}
-        title = item.get("title", "")
-        number = item.get("number", "")
-        prefix = f"#{number} " if number else ""
-        return f"{action} {prefix}{title}"
-
-    if etype == "IssueCommentEvent":
-        issue = payload.get("issue", {})
-        number = issue.get("number", "")
-        return f"commented on #{number}"
-
-    if etype == "CreateEvent":
-        ref_type = payload.get("ref_type", "")
-        ref = payload.get("ref", "")
-        return f"created {ref_type} {ref}" if ref else f"created {ref_type}"
-
-    if etype == "DeleteEvent":
-        ref_type = payload.get("ref_type", "")
-        ref = payload.get("ref", "")
-        return f"deleted {ref_type} {ref}" if ref else f"deleted {ref_type}"
-
-    if action:
-        return action
-    return etype
-
-
 class TimelineView(Static):
-    """DataTable showing recent repository events."""
+    """Chronological list of plan lifecycle events with colored badges."""
 
     DEFAULT_CSS = """
     TimelineView {
@@ -107,6 +77,11 @@ class TimelineView(Static):
     }
     TimelineView .error-label {
         color: $error;
+        padding: 1;
+    }
+    TimelineView .empty-label {
+        color: $text-muted;
+        text-style: italic;
         padding: 1;
     }
     """
@@ -123,11 +98,11 @@ class TimelineView(Static):
         table = DataTable(id="timeline-table")
         table.cursor_type = "row"
         table.zebra_stripes = True
-        table.add_columns("When", "Who", "Event", "Details")
+        table.add_columns("Updated", "#", "Title", "Status")
         yield table
 
     async def load(self, repo: RepoInfo | None = None) -> None:
-        """Fetch events and populate the table."""
+        """Fetch plan issues and populate the timeline."""
         if repo is not None:
             self._repo = repo
         if self._repo is None:
@@ -137,23 +112,41 @@ class TimelineView(Static):
         table.clear()
 
         try:
-            events = await fetch_events(self._repo)
+            issues = await fetch_all_plan_issues(self._repo)
         except GitHubAuthError:
             table.display = False
             await self.mount(
-                Static("Not authenticated — run: gh auth login", classes="error-label")
+                Static(
+                    "Not authenticated -- run: gh auth login",
+                    classes="error-label",
+                )
             )
             return
         except GitHubFetchError as exc:
             log.warning("timeline fetch failed: %s", exc)
             table.display = False
-            await self.mount(Static(f"Fetch error: {exc}", classes="error-label"))
+            await self.mount(
+                Static(f"Fetch error: {exc}", classes="error-label")
+            )
             return
 
-        for event in events:
-            actor = event.get("actor", {}).get("login", "?")
-            etype = event.get("type", "")
-            label = EVENT_LABELS.get(etype, etype)
-            when = _relative_time(event.get("created_at", ""))
-            summary = _summarize_event(event)
-            table.add_row(when, actor, label, summary)
+        if not issues:
+            table.display = False
+            await self.mount(
+                Static("No plan issues found", classes="empty-label")
+            )
+            return
+
+        # Sort by updatedAt descending (most recent first)
+        issues.sort(
+            key=lambda i: i.get("updatedAt", ""),
+            reverse=True,
+        )
+
+        for issue in issues:
+            label = _plan_label(issue)
+            badge = _label_badge(label) if label else Text("--")
+            when = _relative_time(issue.get("updatedAt", ""))
+            number = f"#{issue.get('number', '')}"
+            title = issue.get("title", "")
+            table.add_row(when, number, title, badge)

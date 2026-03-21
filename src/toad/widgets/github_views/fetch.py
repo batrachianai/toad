@@ -257,3 +257,60 @@ async def fetch_plan_issues(
     )
     result: list[dict[str, Any]] = json.loads(raw)
     return result
+
+
+PLAN_LABELS: list[str] = [
+    "plan:draft",
+    "plan:active",
+    "plan:pr-review",
+    "plan:completed",
+    "plan:failed",
+]
+
+
+async def fetch_all_plan_issues(
+    repo: RepoInfo,
+    *,
+    limit_per_label: int = 50,
+) -> list[dict[str, Any]]:
+    """Fetch issues across all plan:* labels for status counts.
+
+    Runs one query per label in parallel, deduplicates by issue number,
+    and returns the merged list with body included for progress parsing.
+    """
+
+    async def _fetch_label(label: str) -> list[dict[str, Any]]:
+        raw = await _run_gh(
+            "issue",
+            "list",
+            "--repo",
+            repo.nwo,
+            "--label",
+            label,
+            "--state",
+            "all",
+            "--json",
+            f"{ISSUE_FIELDS},body",
+            "--limit",
+            str(limit_per_label),
+        )
+        return json.loads(raw)
+
+    results = await asyncio.gather(
+        *[_fetch_label(label) for label in PLAN_LABELS],
+        return_exceptions=True,
+    )
+
+    seen: set[int] = set()
+    merged: list[dict[str, Any]] = []
+    for result in results:
+        if isinstance(result, Exception):
+            log.warning("failed to fetch plan label: %s", result)
+            continue
+        for issue in result:
+            num = issue["number"]
+            if num not in seen:
+                seen.add(num)
+                merged.append(issue)
+
+    return merged
