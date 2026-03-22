@@ -665,6 +665,14 @@ class ToadApp(App, inherit_bindings=False):
         self.set_process_title()
         self.update_show_sessions()
 
+        from toad.socket_controller import start_socket_server
+        self._socket_server = await start_socket_server(self)
+
+    async def on_unmount(self) -> None:
+        if hasattr(self, "_socket_server") and self._socket_server:
+            from toad.socket_controller import stop_socket_server
+            await stop_socket_server(self._socket_server)
+
     @work(thread=True, exit_on_error=False)
     def set_process_title(self) -> None:
         try:
