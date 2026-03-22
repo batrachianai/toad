@@ -71,10 +71,18 @@ class GitHubStateWidget(Widget, can_focus=True):
         self._repo = repo
         self._project_path = project_path
 
+    def _gantt_path(self) -> Path | None:
+        """Resolve timeline.json from the project directory."""
+        project_dir = Path(self._project_path or ".")
+        path = project_dir / "timeline.json"
+        return path if path.exists() else None
+
     def compose(self) -> ComposeResult:
+        gantt_path = self._gantt_path()
         with VerticalScroll():
             yield StatusOverview(id="gh-status-overview")
-            yield GanttTimeline(id="gh-gantt")
+            if gantt_path:
+                yield GanttTimeline(data_path=gantt_path, id="gh-gantt")
             yield Static("Plans", classes="section-title")
             yield PlansView(id="gh-plans")
             yield Static("Pull Requests", classes="section-title")
@@ -112,13 +120,15 @@ class GitHubStateWidget(Widget, can_focus=True):
         timeline = self.query_one("#gh-timeline", TimelineView)
         plans = self.query_one("#gh-plans", PlansView)
         prs = self.query_one("#gh-prs", PRsView)
-        gantt = self.query_one("#gh-gantt", GanttTimeline)
 
-        # Load Gantt from timeline.json in project dir
-        project_dir = Path(self._project_path or ".")
-        timeline_file = project_dir / "timeline.json"
-        if timeline_file.exists():
-            gantt.reload_from_file(timeline_file)
+        # Reload Gantt on refresh if present
+        try:
+            gantt = self.query_one("#gh-gantt", GanttTimeline)
+            gantt_path = self._gantt_path()
+            if gantt_path:
+                gantt.reload_from_file(gantt_path)
+        except Exception:
+            pass
 
         await overview.load(self._repo)
         await plans.load(self._repo)

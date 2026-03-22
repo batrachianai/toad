@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from rich.text import Text
-from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widgets import Static
 
@@ -229,15 +228,11 @@ class GanttTimeline(Static):
 
     DEFAULT_CSS = """
     GanttTimeline {
-        height: auto;
         padding: 0 1;
-        overflow-x: auto;
     }
     """
 
-    timeline_data: reactive[dict[str, Any] | None] = reactive(
-        None, recompose=True
-    )
+    timeline_data: reactive[dict[str, Any] | None] = reactive(None)
 
     def __init__(
         self,
@@ -247,9 +242,16 @@ class GanttTimeline(Static):
     ) -> None:
         super().__init__(**kwargs)
         if data is not None:
-            self.timeline_data = data
+            self._initial_data = data
         elif data_path is not None:
-            self.timeline_data = self._load_file(Path(data_path))
+            self._initial_data = self._load_file(Path(data_path))
+        else:
+            self._initial_data = None
+
+    def on_mount(self) -> None:
+        """Set data after mount so size is available."""
+        if self._initial_data is not None:
+            self.timeline_data = self._initial_data
 
     @staticmethod
     def _load_file(path: Path) -> dict[str, Any] | None:
@@ -260,15 +262,23 @@ class GanttTimeline(Static):
             log.warning("Failed to load timeline data from %s: %s", path, exc)
             return None
 
-    def compose(self) -> ComposeResult:
+    def watch_timeline_data(self) -> None:
+        """Re-render when data changes."""
+        self._render_chart()
+
+    def on_resize(self) -> None:
+        """Re-render on terminal resize."""
+        if self.timeline_data:
+            self._render_chart()
+
+    def _render_chart(self) -> None:
+        """Render the Gantt chart into this widget."""
         if not self.timeline_data:
-            yield Static("No timeline data", classes="empty-label")
+            self.update("No timeline data")
             return
-        # Use available width minus padding
-        track_width = max(40, (self.size.width or 80) - LABEL_WIDTH - 4)
+        track_width = max(40, self.size.width - LABEL_WIDTH - 4)
         lines = render_gantt(self.timeline_data, track_width)
-        content = Text("\n").join(lines)
-        yield Static(content)
+        self.update(Text("\n").join(lines))
 
     def reload_from_file(self, path: str | Path) -> None:
         """Reload timeline data from a JSON file."""
@@ -276,7 +286,7 @@ class GanttTimeline(Static):
 
 
 if __name__ == "__main__":
-    from textual.app import App
+    from textual.app import App, ComposeResult
 
     DEMO_PATH = Path(__file__).resolve().parents[4] / "timeline.json"
     # Fallback to the canon-docs reference data
