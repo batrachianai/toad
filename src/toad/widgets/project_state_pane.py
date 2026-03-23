@@ -15,9 +15,9 @@ from toad.widgets.gantt_timeline import GanttTimeline
 
 log = logging.getLogger(__name__)
 
-GIST_RAW_URL = (
-    "https://gist.githubusercontent.com/CerratoA"
-    "/a11220a561b98d07b4538049c3b13770/raw/timeline.json"
+TIMELINE_RAW_URL = (
+    "https://raw.githubusercontent.com/DEGAorg"
+    "/claude-code-config/develop/data/timeline.json"
 )
 
 
@@ -62,7 +62,7 @@ class ProjectStatePane(VerticalScroll):
         try:
             import httpx
 
-            resp = httpx.get(GIST_RAW_URL, timeout=5, follow_redirects=True)
+            resp = httpx.get(TIMELINE_RAW_URL, timeout=5, follow_redirects=True)
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
