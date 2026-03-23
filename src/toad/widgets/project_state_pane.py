@@ -9,6 +9,7 @@ from pathlib import Path
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
+from textual.timer import Timer
 from textual.widgets import Static
 
 from toad.widgets.gantt_timeline import GanttTimeline
@@ -33,9 +34,12 @@ class ProjectStatePane(VerticalScroll):
     }
     """
 
+    REFRESH_INTERVAL = 30
+
     def __init__(self, project_path: Path | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._project_path = project_path or Path(".").resolve()
+        self._refresh_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
         yield Static("Project State", id="project-state-title")
@@ -43,6 +47,18 @@ class ProjectStatePane(VerticalScroll):
 
     def on_mount(self) -> None:
         self._fetch_timeline()
+
+    def watch_display(self, visible: bool) -> None:
+        """Start/stop auto-refresh timer based on visibility."""
+        if visible:
+            if self._refresh_timer is None:
+                self._refresh_timer = self.set_interval(
+                    self.REFRESH_INTERVAL, self._fetch_timeline
+                )
+        else:
+            if self._refresh_timer is not None:
+                self._refresh_timer.stop()
+                self._refresh_timer = None
 
     @work(thread=True, exit_on_error=False)
     def _fetch_timeline(self) -> None:

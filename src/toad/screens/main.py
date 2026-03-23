@@ -279,9 +279,11 @@ class MainScreen(Screen, can_focus=False):
         pane.refresh_timeline()
 
     def watch_split_enabled(self, enabled: bool) -> None:
-        """Show/hide the project state pane."""
+        """Show/hide the project state pane, refresh on open."""
         pane = self.query_one("#project_state_pane", ProjectStatePane)
         pane.display = enabled
+        if enabled:
+            pane.refresh_timeline()
 
     @on(acp_messages.OpenPanel)
     def on_acp_open_panel(self, message: acp_messages.OpenPanel) -> None:
