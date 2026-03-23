@@ -273,6 +273,11 @@ class MainScreen(Screen, can_focus=False):
         """Toggle the right-side project state pane."""
         self.split_enabled = not self.split_enabled
 
+    def action_refresh_timeline(self) -> None:
+        """Re-fetch timeline data from gist."""
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        pane.refresh_timeline()
+
     def watch_split_enabled(self, enabled: bool) -> None:
         """Show/hide the project state pane."""
         pane = self.query_one("#project_state_pane", ProjectStatePane)

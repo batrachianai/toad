@@ -1,0 +1,216 @@
+{
+  "meta": {
+    "title": "Canon Hackathon Dashboard",
+    "subtitle": "Internal planning view",
+    "generated": "2026-03-19",
+    "startDate": "2026-03-19",
+    "hackathonDate": "2026-04-18",
+    "finaleDate": "2026-05-11",
+    "totalDays": 54
+  },
+  "stats": [
+    { "value": "30", "label": "Days to hackathon", "color": "yellow" },
+    { "value": "17", "label": "Build days (parallel)", "color": "accent" },
+    { "value": "78", "label": "Plans shipped (core)", "color": "green" },
+    { "value": "$3K", "label": "Confirmed budget", "color": "cyan" },
+    { "value": "500+", "label": "Registration target", "color": "text" }
+  ],
+  "components": [
+    {
+      "name": "pmxt POC",
+      "days": 0.5,
+      "risk": "medium",
+      "tags": ["gate"],
+      "startDay": 0,
+      "description": "Test pmxt against Polymarket: fetchMarkets, fetchPositions, fetchBalance, createOrder, fetchOHLCV. Must pass before MCP Server starts. Fallback: direct Polymarket CLOB API.",
+      "status": "pending"
+    },
+    {
+      "name": "RPA Outreach Tool",
+      "days": 2,
+      "risk": "low-med",
+      "tags": ["orch"],
+      "startDay": 0,
+      "description": "Playwright script: scrape DoraHacks profiles, store JSON/SQLite, semi-manual DM sending. Rate limiting + tracking. Primary registration driver.",
+      "status": "pending"
+    },
+    {
+      "name": "TOAD TUI + Conductor",
+      "days": 3,
+      "risk": "medium",
+      "tags": [],
+      "startDay": 2,
+      "description": "Build the Conductor agent interface using TOAD TUI. Main Claude pane + dynamic worker panes. Wraps existing orchestrator. The tool Alberto uses to build everything after it.",
+      "status": "active"
+    },
+    {
+      "name": "MCP Server",
+      "days": 6,
+      "risk": "low-med",
+      "tags": [],
+      "startDay": 5,
+      "description": "8 tools: canon_init (wraps existing), canon_register (needs Arena), canon_market (pmxt), canon_position (pmxt), canon_test (pmxt), canon_ralph (wraps existing), canon_activity (new), canon_help (partial). New repo.",
+      "status": "pending"
+    },
+    {
+      "name": "Arena MVP",
+      "days": 7,
+      "risk": "medium",
+      "tags": [],
+      "startDay": 11,
+      "description": "Next.js + Vercel. Leaderboard (rank by P&L, ROI, win rate), strategy registration, portfolio tracking. Reads Polymarket on-chain data (public, no API key). Vercel cron polls wallets every 5-15 min. The hackathon product.",
+      "status": "pending"
+    },
+    {
+      "name": "Template Research",
+      "days": 4,
+      "risk": "low",
+      "tags": [],
+      "startDay": 0,
+      "description": "Sampson defines strategy logic, parameters, and market approach for 6 templates: arbitrage-scanner, news-sentiment, odds-monitor, simple-strategy, bracket-builder, contrarian-fade.",
+      "status": "pending",
+      "owner": "Sampson"
+    },
+    {
+      "name": "Template Code",
+      "days": 4,
+      "risk": "low",
+      "tags": ["orch"],
+      "startDay": 8,
+      "description": "Implement Sampson's strategy definitions as scaffoldable TS/Python projects. Orchestrator builds, Alberto oversees. Depends on strategy definitions + MCP tools being stable.",
+      "status": "pending"
+    },
+    {
+      "name": "Core Infrastructure",
+      "days": 0,
+      "risk": "none",
+      "tags": ["done"],
+      "startDay": 0,
+      "description": "Ralph Loop, Orchestrator, Planner Loop, Agent Framework (6 personas, 8 skills), 10 hooks, 8 commands, domain layering. 78 plans shipped.",
+      "status": "done"
+    }
+  ],
+  "ganttBars": [
+    { "label": "pmxt POC", "startDay": 0, "days": 1, "color": "orange", "text": "POC", "status": "pending" },
+    { "label": "RPA Tool (orch)", "startDay": 0, "days": 2, "color": "cyan", "text": "Playwright", "status": "pending" },
+    { "label": "Conductor + TUI", "startDay": 2, "days": 3, "color": "accent", "text": "TOAD + Conductor (3 days)", "status": "active" },
+    { "label": "MCP Server", "startDay": 5, "days": 6, "color": "accent", "text": "8 tools (6 days)", "status": "pending" },
+    { "label": "Template Research", "startDay": 0, "days": 4, "color": "green", "text": "Sampson — strategy definitions", "status": "pending" },
+    { "label": "Template Code", "startDay": 8, "days": 4, "color": "cyan", "text": "Orch + Alberto — code templates", "status": "pending" },
+    { "label": "Arena MVP", "startDay": 11, "days": 7, "color": "accent", "text": "Leaderboard + Portfolio (7 days)", "status": "pending" },
+    { "label": "Integration Test", "startDay": 18, "days": 3, "color": "accent", "text": "Integration + smoke tests", "status": "pending" },
+    { "label": "Testing Phase", "startDay": 21, "days": 9, "color": "accent", "text": "Heavy testing + bug fixes", "status": "pending" },
+    { "label": "DoraHacks + DMs", "startDay": 6, "days": 24, "color": "green", "text": "Registration window + outreach", "status": "pending" },
+    { "label": "Hackathon", "startDay": 30, "days": 21, "color": "yellow", "text": "3 weeks — NBA Playoffs", "status": "pending" },
+    { "label": "Finale", "startDay": 52, "days": 2, "color": "red", "text": "Livestream", "status": "pending" }
+  ],
+  "gates": [
+    { "day": 6, "label": "Budget", "type": "gate" },
+    { "day": 19, "label": "GO/NO-GO", "type": "gate" },
+    { "day": 29, "label": "Reg close", "type": "event" },
+    { "day": 30, "label": "KICKOFF", "type": "event" },
+    { "day": 51, "label": "Sub close", "type": "event" },
+    { "day": 53, "label": "WINNERS", "type": "event" }
+  ],
+  "criticalPath": [
+    { "name": "pmxt POC", "timing": "Day 1", "type": "gate" },
+    { "name": "Conductor", "timing": "Days 3-5", "type": "build" },
+    { "name": "MCP Server", "timing": "Days 6-11", "type": "build" },
+    { "name": "Arena MVP", "timing": "Days 12-18", "type": "build" },
+    { "name": "Integration", "timing": "Days 19-21", "type": "build" },
+    { "name": "GO/NO-GO", "timing": "Apr 7", "type": "gate" },
+    { "name": "HACKATHON", "timing": "Apr 18", "type": "event" }
+  ],
+  "parallelTrack": [
+    { "name": "RPA Tool", "timing": "Days 1-2", "type": "parallel" },
+    { "name": "Tmpl Research", "timing": "Days 1-4 (Sampson)", "type": "parallel" },
+    { "name": "Tmpl Code", "timing": "Days 9-12 (orch)", "type": "parallel" }
+  ],
+  "weeks": [
+    {
+      "num": 1,
+      "dates": "Mar 19 – 23",
+      "theme": "Foundation + Conductor",
+      "current": true,
+      "tasks": [
+        { "text": "pmxt POC + RPA tool (orch, parallel)", "type": "product" },
+        { "text": "TOAD TUI eval + Conductor build", "type": "product" },
+        { "text": "DoraHacks listing draft", "type": "marketing" },
+        { "text": "Discord setup", "type": "marketing" },
+        { "text": "Carlos meeting (Mar 19)", "type": "planning" },
+        { "text": "pmxt result → MCP approach", "type": "gate" }
+      ]
+    },
+    {
+      "num": 2,
+      "dates": "Mar 24 – 29",
+      "theme": "MCP Server",
+      "current": false,
+      "tasks": [
+        { "text": "MCP Server — build through Conductor", "type": "product" },
+        { "text": "Templates (orch, parallel)", "type": "product" },
+        { "text": "DoraHacks listing LIVE (Mar 25)", "type": "marketing" },
+        { "text": "DM outreach begins", "type": "marketing" },
+        { "text": "Mar 25 — budget locked", "type": "gate" }
+      ]
+    },
+    {
+      "num": 3,
+      "dates": "Mar 30 – Apr 5",
+      "theme": "Arena MVP",
+      "current": false,
+      "tasks": [
+        { "text": "Arena — scaffold, API, leaderboard, Polymarket data", "type": "product" },
+        { "text": "MCP ↔ Arena integration", "type": "product" },
+        { "text": "Arena screenshot → update listing", "type": "marketing" },
+        { "text": "DM outreach at scale", "type": "marketing" }
+      ]
+    },
+    {
+      "num": 4,
+      "dates": "Apr 6 – 12",
+      "theme": "Testing + GO/NO-GO",
+      "current": false,
+      "tasks": [
+        { "text": "Heavy testing — all modules", "type": "product" },
+        { "text": "Bug fixes + edge cases", "type": "product" },
+        { "text": "Apr 7 — GO/NO-GO", "type": "gate" },
+        { "text": "Final registration push", "type": "marketing" },
+        { "text": "\"How to participate\" guide", "type": "marketing" }
+      ]
+    },
+    {
+      "num": 5,
+      "dates": "Apr 13 – 18",
+      "theme": "Final Testing + Launch",
+      "current": false,
+      "tasks": [
+        { "text": "Final testing + fixes", "type": "product" },
+        { "text": "Deploy stable version", "type": "product" },
+        { "text": "Welcome email to registrants", "type": "marketing" },
+        { "text": "Apr 17 — Registration closes", "type": "event" },
+        { "text": "Apr 18 — KICKOFF", "type": "event" }
+      ]
+    },
+    {
+      "num": "6-8",
+      "dates": "Apr 18 – May 11",
+      "theme": "Hackathon Live",
+      "current": false,
+      "tasks": [
+        { "text": "3 workshops (Mon-Wed Week 1)", "type": "event" },
+        { "text": "Week 1 checkpoint (Apr 24)", "type": "event" },
+        { "text": "Week 2 checkpoint (May 1)", "type": "event" },
+        { "text": "Submissions close (May 9)", "type": "event" },
+        { "text": "Judging (May 10)", "type": "event" },
+        { "text": "WINNERS LIVESTREAM (May 11)", "type": "event" }
+      ]
+    }
+  ],
+  "cutList": [
+    { "priority": "MUST SHIP", "level": "p1", "items": "Conductor + Arena leaderboard + canon_register + canon_market + 3 templates" },
+    { "priority": "SHOULD SHIP", "level": "p2", "items": "Remaining MCP tools + 4 more templates + portfolio view" },
+    { "priority": "NICE TO HAVE", "level": "p3", "items": "canon_activity + canon_test + polished DX docs" },
+    { "priority": "CUT FIRST", "level": "p4", "items": "canon_help refinement, 10th template, video walkthroughs" }
+  ]
+}

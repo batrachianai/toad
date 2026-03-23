@@ -30,7 +30,12 @@ TODAY_STYLE = "bold bright_green"
 AXIS_STYLE = "bright_black"
 LABEL_WIDTH = 20
 BAR_CHAR = "\u2588"  # █
+BAR_CHAR_DIM = "\u2591"  # ░
 TODAY_CHAR = "\u2502"  # │
+
+STATUS_DONE = "done"
+STATUS_ACTIVE = "active"
+STATUS_PENDING = "pending"
 
 
 def _resolve_color(name: str) -> str:
@@ -163,13 +168,25 @@ def render_today_row(
     return label_part
 
 
+def _status_indicator(status: str) -> str:
+    """Return a status prefix character."""
+    if status == STATUS_DONE:
+        return "\u2713 "  # ✓
+    if status == STATUS_ACTIVE:
+        return "\u25b6 "  # ▶
+    return "  "
+
+
 def render_bar_row(
     bar: dict[str, Any],
     total_days: int,
     track_width: int,
 ) -> Text:
-    """Render one Gantt bar row: [label] [positioned bar]."""
-    label = bar.get("label", "")[:LABEL_WIDTH - 1].ljust(LABEL_WIDTH)
+    """Render one Gantt bar row: [status] [label] [positioned bar]."""
+    status = bar.get("status", STATUS_PENDING)
+    raw_label = bar.get("label", "")
+    indicator = _status_indicator(status)
+    label = (indicator + raw_label)[:LABEL_WIDTH - 1].ljust(LABEL_WIDTH)
     color = _resolve_color(bar.get("color", "white"))
 
     offset, width = compute_bar_position(
@@ -179,10 +196,22 @@ def render_bar_row(
         track_width,
     )
 
-    # Build track with positioned solid bar
-    line = Text(label, style="bold")
+    if status == STATUS_DONE:
+        label_style = "dim strike green"
+        bar_style = "dim green"
+        char = BAR_CHAR
+    elif status == STATUS_ACTIVE:
+        label_style = "bold bright_white"
+        bar_style = f"bold {color}"
+        char = BAR_CHAR
+    else:
+        label_style = "dim"
+        bar_style = f"dim {color}"
+        char = BAR_CHAR_DIM
+
+    line = Text(label, style=label_style)
     line.append(" " * offset)
-    line.append(BAR_CHAR * width, style=f"bold {color}")
+    line.append(char * width, style=bar_style)
 
     remaining = track_width - offset - width
     if remaining > 0:

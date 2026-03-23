@@ -14,13 +14,14 @@ tools/toad-ctl.sh action "screen.toggle_project_state"
 # Close it (same toggle)
 tools/toad-ctl.sh action "screen.toggle_project_state"
 
-# Or with socat directly
-echo '{"cmd":"action","name":"screen.toggle_project_state"}' | socat - UNIX-CONNECT:/tmp/toad-*.sock
+# Refresh timeline data (re-fetch from gist after updates)
+tools/toad-ctl.sh action "screen.refresh_timeline"
 ```
 
 ## When to use
 
 - User asks to see project state, status, overview, or dashboard → toggle project_state pane
 - User asks to close or hide the panel → toggle it again
+- After updating the timeline gist → refresh_timeline so the pane shows new data
 
 Use your terminal tool to run `toad-ctl.sh`. Do NOT output `/panel` text.
