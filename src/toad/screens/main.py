@@ -312,9 +312,17 @@ class MainScreen(Screen, can_focus=False):
         """Open pane and show Workers tab."""
         self._show_section_tab("section-orchestrator", "tab-workers")
 
+    def action_show_builder(self) -> None:
+        """Open pane and show Builder tab."""
+        self._show_section_tab("section-builder", "tab-builder")
+
+    def action_show_automation(self) -> None:
+        """Open pane and show Automation tab."""
+        self._show_section_tab("section-automations", "tab-automation")
+
     def action_show_automations(self) -> None:
-        """Open pane and show Automations tab."""
-        self._show_section_tab("section-automations", "tab-runs")
+        """Open pane and show Automations tab (legacy alias)."""
+        self._show_section_tab("section-automations", "tab-automation")
 
     def watch_split_enabled(self, enabled: bool) -> None:
         """Show/hide the project state pane."""
@@ -335,7 +343,9 @@ class MainScreen(Screen, can_focus=False):
         "timeline": ("section-github", "tab-timeline"),
         "orchestrator": ("section-orchestrator", "tab-plans"),
         "workers": ("section-orchestrator", "tab-workers"),
-        "automations": ("section-automations", "tab-runs"),
+        "builder": ("section-builder", "tab-builder"),
+        "automation": ("section-automations", "tab-automation"),
+        "automations": ("section-automations", "tab-automation"),
     }
 
     # Map ACP panel IDs to section_id for close
@@ -344,6 +354,8 @@ class MainScreen(Screen, can_focus=False):
         "timeline": "section-github",
         "orchestrator": "section-orchestrator",
         "workers": "section-orchestrator",
+        "builder": "section-builder",
+        "automation": "section-automations",
         "automations": "section-automations",
     }
 
