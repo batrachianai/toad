@@ -14,19 +14,13 @@ from textual.widgets import Static
 
 log = logging.getLogger(__name__)
 
-COLOR_MAP: dict[str, str] = {
-    "accent": "dodger_blue2",
-    "cyan": "cyan",
-    "green": "green",
-    "orange": "dark_orange",
-    "yellow": "yellow",
-    "red": "red",
-    "purple": "medium_purple",
-}
+# Two-tone palette: completed vs pending. Ignore per-bar colors from JSON.
+COMPLETED_STYLE = "green"
+PENDING_STYLE = "bright_black"
 
-GATE_STYLE = "bold bright_red"
-EVENT_STYLE = "bold bright_yellow"
-TODAY_STYLE = "bold bright_green"
+GATE_STYLE = "bold yellow"
+EVENT_STYLE = "bold yellow"
+TODAY_STYLE = "bold green"
 AXIS_STYLE = "bright_black"
 LABEL_WIDTH = 20
 BAR_CHAR = "\u2588"  # █
@@ -38,9 +32,11 @@ STATUS_ACTIVE = "active"
 STATUS_PENDING = "pending"
 
 
-def _resolve_color(name: str) -> str:
-    """Map a JSON color name to a Rich style string."""
-    return COLOR_MAP.get(name, name)
+def _bar_style(status: str) -> str:
+    """Return the bar style based on status — completed or pending."""
+    if status == STATUS_DONE:
+        return COMPLETED_STYLE
+    return PENDING_STYLE
 
 
 def _parse_start_date(meta: dict[str, Any]) -> date | None:
@@ -107,7 +103,7 @@ def render_date_axis(
                     date_track[idx] = ch
 
     date_line = Text(" " * LABEL_WIDTH)
-    date_line.append("".join(date_track), style="bold white")
+    date_line.append("".join(date_track), style=f"bold {AXIS_STYLE}")
 
     # --- Row 2: gate / event markers ---
     gate_track = [" "] * track_width
@@ -187,7 +183,7 @@ def render_bar_row(
     raw_label = bar.get("label", "")
     indicator = _status_indicator(status)
     label = (indicator + raw_label)[:LABEL_WIDTH - 1].ljust(LABEL_WIDTH)
-    color = _resolve_color(bar.get("color", "white"))
+    style = _bar_style(status)
 
     offset, width = compute_bar_position(
         bar.get("startDay", 0),
@@ -196,22 +192,13 @@ def render_bar_row(
         track_width,
     )
 
-    if status == STATUS_DONE:
-        label_style = "dim strike green"
-        bar_style = "dim green"
-        char = BAR_CHAR
-    elif status == STATUS_ACTIVE:
-        label_style = "bold bright_white"
-        bar_style = f"bold {color}"
-        char = BAR_CHAR
-    else:
-        label_style = "dim"
-        bar_style = f"dim {color}"
-        char = BAR_CHAR_DIM
+    completed = status == STATUS_DONE
+    char = BAR_CHAR if completed else BAR_CHAR_DIM
+    label_style = f"dim {style}" if completed else style
 
     line = Text(label, style=label_style)
     line.append(" " * offset)
-    line.append(char * width, style=bar_style)
+    line.append(char * width, style=style)
 
     remaining = track_width - offset - width
     if remaining > 0:

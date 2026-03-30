@@ -11,7 +11,9 @@ from textual.widgets import DataTable, Static
 
 from toad.widgets.github_views.fetch import (
     GitHubFetchError,
+    PLAN_LABELS,
     RepoInfo,
+    fetch_issues,
     fetch_plan_issues,
 )
 
@@ -63,12 +65,24 @@ class PlansView(Static):
         yield table
 
     async def load(self, repo: RepoInfo) -> None:
-        """Fetch plan issues and populate the table."""
+        """Fetch plan issues and populate the table.
+
+        Tries label-based fetch first. Falls back to matching open
+        issues with a ``Plan:`` title prefix when no labelled plans
+        are found.
+        """
         table = self.query_one("#plans-table", DataTable)
         table.clear()
 
         try:
             issues = await fetch_plan_issues(repo)
+            if not issues:
+                # Fallback: open issues with "Plan:" title prefix
+                all_open = await fetch_issues(repo, state="open")
+                issues = [
+                    i for i in all_open
+                    if (i.get("title") or "").startswith("Plan:")
+                ]
         except GitHubFetchError as exc:
             log.warning("Failed to fetch plan issues: %s", exc)
             table.add_row("--", str(exc), "", "", "")

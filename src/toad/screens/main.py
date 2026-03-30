@@ -305,14 +305,6 @@ class MainScreen(Screen, can_focus=False):
         """Open pane and show Timeline tab."""
         self._show_section_tab("section-github", "tab-timeline")
 
-    def action_show_plans(self) -> None:
-        """Open pane and show Plans tab."""
-        self._show_section_tab("section-orchestrator", "tab-plans")
-
-    def action_show_workers(self) -> None:
-        """Open pane and show Workers tab."""
-        self._show_section_tab("section-orchestrator", "tab-workers")
-
     def action_show_builder(self) -> None:
         """Open pane and show Builder tab."""
         self._show_section_tab("section-builder", "tab-builder")
@@ -390,8 +382,6 @@ class MainScreen(Screen, can_focus=False):
     _PANEL_MAP: dict[str, tuple[str, str]] = {
         "github": ("section-github", "tab-github"),
         "timeline": ("section-github", "tab-timeline"),
-        "orchestrator": ("section-orchestrator", "tab-plans"),
-        "workers": ("section-orchestrator", "tab-workers"),
         "builder": ("section-builder", "tab-builder"),
         "automation": ("section-automations", "tab-automation"),
         "automations": ("section-automations", "tab-automation"),
@@ -401,8 +391,6 @@ class MainScreen(Screen, can_focus=False):
     _PANEL_SECTION_MAP: dict[str, str] = {
         "github": "section-github",
         "timeline": "section-github",
-        "orchestrator": "section-orchestrator",
-        "workers": "section-orchestrator",
         "builder": "section-builder",
         "automation": "section-automations",
         "automations": "section-automations",

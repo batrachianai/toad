@@ -9,18 +9,16 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.widget import Widget
-from textual.widgets import Collapsible, Static
+from textual.widgets import Static
 
 from toad.widgets.github_views.fetch import (
     RepoInfo,
     check_auth,
     detect_repo_from_path,
 )
-from toad.widgets.github_views.issues import IssuesView
 from toad.widgets.github_views.plans import PlansView
 from toad.widgets.github_views.prs import PRsView
 from toad.widgets.github_views.status_overview import StatusOverview
-from toad.widgets.github_views.timeline import TimelineView
 
 log = logging.getLogger(__name__)
 
@@ -76,8 +74,6 @@ class GitHubStateWidget(Widget, can_focus=True):
             yield PlansView(id="gh-plans")
             yield Static("Pull Requests", classes="section-title")
             yield PRsView(id="gh-prs")
-            with Collapsible(title="Timeline", collapsed=True):
-                yield TimelineView(id="gh-timeline")
 
     async def on_mount(self) -> None:
         """Detect repo and load initial data."""
@@ -106,14 +102,12 @@ class GitHubStateWidget(Widget, can_focus=True):
             return
 
         overview = self.query_one("#gh-status-overview", StatusOverview)
-        timeline = self.query_one("#gh-timeline", TimelineView)
         plans = self.query_one("#gh-plans", PlansView)
         prs = self.query_one("#gh-prs", PRsView)
 
         await overview.load(self._repo)
         await plans.load(self._repo)
         await prs.load(self._repo)
-        await timeline.load(self._repo)
 
     async def refresh_data(self) -> None:
         """Re-fetch data for all views."""

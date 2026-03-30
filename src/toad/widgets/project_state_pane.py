@@ -19,9 +19,6 @@ from toad.widgets.builder_view import BuilderView
 from toad.widgets.canon_state import CanonStateWidget
 from toad.widgets.gantt_timeline import GanttTimeline
 from toad.widgets.github_state import GitHubStateWidget
-from toad.widgets.orchestrator_state import OrchestratorStateWidget
-from toad.widgets.plan_list_view import PlanListView
-from toad.widgets.worker_list_view import WorkerListView
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +52,6 @@ def _read_timeline_url(project_path: Path) -> str:
 
 # Section IDs — used as TabbedContent widget IDs and toolbar button suffix
 SECTION_GITHUB = "section-github"
-SECTION_ORCHESTRATOR = "section-orchestrator"
 SECTION_BUILDER = "section-builder"
 SECTION_AUTOMATIONS = "section-automations"
 
@@ -71,7 +67,6 @@ class _SectionDef:
 # Ordered list of sections — add new ones here
 SECTIONS: list[_SectionDef] = [
     _SectionDef(SECTION_GITHUB, "GitHub"),
-    _SectionDef(SECTION_ORCHESTRATOR, "Plans"),
     _SectionDef(SECTION_BUILDER, "Builder"),
     _SectionDef(SECTION_AUTOMATIONS, "Automations"),
 ]
@@ -99,7 +94,7 @@ class ProjectStatePane(Vertical):
     ProjectStatePane #pane-toolbar {
         height: auto;
         dock: top;
-        padding: 0 1;
+        padding: 1 2;
     }
 
     ProjectStatePane #pane-toolbar Button {
@@ -169,21 +164,6 @@ class ProjectStatePane(Vertical):
                 )
             with TabPane("Timeline", id="tab-timeline"):
                 yield GanttTimeline(id="pane-gantt")
-
-        # Orchestrator state watcher (invisible, drives data)
-        yield OrchestratorStateWidget(
-            project_path=self._project_path,
-            id="orchestrator-state",
-        )
-
-        # --- Plans / Workers section ---
-        with TabbedContent(
-            id=SECTION_ORCHESTRATOR, classes="pane-section"
-        ):
-            with TabPane("Plans", id="tab-plans"):
-                yield PlanListView(id="plan-list-view")
-            with TabPane("Workers", id="tab-workers"):
-                yield WorkerListView(id="worker-list-view")
 
         # Canon state watcher (invisible, drives builder/automation)
         yield CanonStateWidget(
@@ -291,19 +271,6 @@ class ProjectStatePane(Vertical):
             tc.active = tab_id
             return
         log.warning("Tab %r not found in ProjectStatePane", tab_id)
-
-    # ------------------------------------------------------------------
-    # Plan selection forwarding
-    # ------------------------------------------------------------------
-
-    def on_plan_list_view_plan_selected(
-        self, event: PlanListView.PlanSelected
-    ) -> None:
-        """Forward plan selection to OrchestratorStateWidget."""
-        orch = self.query_one(
-            "#orchestrator-state", OrchestratorStateWidget
-        )
-        orch.select_plan(event.slug)
 
     # ------------------------------------------------------------------
     # Timeline fetch
