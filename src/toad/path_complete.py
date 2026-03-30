@@ -161,7 +161,8 @@ class PathComplete:
                 return None, self.decorate_listing(listing)
 
             node_name = Path(node).name
-            if not node_name:
+
+            if not node_name or path.endswith("/"):
                 return None, self.decorate_listing(listing)
             matching_nodes = [
                 listing_path
