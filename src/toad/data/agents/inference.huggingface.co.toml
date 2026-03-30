@@ -37,7 +37,7 @@ Use `/skills` to manage and install skills.
 Join the community at [Toad Hf Inference Explorers](https://huggingface.co/toad-hf-inference-explorers)
 '''
 
-recommended = true
+recommended = false
 
 [actions."*".install]
 command = "uv tool install -U hf-inference-acp --with-executables-from huggingface_hub --force"
