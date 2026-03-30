@@ -12,8 +12,11 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.timer import Timer
-from textual.widgets import Button, Static, TabbedContent, TabPane
+from textual.widgets import Button, TabbedContent, TabPane
 
+from toad.widgets.automation_view import AutomationView
+from toad.widgets.builder_view import BuilderView
+from toad.widgets.canon_state import CanonStateWidget
 from toad.widgets.gantt_timeline import GanttTimeline
 from toad.widgets.github_state import GitHubStateWidget
 from toad.widgets.orchestrator_state import OrchestratorStateWidget
@@ -53,6 +56,7 @@ def _read_timeline_url(project_path: Path) -> str:
 # Section IDs — used as TabbedContent widget IDs and toolbar button suffix
 SECTION_GITHUB = "section-github"
 SECTION_ORCHESTRATOR = "section-orchestrator"
+SECTION_BUILDER = "section-builder"
 SECTION_AUTOMATIONS = "section-automations"
 
 
@@ -68,6 +72,7 @@ class _SectionDef:
 SECTIONS: list[_SectionDef] = [
     _SectionDef(SECTION_GITHUB, "GitHub"),
     _SectionDef(SECTION_ORCHESTRATOR, "Plans"),
+    _SectionDef(SECTION_BUILDER, "Builder"),
     _SectionDef(SECTION_AUTOMATIONS, "Automations"),
 ]
 
@@ -180,16 +185,25 @@ class ProjectStatePane(Vertical):
             with TabPane("Workers", id="tab-workers"):
                 yield WorkerListView(id="worker-list-view")
 
+        # Canon state watcher (invisible, drives builder/automation)
+        yield CanonStateWidget(
+            project_path=self._project_path,
+            id="canon-state",
+        )
+
+        # --- Builder section ---
+        with TabbedContent(
+            id=SECTION_BUILDER, classes="pane-section"
+        ):
+            with TabPane("Builder", id="tab-builder"):
+                yield BuilderView(id="builder-view")
+
         # --- Automations section ---
         with TabbedContent(
             id=SECTION_AUTOMATIONS, classes="pane-section"
         ):
-            with TabPane("Runs", id="tab-runs"):
-                yield Static(
-                    "No automation runs",
-                    classes="empty-state",
-                    id="automations-empty",
-                )
+            with TabPane("Automation", id="tab-automation"):
+                yield AutomationView(id="automation-view")
 
     def on_mount(self) -> None:
         # All sections hidden by default

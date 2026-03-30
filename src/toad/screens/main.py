@@ -26,6 +26,7 @@ from toad.widgets.throbber import Throbber
 from toad.widgets.conversation import Conversation
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
 from toad.widgets.side_bar import SideBar
+from toad.widgets.canon_state import CanonStateWidget
 from toad.widgets.project_state_pane import ProjectStatePane
 
 
@@ -312,9 +313,65 @@ class MainScreen(Screen, can_focus=False):
         """Open pane and show Workers tab."""
         self._show_section_tab("section-orchestrator", "tab-workers")
 
+    def action_show_builder(self) -> None:
+        """Open pane and show Builder tab."""
+        self._show_section_tab("section-builder", "tab-builder")
+
+    def action_show_automation(self) -> None:
+        """Open pane and show Automation tab."""
+        self._show_section_tab("section-automations", "tab-automation")
+
     def action_show_automations(self) -> None:
-        """Open pane and show Automations tab."""
-        self._show_section_tab("section-automations", "tab-runs")
+        """Open pane and show Automations tab (legacy alias)."""
+        self._show_section_tab("section-automations", "tab-automation")
+
+    # ------------------------------------------------------------------
+    # Canon auto-show logic
+    # ------------------------------------------------------------------
+
+    @on(CanonStateWidget.CanonStateDetected)
+    def _on_canon_detected(
+        self,
+        _event: CanonStateWidget.CanonStateDetected,
+    ) -> None:
+        """Auto-show Builder or Automation when canon state appears."""
+        _event.stop()
+        canon = self.query_one("#canon-state", CanonStateWidget)
+        state = canon.state
+        if state.is_build_phase:
+            self._show_section_tab("section-builder", "tab-builder")
+        elif state.is_run_phase:
+            self._show_section_tab(
+                "section-automations", "tab-automation"
+            )
+
+    @on(CanonStateWidget.CanonStateUpdated)
+    def _on_canon_updated(
+        self,
+        event: CanonStateWidget.CanonStateUpdated,
+    ) -> None:
+        """Auto-switch between Builder and Automation on phase change."""
+        event.stop()
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        state = event.state
+
+        builder_visible = pane.query_one(
+            "#section-builder"
+        ).display
+        automation_visible = pane.query_one(
+            "#section-automations"
+        ).display
+
+        if state.is_build_phase and not builder_visible:
+            if automation_visible:
+                pane.hide_section("section-automations")
+            self._show_section_tab("section-builder", "tab-builder")
+        elif state.is_run_phase and not automation_visible:
+            if builder_visible:
+                pane.hide_section("section-builder")
+            self._show_section_tab(
+                "section-automations", "tab-automation"
+            )
 
     def watch_split_enabled(self, enabled: bool) -> None:
         """Show/hide the project state pane."""
@@ -335,7 +392,9 @@ class MainScreen(Screen, can_focus=False):
         "timeline": ("section-github", "tab-timeline"),
         "orchestrator": ("section-orchestrator", "tab-plans"),
         "workers": ("section-orchestrator", "tab-workers"),
-        "automations": ("section-automations", "tab-runs"),
+        "builder": ("section-builder", "tab-builder"),
+        "automation": ("section-automations", "tab-automation"),
+        "automations": ("section-automations", "tab-automation"),
     }
 
     # Map ACP panel IDs to section_id for close
@@ -344,6 +403,8 @@ class MainScreen(Screen, can_focus=False):
         "timeline": "section-github",
         "orchestrator": "section-orchestrator",
         "workers": "section-orchestrator",
+        "builder": "section-builder",
+        "automation": "section-automations",
         "automations": "section-automations",
     }
 

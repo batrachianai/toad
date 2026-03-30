@@ -20,8 +20,11 @@ tools/toad-ctl.sh action "screen.show_plans"
 # Show orchestrator workers for the selected plan
 tools/toad-ctl.sh action "screen.show_workers"
 
-# Show automation runs
-tools/toad-ctl.sh action "screen.show_automations"
+# Show canon builder (phase, iteration, build logs)
+tools/toad-ctl.sh action "screen.show_builder"
+
+# Show canon automation (status, metrics, run logs)
+tools/toad-ctl.sh action "screen.show_automation"
 
 # Toggle the entire right pane open/closed
 tools/toad-ctl.sh action "screen.toggle_project_state"
@@ -36,7 +39,8 @@ tools/toad-ctl.sh action "screen.refresh_timeline"
 - User asks about project timeline, milestones, or schedule → show_timeline
 - User asks about orchestrator plans or plan progress → show_plans
 - User asks about workers, items, or task status → show_workers
-- User asks about automation runs or canon executions → show_automations
+- User asks about canon build progress, phases, or iterations → show_builder
+- User asks about canon automation, metrics, or run status → show_automation
 - User asks to see project state, status, or dashboard → toggle_project_state
 - User asks to close or hide the panel → toggle_project_state
 - After updating the timeline → refresh_timeline
