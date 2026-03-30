@@ -11,10 +11,12 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.message import Message
 from textual.timer import Timer
-from textual.widgets import Static, TabbedContent, TabPane
+from textual.widgets import TabbedContent, TabPane
 
 from toad.widgets.gantt_timeline import GanttTimeline
 from toad.widgets.github_state import GitHubStateWidget
+from toad.widgets.orchestrator_state import OrchestratorStateWidget
+from toad.widgets.plan_list_view import PlanListView
 from toad.widgets.worker_list_view import WorkerListView
 
 log = logging.getLogger(__name__)
@@ -117,13 +119,14 @@ class ProjectStatePane(Vertical):
                     id="github_state",
                 )
 
+        yield OrchestratorStateWidget(
+            project_path=self._project_path,
+            id="orchestrator-state",
+        )
+
         with TabbedContent(id="bottom-section"):
             with TabPane("Plans", id="tab-plans"):
-                yield Static(
-                    "No orchestrator data",
-                    classes="empty-state",
-                    id="plans-empty",
-                )
+                yield PlanListView(id="plan-list-view")
             with TabPane("Workers", id="tab-workers"):
                 yield WorkerListView(id="worker-list-view")
 
@@ -168,6 +171,15 @@ class ProjectStatePane(Vertical):
         if not bottom.has_class("visible"):
             bottom.add_class("visible")
             self.post_message(self.OrchestratorSectionShown())
+
+    def on_plan_list_view_plan_selected(
+        self, event: PlanListView.PlanSelected
+    ) -> None:
+        """Forward plan selection to OrchestratorStateWidget."""
+        orch = self.query_one(
+            "#orchestrator-state", OrchestratorStateWidget
+        )
+        orch.select_plan(event.slug)
 
     def hide_orchestrator_section(self) -> None:
         """Hide the bottom orchestrator section."""
