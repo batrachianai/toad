@@ -349,44 +349,6 @@ class ProjectStatePane(Vertical):
             log.warning("Failed to load local timeline: %s", exc)
             return None
 
-    # ------------------------------------------------------------------
-    # Canon auto-show logic
-    # ------------------------------------------------------------------
-
-    def on_canon_state_widget_canon_state_detected(
-        self,
-        _event: CanonStateWidget.CanonStateDetected,
-    ) -> None:
-        """Auto-show Builder or Automation when canon state appears."""
-        canon = self.query_one("#canon-state", CanonStateWidget)
-        state = canon.state
-        if state.is_build_phase:
-            self.show_section(SECTION_BUILDER)
-        elif state.is_run_phase:
-            self.show_section(SECTION_AUTOMATIONS)
-
-    def on_canon_state_widget_canon_state_updated(
-        self,
-        event: CanonStateWidget.CanonStateUpdated,
-    ) -> None:
-        """Auto-switch between Builder and Automation on phase change."""
-        state = event.state
-        builder_visible = self.query_one(
-            f"#{SECTION_BUILDER}"
-        ).display
-        automation_visible = self.query_one(
-            f"#{SECTION_AUTOMATIONS}"
-        ).display
-
-        if state.is_build_phase and not builder_visible:
-            if automation_visible:
-                self.hide_section(SECTION_AUTOMATIONS)
-            self.show_section(SECTION_BUILDER)
-        elif state.is_run_phase and not automation_visible:
-            if builder_visible:
-                self.hide_section(SECTION_BUILDER)
-            self.show_section(SECTION_AUTOMATIONS)
-
     def refresh_timeline(self) -> None:
         """Re-fetch timeline data. Called via socket controller."""
         self._fetch_timeline()
