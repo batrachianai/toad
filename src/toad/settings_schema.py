@@ -21,6 +21,7 @@ SCHEMA: list[SchemaDict] = [
                 "type": "choices",
                 "default": "dracula",
                 "choices": [
+                    "conductor",
                     "atom-one-dark",
                     "atom-one-light",
                     "catppuccin-latte",

@@ -16,6 +16,7 @@ from textual.binding import Binding, BindingType
 from textual.content import Content
 from textual.reactive import var, reactive
 from textual.app import App
+from textual.theme import Theme
 from textual import events
 from textual.signal import Signal
 from textual.timer import Timer
@@ -62,6 +63,46 @@ DRACULA_TERMINAL_THEME = terminal_theme.TerminalTheme(
         (214, 172, 255),  # bright blue - #D6ACFF
         (255, 146, 223),  # bright magenta - #FF92DF
         (164, 255, 255),  # bright cyan - #A4FFFF
+        (255, 255, 255),  # bright white - #FFFFFF
+    ],
+)
+
+CONDUCTOR_THEME = Theme(
+    name="conductor",
+    primary="#00ff41",
+    secondary="#00d4ff",
+    accent="#00d4ff",
+    foreground="#e8e8e8",
+    background="#0a0a0a",
+    surface="#111111",
+    panel="#151515",
+    warning="#ffaa00",
+    error="#ff4444",
+    success="#00ff41",
+    dark=True,
+)
+
+CONDUCTOR_TERMINAL_THEME = terminal_theme.TerminalTheme(
+    background=(10, 10, 10),  # #0A0A0A
+    foreground=(232, 232, 232),  # #E8E8E8
+    normal=[
+        (21, 21, 21),  # black - #151515
+        (255, 68, 68),  # red - #FF4444
+        (0, 255, 65),  # green - #00FF41
+        (255, 170, 0),  # yellow - #FFAA00
+        (0, 212, 255),  # blue - #00D4FF
+        (189, 147, 249),  # magenta - #BD93F9
+        (0, 212, 255),  # cyan - #00D4FF
+        (232, 232, 232),  # white - #E8E8E8
+    ],
+    bright=[
+        (85, 85, 85),  # bright black - #555555
+        (255, 100, 100),  # bright red - #FF6464
+        (51, 255, 100),  # bright green - #33FF64
+        (255, 200, 50),  # bright yellow - #FFC832
+        (51, 222, 255),  # bright blue - #33DEFF
+        (214, 172, 255),  # bright magenta - #D6ACFF
+        (51, 222, 255),  # bright cyan - #33DEFF
         (255, 255, 255),  # bright white - #FFFFFF
     ],
 )
@@ -598,6 +639,10 @@ class ToadApp(App, inherit_bindings=False):
         elif key == "ui.theme":
             if isinstance(value, str):
                 self.theme = value
+                if value == "conductor":
+                    self.ansi_theme_dark = CONDUCTOR_TERMINAL_THEME
+                else:
+                    self.ansi_theme_dark = DRACULA_TERMINAL_THEME
         elif key == "ui.scrollbar":
             if isinstance(value, str):
                 self.scrollbar = value
@@ -621,6 +666,7 @@ class ToadApp(App, inherit_bindings=False):
         self.settings_changed_signal.publish((key, value))
 
     async def on_load(self) -> None:
+        self.register_theme(CONDUCTOR_THEME)
         db = await self.get_db()
         await db.create()
         settings_path = self.settings_path
