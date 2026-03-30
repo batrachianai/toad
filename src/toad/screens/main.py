@@ -25,9 +25,9 @@ from toad.widgets.plan import Plan
 from toad.widgets.throbber import Throbber
 from toad.widgets.conversation import Conversation
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
-from toad.widgets.side_bar import SideBar, SideBarCollapsible
-from toad.widgets.github_state import GitHubStateWidget
+from toad.widgets.side_bar import SideBar
 from toad.widgets.project_state_pane import ProjectStatePane
+from toad.widgets.orchestrator_state import OrchestratorStateWidget
 
 
 class ModeProvider(Provider):
@@ -289,9 +289,17 @@ class MainScreen(Screen, can_focus=False):
     def on_acp_open_panel(self, message: acp_messages.OpenPanel) -> None:
         """Agent requests opening a panel."""
         message.stop()
+        pane = self.query_one(
+            "#project_state_pane", ProjectStatePane
+        )
         panel_id = message.panel_id
         if panel_id == "github":
-            self._open_github_panel(message.context)
+            self.split_enabled = True
+            pane.activate_tab("tab-github")
+        elif panel_id == "orchestrator":
+            self.split_enabled = True
+            pane.show_orchestrator_section()
+            pane.activate_tab("tab-plans")
         elif panel_id == "project_state":
             self.split_enabled = True
 
@@ -300,51 +308,21 @@ class MainScreen(Screen, can_focus=False):
         """Agent requests closing a panel."""
         message.stop()
         panel_id = message.panel_id
-        if panel_id == "github":
-            self._close_github_panel()
-        elif panel_id == "project_state":
+        if panel_id in ("github", "orchestrator", "project_state"):
             self.split_enabled = False
 
-    def _open_github_panel(
-        self, context: dict[str, object] | None = None
+    @on(OrchestratorStateWidget.OrchestratorDetected)
+    def on_orchestrator_detected(
+        self, message: OrchestratorStateWidget.OrchestratorDetected
     ) -> None:
-        """Mount and expand the GitHub panel in the sidebar.
-
-        If the panel already exists, just expand and focus it.
-        Accepts optional context with a 'project_path' override.
-        """
-        project_path = str(self.project_path)
-        if context and "project_path" in context:
-            project_path = str(context["project_path"])
-
-        collapsibles = self.side_bar.query(SideBarCollapsible)
-        for collapsible in collapsibles:
-            if collapsible.title == "Project Status":
-                collapsible.collapsed = False
-                github_widget = self.query_one(
-                    "#github_state", GitHubStateWidget
-                )
-                github_widget.focus()
-                return
-
-        collapsible = SideBarCollapsible(
-            GitHubStateWidget(
-                project_path=project_path,
-                id="github_state",
-            ),
-            title="Project Status",
-            collapsed=False,
-            classes="-fixed",
+        """Auto-open pane and switch to Plans tab on first detection."""
+        message.stop()
+        self.split_enabled = True
+        pane = self.query_one(
+            "#project_state_pane", ProjectStatePane
         )
-        self.side_bar.mount(collapsible)
-
-    def _close_github_panel(self) -> None:
-        """Collapse the GitHub panel if it exists."""
-        collapsibles = self.side_bar.query(SideBarCollapsible)
-        for collapsible in collapsibles:
-            if collapsible.title == "Project Status":
-                collapsible.collapsed = True
-                return
+        pane.show_orchestrator_section()
+        pane.activate_tab("tab-plans")
 
     def action_focus_prompt(self) -> None:
         self.conversation.focus_prompt()

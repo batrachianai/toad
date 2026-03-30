@@ -583,7 +583,41 @@ MainScreen {
         height: 1fr;
     }    
 
-    SideBar {        
+    ProjectStatePane {
+        display: none;
+        width: 50%;
+        border-left: tall $primary 30%;
+
+        #top-section {
+            height: 1fr;
+        }
+
+        #bottom-section {
+            height: 1fr;
+            display: none;
+
+            &.visible {
+                display: block;
+            }
+        }
+
+        #pane-gantt {
+            height: 1fr;
+        }
+
+        TabPane {
+            padding: 0 1;
+        }
+
+        .empty-state {
+            color: $text-muted;
+            text-style: italic;
+            padding: 2 1;
+            text-align: center;
+        }
+    }
+
+    SideBar {
         border-right: tall black 10%;
         background: transparent;        
         dock: left;

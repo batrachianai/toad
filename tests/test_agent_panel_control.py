@@ -101,15 +101,10 @@ class TestMainScreenPanelHandlers:
 
         assert hasattr(MainScreen, "on_acp_close_panel")
 
-    def test_open_github_panel_method_exists(self):
+    def test_orchestrator_detected_handler_exists(self):
         from toad.screens.main import MainScreen
 
-        assert hasattr(MainScreen, "_open_github_panel")
-
-    def test_close_github_panel_method_exists(self):
-        from toad.screens.main import MainScreen
-
-        assert hasattr(MainScreen, "_close_github_panel")
+        assert hasattr(MainScreen, "on_orchestrator_detected")
 
     def test_toggle_github_still_works(self):
         """ctrl+g binding is still present for manual toggle."""

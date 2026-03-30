@@ -1,4 +1,4 @@
-"""Right-side pane for project state (timeline, plans, status)."""
+"""Right-side pane for project state (timeline, GitHub, orchestrator)."""
 
 from __future__ import annotations
 
@@ -8,11 +8,16 @@ from pathlib import Path
 
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Vertical
+from textual.message import Message
 from textual.timer import Timer
-from textual.widgets import Static
+from textual.widgets import TabbedContent, TabPane
 
 from toad.widgets.gantt_timeline import GanttTimeline
+from toad.widgets.github_state import GitHubStateWidget
+from toad.widgets.orchestrator_state import OrchestratorStateWidget
+from toad.widgets.plan_list_view import PlanListView
+from toad.widgets.worker_list_view import WorkerListView
 
 log = logging.getLogger(__name__)
 
@@ -44,29 +49,86 @@ def _read_timeline_url(project_path: Path) -> str:
     return DEFAULT_TIMELINE_URL
 
 
-class ProjectStatePane(VerticalScroll):
-    """Toggleable right pane showing project state."""
+class ProjectStatePane(Vertical):
+    """Toggleable right pane with tabbed project state sections.
+
+    Top section (always visible): Timeline + GitHub tabs.
+    Bottom section (hidden by default): Plans + Workers tabs.
+    Both sections use ``height: 1fr`` so a single visible section
+    fills the pane and two visible sections split 50/50.
+    """
+
+    class OrchestratorSectionShown(Message):
+        """Posted when the orchestrator (bottom) section becomes visible."""
 
     DEFAULT_CSS = """
     ProjectStatePane {
         display: none;
         width: 50%;
         border-left: tall $primary 30%;
-        padding: 1 2;
+    }
+
+    ProjectStatePane #top-section {
+        height: 1fr;
+    }
+
+    ProjectStatePane #bottom-section {
+        height: 1fr;
+        display: none;
+    }
+
+    ProjectStatePane #bottom-section.visible {
+        display: block;
+    }
+
+    ProjectStatePane #pane-gantt {
+        height: 1fr;
+    }
+
+    ProjectStatePane TabPane {
+        padding: 0 1;
+    }
+
+    ProjectStatePane .empty-state {
+        color: $text-muted;
+        text-style: italic;
+        padding: 2 1;
+        text-align: center;
     }
     """
 
     REFRESH_INTERVAL = 30
 
-    def __init__(self, project_path: Path | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        project_path: Path | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self._project_path = project_path or Path(".").resolve()
         self._refresh_timer: Timer | None = None
         self._timeline_url = _read_timeline_url(self._project_path)
 
     def compose(self) -> ComposeResult:
-        yield Static("Project State", id="project-state-title")
-        yield GanttTimeline(id="pane-gantt")
+        with TabbedContent(id="top-section"):
+            with TabPane("Timeline", id="tab-timeline"):
+                yield GanttTimeline(id="pane-gantt")
+            with TabPane("GitHub", id="tab-github"):
+                yield GitHubStateWidget(
+                    project_path=str(self._project_path),
+                    id="github_state",
+                )
+
+        yield OrchestratorStateWidget(
+            project_path=self._project_path,
+            id="orchestrator-state",
+        )
+
+        with TabbedContent(id="bottom-section"):
+            with TabPane("Plans", id="tab-plans"):
+                yield PlanListView(id="plan-list-view")
+            with TabPane("Workers", id="tab-workers"):
+                yield WorkerListView(id="worker-list-view")
 
     def on_mount(self) -> None:
         self._fetch_timeline()
@@ -82,6 +144,51 @@ class ProjectStatePane(VerticalScroll):
             if self._refresh_timer is not None:
                 self._refresh_timer.stop()
                 self._refresh_timer = None
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def activate_tab(self, tab_id: str) -> None:
+        """Switch to a specific tab by its pane id.
+
+        ``tab_id`` should be one of: ``tab-timeline``, ``tab-github``,
+        ``tab-plans``, ``tab-workers``.
+        """
+        for tc in self.query(TabbedContent):
+            try:
+                pane = tc.query_one(f"#{tab_id}", TabPane)
+            except Exception:
+                continue
+            tc.active = tab_id
+            pane.focus()
+            return
+        log.warning("Tab %r not found in ProjectStatePane", tab_id)
+
+    def show_orchestrator_section(self) -> None:
+        """Make the bottom orchestrator section visible."""
+        bottom = self.query_one("#bottom-section", TabbedContent)
+        if not bottom.has_class("visible"):
+            bottom.add_class("visible")
+            self.post_message(self.OrchestratorSectionShown())
+
+    def on_plan_list_view_plan_selected(
+        self, event: PlanListView.PlanSelected
+    ) -> None:
+        """Forward plan selection to OrchestratorStateWidget."""
+        orch = self.query_one(
+            "#orchestrator-state", OrchestratorStateWidget
+        )
+        orch.select_plan(event.slug)
+
+    def hide_orchestrator_section(self) -> None:
+        """Hide the bottom orchestrator section."""
+        bottom = self.query_one("#bottom-section", TabbedContent)
+        bottom.remove_class("visible")
+
+    # ------------------------------------------------------------------
+    # Timeline fetch (preserved from original)
+    # ------------------------------------------------------------------
 
     @work(thread=True, exit_on_error=False)
     def _fetch_timeline(self) -> None:
@@ -106,8 +213,11 @@ class ProjectStatePane(VerticalScroll):
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
-            log.warning("Failed to fetch timeline from %s: %s",
-                        self._timeline_url, exc)
+            log.warning(
+                "Failed to fetch timeline from %s: %s",
+                self._timeline_url,
+                exc,
+            )
             return None
 
     def _load_local(self) -> dict | None:
