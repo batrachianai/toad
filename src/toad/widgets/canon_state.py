@@ -58,7 +58,7 @@ def _parse_state(data: dict) -> CanonState:
     logs = tuple(
         LogEntry(
             level=entry.get("level", "info"),
-            message=entry.get("message", ""),
+            message=entry.get("msg", entry.get("message", "")),
             timestamp=entry.get("timestamp", ""),
         )
         for entry in logs_raw

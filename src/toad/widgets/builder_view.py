@@ -1,4 +1,4 @@
-"""BuilderView — phase badge, iteration, scrollable logs, error banner."""
+"""BuilderView — status bar, scrollable logs, metrics grid."""
 
 from __future__ import annotations
 
@@ -27,6 +27,16 @@ PHASE_COLORS: dict[str, str] = {
     "develop": "yellow",
 }
 
+STATUS_COLORS: dict[str, str] = {
+    "running": "green",
+    "idle": "dim",
+    "complete": "green bold",
+    "error": "red bold",
+    "paused": "yellow",
+    "executing": "magenta",
+    "automating": "cyan",
+}
+
 LOG_LEVEL_COLORS: dict[str, str] = {
     "error": "red bold",
     "warn": "yellow",
@@ -36,22 +46,43 @@ LOG_LEVEL_COLORS: dict[str, str] = {
 }
 
 
-def _phase_badge(phase: str) -> str:
-    """Return a Rich-markup phase badge."""
-    color = PHASE_COLORS.get(phase, "dim")
-    return f"[{color}] {phase.upper()} [/]"
+def _status_bar(phase: str, status: str) -> str:
+    """Render phase + status as a single-line bar."""
+    phase_color = PHASE_COLORS.get(phase, "dim")
+    status_color = STATUS_COLORS.get(status, "dim")
+    phase_text = f"[{phase_color} bold]{phase.upper()}[/]"
+    status_text = f"[{status_color}] {status.upper()} [/]"
+    return f"  Phase: {phase_text}    Status: {status_text}"
 
 
 def _render_log(entry: LogEntry) -> str:
     """Format a single log entry with level-based coloring."""
     color = LOG_LEVEL_COLORS.get(entry.level, "white")
-    ts = f"[dim]{entry.timestamp}[/] " if entry.timestamp else ""
-    tag = f"[{color}]{entry.level.upper():>5s}[/]"
-    return f"  {ts}{tag}  {entry.message}"
+    ts = entry.timestamp[-8:] if entry.timestamp else ""
+    ts_markup = f"[dim]{ts}[/] " if ts else ""
+    return f"  {ts_markup}[{color}]{entry.message}[/]"
+
+
+def _render_metrics(metrics: tuple[tuple[str, object], ...]) -> str:
+    """Render metrics as a key-value grid."""
+    if not metrics:
+        return "  [dim]No metrics[/]"
+    lines: list[str] = []
+    pairs = list(metrics)
+    for i in range(0, len(pairs), 2):
+        k1, v1 = pairs[i]
+        left = f"  [bold]{k1}:[/] {v1}"
+        if i + 1 < len(pairs):
+            k2, v2 = pairs[i + 1]
+            right = f"    [bold]{k2}:[/] {v2}"
+            lines.append(f"{left:<40s}{right}")
+        else:
+            lines.append(left)
+    return "\n".join(lines)
 
 
 class BuilderView(Widget, can_focus=True):
-    """Displays canon builder state: phase, iteration, logs, errors.
+    """Displays canon builder state: status bar, logs, metrics.
 
     Listens to :class:`CanonStateWidget.CanonStateUpdated` messages
     and re-renders when the phase is a build phase.
@@ -61,9 +92,10 @@ class BuilderView(Widget, can_focus=True):
     BuilderView {
         height: 1fr;
     }
-    BuilderView #builder-header {
+    BuilderView #builder-status-bar {
         height: auto;
-        padding: 0 1;
+        padding: 1 0;
+        background: $surface;
     }
     BuilderView #builder-error {
         display: none;
@@ -72,6 +104,11 @@ class BuilderView(Widget, can_focus=True):
         background: $error 20%;
         color: $text;
         text-style: bold;
+    }
+    BuilderView #builder-metrics {
+        height: auto;
+        padding: 1 0;
+        background: $surface;
     }
     BuilderView VerticalScroll {
         height: 1fr;
@@ -82,20 +119,21 @@ class BuilderView(Widget, can_focus=True):
         padding: 2 1;
         text-align: center;
     }
-    BuilderView .log-row {
-        padding: 0 0 0 1;
-    }
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(id="builder-header")
+        yield Static(
+            "  [dim]Phase:[/] —    [dim]Status:[/] —",
+            id="builder-status-bar",
+        )
         yield Static(id="builder-error")
         with VerticalScroll():
             yield Static(
-                "No build activity",
+                "Waiting for build activity…",
                 classes="empty-state",
                 id="builder-empty-label",
             )
+        yield Static("[dim]  No metrics[/]", id="builder-metrics")
 
     def on_canon_state_widget_canon_state_updated(
         self,
@@ -106,25 +144,21 @@ class BuilderView(Widget, can_focus=True):
 
     def _render_state(self, state: CanonState) -> None:
         """Rebuild the builder view from canon state."""
-        # Header: phase badge + iteration
-        header = self.query_one("#builder-header", Static)
-        if state.phase in BUILD_PHASES:
-            badge = _phase_badge(state.phase)
-            header.update(
-                f"{badge}  Iteration [bold]{state.iteration}[/]"
-            )
-        else:
-            header.update("[dim]Builder idle[/]")
+        # Status bar: phase + status
+        status_bar = self.query_one("#builder-status-bar", Static)
+        status_bar.update(_status_bar(state.phase, state.status))
 
         # Error banner
         error_widget = self.query_one("#builder-error", Static)
         if state.status == "error" and state.error:
-            error_widget.update(f"[red bold]ERROR:[/] {state.error}")
+            error_widget.update(
+                f"[red bold]ERROR:[/] {state.error}"
+            )
             error_widget.display = True
         else:
             error_widget.display = False
 
-        # Logs — cap at MAX_LOG_LINES, most recent last
+        # Logs
         scroll = self.query_one(VerticalScroll)
         scroll.remove_children()
 
@@ -137,9 +171,10 @@ class BuilderView(Widget, can_focus=True):
                     id="builder-empty-label",
                 )
             )
-            return
+        else:
+            for entry in logs:
+                scroll.mount(Static(_render_log(entry)))
 
-        for entry in logs:
-            scroll.mount(
-                Static(_render_log(entry), classes="log-row")
-            )
+        # Metrics
+        metrics_widget = self.query_one("#builder-metrics", Static)
+        metrics_widget.update(_render_metrics(state.metrics))

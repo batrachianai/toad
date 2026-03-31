@@ -26,7 +26,8 @@ from toad.widgets.throbber import Throbber
 from toad.widgets.conversation import Conversation
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
 from toad.widgets.side_bar import SideBar
-from toad.widgets.canon_state import CanonStateWidget
+from toad.widgets.builder_view import BuilderView
+from toad.widgets.canon_state import CanonState, CanonStateWidget
 from toad.widgets.project_state_pane import ProjectStatePane
 
 
@@ -272,7 +273,7 @@ class MainScreen(Screen, can_focus=False):
     def action_toggle_project_state(self) -> None:
         """Toggle the right-side project state pane.
 
-        If opening, shows the GitHub section by default.
+        If opening, shows the State section by default.
         If closing, hides all sections.
         """
         if self.split_enabled:
@@ -281,7 +282,7 @@ class MainScreen(Screen, can_focus=False):
         else:
             self.split_enabled = True
             pane = self.query_one("#project_state_pane", ProjectStatePane)
-            pane.show_section("section-github")
+            pane.show_section("section-builder")
 
     def action_refresh_timeline(self) -> None:
         """Re-fetch timeline data from gist."""
@@ -297,6 +298,12 @@ class MainScreen(Screen, can_focus=False):
         pane.show_section(section_id)
         pane.activate_tab(tab_id)
 
+    def _forward_canon_state(self, state: "CanonState") -> None:
+        """Forward canon state directly to State view."""
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        for view in pane.query(BuilderView):
+            view._render_state(state)
+
     def action_show_github(self) -> None:
         """Open pane and show GitHub tab."""
         self._show_section_tab("section-github", "tab-github")
@@ -309,13 +316,9 @@ class MainScreen(Screen, can_focus=False):
         """Open pane and show Builder tab."""
         self._show_section_tab("section-builder", "tab-builder")
 
-    def action_show_automation(self) -> None:
-        """Open pane and show Automation tab."""
-        self._show_section_tab("section-automations", "tab-automation")
-
-    def action_show_automations(self) -> None:
-        """Open pane and show Automations tab (legacy alias)."""
-        self._show_section_tab("section-automations", "tab-automation")
+    def action_show_state(self) -> None:
+        """Open pane and show State tab."""
+        self._show_section_tab("section-builder", "tab-builder")
 
     # ------------------------------------------------------------------
     # Canon auto-show logic
@@ -330,12 +333,11 @@ class MainScreen(Screen, can_focus=False):
         _event.stop()
         canon = self.query_one("#canon-state", CanonStateWidget)
         state = canon.state
-        if state.is_build_phase:
-            self._show_section_tab("section-builder", "tab-builder")
-        elif state.is_run_phase:
-            self._show_section_tab(
-                "section-automations", "tab-automation"
-            )
+        # Don't auto-open the pane — just ensure State section is visible
+        # when the user opens it with Ctrl+G
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        pane.show_section("section-builder")
+        self.call_later(self._forward_canon_state, state)
 
     @on(CanonStateWidget.CanonStateUpdated)
     def _on_canon_updated(
@@ -347,23 +349,8 @@ class MainScreen(Screen, can_focus=False):
         pane = self.query_one("#project_state_pane", ProjectStatePane)
         state = event.state
 
-        builder_visible = pane.query_one(
-            "#section-builder"
-        ).display
-        automation_visible = pane.query_one(
-            "#section-automations"
-        ).display
-
-        if state.is_build_phase and not builder_visible:
-            if automation_visible:
-                pane.hide_section("section-automations")
-            self._show_section_tab("section-builder", "tab-builder")
-        elif state.is_run_phase and not automation_visible:
-            if builder_visible:
-                pane.hide_section("section-builder")
-            self._show_section_tab(
-                "section-automations", "tab-automation"
-            )
+        # Forward state data (don't force-open the pane)
+        self._forward_canon_state(state)
 
     def watch_split_enabled(self, enabled: bool) -> None:
         """Show/hide the project state pane."""
@@ -382,18 +369,16 @@ class MainScreen(Screen, can_focus=False):
     _PANEL_MAP: dict[str, tuple[str, str]] = {
         "github": ("section-github", "tab-github"),
         "timeline": ("section-github", "tab-timeline"),
+        "state": ("section-builder", "tab-builder"),
         "builder": ("section-builder", "tab-builder"),
-        "automation": ("section-automations", "tab-automation"),
-        "automations": ("section-automations", "tab-automation"),
     }
 
     # Map ACP panel IDs to section_id for close
     _PANEL_SECTION_MAP: dict[str, str] = {
         "github": "section-github",
         "timeline": "section-github",
+        "state": "section-builder",
         "builder": "section-builder",
-        "automation": "section-automations",
-        "automations": "section-automations",
     }
 
     @on(acp_messages.OpenPanel)

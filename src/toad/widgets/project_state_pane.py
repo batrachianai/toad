@@ -14,7 +14,6 @@ from textual.message import Message
 from textual.timer import Timer
 from textual.widgets import Button, TabbedContent, TabPane
 
-from toad.widgets.automation_view import AutomationView
 from toad.widgets.builder_view import BuilderView
 from toad.widgets.canon_state import CanonStateWidget
 from toad.widgets.gantt_timeline import GanttTimeline
@@ -53,7 +52,6 @@ def _read_timeline_url(project_path: Path) -> str:
 # Section IDs — used as TabbedContent widget IDs and toolbar button suffix
 SECTION_GITHUB = "section-github"
 SECTION_BUILDER = "section-builder"
-SECTION_AUTOMATIONS = "section-automations"
 
 
 @dataclass
@@ -66,9 +64,8 @@ class _SectionDef:
 
 # Ordered list of sections — add new ones here
 SECTIONS: list[_SectionDef] = [
+    _SectionDef(SECTION_BUILDER, "State"),
     _SectionDef(SECTION_GITHUB, "GitHub"),
-    _SectionDef(SECTION_BUILDER, "Builder"),
-    _SectionDef(SECTION_AUTOMATIONS, "Automations"),
 ]
 
 
@@ -165,30 +162,23 @@ class ProjectStatePane(Vertical):
             with TabPane("Timeline", id="tab-timeline"):
                 yield GanttTimeline(id="pane-gantt")
 
-        # Canon state watcher (invisible, drives builder/automation)
+        # Canon state watcher (invisible, drives State view)
         yield CanonStateWidget(
             project_path=self._project_path,
             id="canon-state",
         )
 
-        # --- Builder section ---
+        # --- State section (canon build + run) ---
         with TabbedContent(
             id=SECTION_BUILDER, classes="pane-section"
         ):
-            with TabPane("Builder", id="tab-builder"):
+            with TabPane("State", id="tab-builder"):
                 yield BuilderView(id="builder-view")
 
-        # --- Automations section ---
-        with TabbedContent(
-            id=SECTION_AUTOMATIONS, classes="pane-section"
-        ):
-            with TabPane("Automation", id="tab-automation"):
-                yield AutomationView(id="automation-view")
-
     def on_mount(self) -> None:
-        # All sections hidden by default
-        for sec in SECTIONS:
-            self.query_one(f"#{sec.section_id}").display = False
+        # GitHub hidden by default, State visible
+        self.query_one(f"#{SECTION_GITHUB}").display = False
+        self.query_one(f"#{SECTION_BUILDER}").display = True
         self._sync_toolbar()
         self._fetch_timeline()
 
