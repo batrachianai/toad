@@ -1,4 +1,4 @@
-See `LICENSE` for the Open Source license.
+See [LICENSE](./LICENSE) for the Open Source license.
 
 If you would like to use the source code without AGPL's copyleft requriments, a commercial license is available.
 
