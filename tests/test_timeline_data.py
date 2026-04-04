@@ -14,10 +14,6 @@ from __future__ import annotations
 from datetime import date
 
 from toad.widgets.github_views.timeline_data import (
-    GateMarker,
-    MilestoneGroup,
-    TimelineData,
-    TimelineItem,
     build_timeline,
 )
 from toad.widgets.github_views.timeline_provider import (

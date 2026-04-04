@@ -13,8 +13,6 @@ from __future__ import annotations
 
 from datetime import date
 
-from rich.text import Text
-
 from toad.widgets.gantt_timeline import (
     ACTIVE_STYLE,
     BAR_CHAR,
