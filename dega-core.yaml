@@ -20,6 +20,10 @@ github:
   close_on_ship: false
   pr_target: conductor
 
+timeline:
+  repo: DEGAorg/claude-code-config
+  project_number: 8
+
 success_criteria:
   - "tests pass"
   - "linting clean"
