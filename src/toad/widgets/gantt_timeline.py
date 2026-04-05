@@ -85,8 +85,12 @@ def compute_bar_position(
 def render_date_axis(
     data: TimelineData,
     track_width: int,
-) -> list[Text]:
-    """Build date axis rows: dates on top, gate markers below."""
+) -> list[tuple[Text, Text]]:
+    """Build date axis rows: dates on top, gate markers below.
+
+    Returns:
+        List of (label, track) pairs — one per axis row.
+    """
     total_days = data.total_days
     start = data.start_date
 
@@ -109,13 +113,19 @@ def render_date_axis(
                 if idx < track_width:
                     date_track[idx] = ch
 
-    date_line = Text(" " * LABEL_WIDTH)
-    date_line.append("".join(date_track), style=f"bold {AXIS_STYLE}")
+    date_label = Text(" " * LABEL_WIDTH)
+    date_track_text = Text(
+        "".join(date_track), style=f"bold {AXIS_STYLE}"
+    )
 
     # Row 2: gate markers
     gate_track = [" "] * track_width
     for gate in data.gates:
-        pos = int((gate.day / total_days) * track_width) if total_days > 0 else 0
+        pos = (
+            int((gate.day / total_days) * track_width)
+            if total_days > 0
+            else 0
+        )
         pos = min(pos, track_width - 1)
         tag = f"{DIAMOND}{gate.label}"
         for i, ch in enumerate(tag):
@@ -126,23 +136,30 @@ def render_date_axis(
     gate_str = "".join(gate_track)
     gate_text = Text(gate_str, style=AXIS_STYLE)
     for gate in data.gates:
-        pos = int((gate.day / total_days) * track_width) if total_days > 0 else 0
+        pos = (
+            int((gate.day / total_days) * track_width)
+            if total_days > 0
+            else 0
+        )
         pos = min(pos, track_width - 1)
         tag = f"{DIAMOND}{gate.label}"
         end = min(pos + len(tag), track_width)
         gate_text.stylize(GATE_STYLE, pos, end)
 
-    gate_line = Text(" " * LABEL_WIDTH)
-    gate_line.append_text(gate_text)
+    gate_label = Text(" " * LABEL_WIDTH)
 
-    return [date_line, gate_line]
+    return [(date_label, date_track_text), (gate_label, gate_text)]
 
 
 def render_today_row(
     data: TimelineData,
     track_width: int,
-) -> Text | None:
-    """Build a today-marker row if today falls within the timeline range."""
+) -> tuple[Text, Text] | None:
+    """Build a today-marker row if today falls within the timeline range.
+
+    Returns:
+        (label, track) pair, or None if today is outside the range.
+    """
     today = date.today()
     day_offset = (today - data.start_date).days
     if day_offset < 0 or day_offset >= data.total_days:
@@ -151,24 +168,29 @@ def render_today_row(
     pos = int((day_offset / data.total_days) * track_width)
     pos = min(pos, track_width - 1)
 
-    label_part = Text("TODAY".ljust(LABEL_WIDTH), style=TODAY_STYLE)
+    label = Text("TODAY".ljust(LABEL_WIDTH), style=TODAY_STYLE)
     track = Text(
         " " * pos + TODAY_CHAR + " " * (track_width - pos - 1),
         style=TODAY_STYLE,
     )
-    label_part.append_text(track)
-    return label_part
+    return (label, track)
 
 
 def render_bar_row(
     item: TimelineItem,
     total_days: int,
     track_width: int,
-) -> Text:
-    """Render one Gantt bar row: [status] [label] [positioned bar]."""
+) -> tuple[Text, Text]:
+    """Render one Gantt bar row: label and positioned bar track.
+
+    Returns:
+        (label, track) pair.
+    """
     indicator = _status_indicator(item.status)
     raw_label = item.title
-    label = (indicator + raw_label)[: LABEL_WIDTH - 1].ljust(LABEL_WIDTH)
+    label_str = (indicator + raw_label)[: LABEL_WIDTH - 1].ljust(
+        LABEL_WIDTH
+    )
     style = _item_bar_style(item)
 
     offset, width = compute_bar_position(
@@ -190,27 +212,33 @@ def render_bar_row(
     # Risk items get underlined bars
     bar_style = f"underline {style}" if item.risk_labels else style
 
-    line = Text(label, style=label_style)
-    line.append(" " * offset)
-    line.append(char * width, style=bar_style)
+    label = Text(label_str, style=label_style)
 
+    track = Text(" " * offset)
+    track.append(char * width, style=bar_style)
     remaining = track_width - offset - width
     if remaining > 0:
-        line.append(" " * remaining)
+        track.append(" " * remaining)
 
-    return line
+    return (label, track)
 
 
 def render_group_header(
     group: MilestoneGroup,
     data: TimelineData,
     track_width: int,
-) -> Text:
-    """Render a milestone group header with optional due-date marker."""
-    title = f"\u2501\u2501 {group.title} "
-    header = Text(title[: LABEL_WIDTH - 1].ljust(LABEL_WIDTH), style=GROUP_STYLE)
+) -> tuple[Text, Text]:
+    """Render a milestone group header with optional due-date marker.
 
-    track = ["\u2500"] * track_width
+    Returns:
+        (label, track) pair.
+    """
+    title = f"\u2501\u2501 {group.title} "
+    label = Text(
+        title[: LABEL_WIDTH - 1].ljust(LABEL_WIDTH), style=GROUP_STYLE
+    )
+
+    track_chars = ["\u2500"] * track_width
     if group.due_date:
         day_offset = (group.due_date - data.start_date).days
         if 0 <= day_offset < data.total_days:
@@ -220,9 +248,9 @@ def render_group_header(
             for i, ch in enumerate(due_label):
                 idx = pos + i
                 if idx < track_width:
-                    track[idx] = ch
+                    track_chars[idx] = ch
 
-    track_text = Text("".join(track), style=AXIS_STYLE)
+    track = Text("".join(track_chars), style=AXIS_STYLE)
     if group.due_date:
         day_offset = (group.due_date - data.start_date).days
         if 0 <= day_offset < data.total_days:
@@ -230,41 +258,52 @@ def render_group_header(
             pos = min(pos, track_width - 1)
             due_label = f"{DIAMOND}{group.due_date.strftime('%b %d')}"
             end = min(pos + len(due_label), track_width)
-            track_text.stylize(DUE_STYLE, pos, end)
+            track.stylize(DUE_STYLE, pos, end)
 
-    header.append_text(track_text)
-    return header
+    return (label, track)
 
 
 def render_gantt(
     data: TimelineData,
     track_width: int = 60,
-) -> list[Text]:
-    """Render the full Gantt chart as a list of Rich Text lines."""
-    lines: list[Text] = []
+) -> tuple[list[Text], list[Text]]:
+    """Render the full Gantt chart as parallel label and track lists.
+
+    Returns:
+        (labels, tracks) — same-length lists for the label column
+        and the scrollable track column.
+    """
+    labels: list[Text] = []
+    tracks: list[Text] = []
 
     # Date axis (dates + gate markers = 2 rows)
-    lines.extend(render_date_axis(data, track_width))
+    for lbl, trk in render_date_axis(data, track_width):
+        labels.append(lbl)
+        tracks.append(trk)
 
     # Separator
-    sep = Text(" " * LABEL_WIDTH, style=AXIS_STYLE)
-    sep.append("\u2500" * track_width, style=AXIS_STYLE)
-    lines.append(sep)
+    labels.append(Text(" " * LABEL_WIDTH, style=AXIS_STYLE))
+    tracks.append(Text("\u2500" * track_width, style=AXIS_STYLE))
 
     # Today marker
-    today_line = render_today_row(data, track_width)
-    if today_line:
-        lines.append(today_line)
+    today = render_today_row(data, track_width)
+    if today:
+        labels.append(today[0])
+        tracks.append(today[1])
 
     # Milestone groups with headers
     for group in data.groups:
-        lines.append(render_group_header(group, data, track_width))
+        lbl, trk = render_group_header(group, data, track_width)
+        labels.append(lbl)
+        tracks.append(trk)
         for item in group.items:
-            lines.append(
-                render_bar_row(item, data.total_days, track_width)
+            lbl, trk = render_bar_row(
+                item, data.total_days, track_width
             )
+            labels.append(lbl)
+            tracks.append(trk)
 
-    return lines
+    return (labels, tracks)
 
 
 class GanttTimeline(Static):
@@ -295,5 +334,12 @@ class GanttTimeline(Static):
             return
         width = self.size.width if self.size.width > 0 else 80
         track_width = max(40, width - LABEL_WIDTH - 4)
-        lines = render_gantt(self.timeline_data, track_width)
-        self.update(Text("\n").join(lines))
+        labels, track_parts = render_gantt(
+            self.timeline_data, track_width
+        )
+        combined: list[Text] = []
+        for lbl, trk in zip(labels, track_parts):
+            line = lbl.copy()
+            line.append_text(trk)
+            combined.append(line)
+        self.update(Text("\n").join(combined))

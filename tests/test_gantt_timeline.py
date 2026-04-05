@@ -129,27 +129,24 @@ class TestRenderBarRow:
 
     def test_done_item_uses_solid_bar(self) -> None:
         item = _ti("Done Task", status=ItemStatus.DONE, start_day=0, days=10)
-        line = render_bar_row(item, total_days=100, track_width=100)
-        assert BAR_CHAR in line.plain
+        label, track = render_bar_row(item, total_days=100, track_width=100)
+        assert BAR_CHAR in track.plain
 
     def test_todo_item_uses_dim_bar(self) -> None:
         item = _ti("Todo Task", status=ItemStatus.TODO, start_day=0, days=10)
-        line = render_bar_row(item, total_days=100, track_width=100)
-        assert BAR_DIM in line.plain
+        label, track = render_bar_row(item, total_days=100, track_width=100)
+        assert BAR_DIM in track.plain
 
     def test_label_truncated_to_width(self) -> None:
         long_name = "A" * 50
         item = _ti(long_name, start_day=0, days=10)
-        line = render_bar_row(item, total_days=100, track_width=100)
-        # Label portion should not exceed LABEL_WIDTH
-        label_text = line.plain[:LABEL_WIDTH]
-        assert len(label_text) == LABEL_WIDTH
+        label, track = render_bar_row(item, total_days=100, track_width=100)
+        assert len(label.plain) == LABEL_WIDTH
 
     def test_risk_labels_present(self) -> None:
         item = _ti(risk_labels=["risk:api"])
-        line = render_bar_row(item, total_days=100, track_width=60)
-        # Bar should still render (no crash)
-        assert len(line.plain) > 0
+        label, track = render_bar_row(item, total_days=100, track_width=60)
+        assert len(track.plain) > 0
 
 
 class TestRenderGroupHeader:
@@ -160,8 +157,8 @@ class TestRenderGroupHeader:
         data = TimelineData(
             start_date=date(2026, 4, 1), total_days=30
         )
-        line = render_group_header(group, data, track_width=60)
-        assert "Sprint 1" in line.plain
+        label, track = render_group_header(group, data, track_width=60)
+        assert "Sprint 1" in label.plain
 
     def test_due_date_marker(self) -> None:
         group = MilestoneGroup(
@@ -172,18 +169,16 @@ class TestRenderGroupHeader:
         data = TimelineData(
             start_date=date(2026, 4, 1), total_days=30
         )
-        line = render_group_header(group, data, track_width=60)
-        # Diamond marker should appear
-        assert "\u25c6" in line.plain
+        label, track = render_group_header(group, data, track_width=60)
+        assert "\u25c6" in track.plain
 
     def test_no_due_date_no_diamond(self) -> None:
         group = MilestoneGroup(title="Sprint 1", items=[])
         data = TimelineData(
             start_date=date(2026, 4, 1), total_days=30
         )
-        line = render_group_header(group, data, track_width=60)
-        # Only horizontal lines, no diamond
-        assert "\u25c6" not in line.plain
+        label, track = render_group_header(group, data, track_width=60)
+        assert "\u25c6" not in track.plain
 
 
 class TestRenderDateAxis:
@@ -195,6 +190,9 @@ class TestRenderDateAxis:
         )
         rows = render_date_axis(data, track_width=60)
         assert len(rows) == 2
+        # Each row is a (label, track) tuple
+        for label, track in rows:
+            assert len(label.plain) == LABEL_WIDTH
 
     def test_gate_markers_in_second_row(self) -> None:
         data = TimelineData(
@@ -203,8 +201,8 @@ class TestRenderDateAxis:
             gates=[GateMarker(label="GA", day=10)],
         )
         rows = render_date_axis(data, track_width=60)
-        gate_row = rows[1]
-        assert "GA" in gate_row.plain
+        _label, track = rows[1]
+        assert "GA" in track.plain
 
 
 class TestRenderGantt:
@@ -230,17 +228,19 @@ class TestRenderGantt:
             ],
             gates=[GateMarker(label="Gate", day=20)],
         )
-        lines = render_gantt(data, track_width=60)
+        labels, tracks = render_gantt(data, track_width=60)
+        assert len(labels) == len(tracks)
         # 2 axis rows + 1 separator + 2 group headers + 3 items = 8 minimum
-        assert len(lines) >= 8
-        text = "\n".join(line.plain for line in lines)
-        assert "Sprint 1" in text
-        assert "Ungrouped" in text
+        assert len(labels) >= 8
+        label_text = "\n".join(lbl.plain for lbl in labels)
+        assert "Sprint 1" in label_text
+        assert "Ungrouped" in label_text
 
     def test_minimal_data(self) -> None:
         data = TimelineData(
             start_date=date(2026, 4, 1), total_days=1
         )
-        lines = render_gantt(data, track_width=60)
+        labels, tracks = render_gantt(data, track_width=60)
+        assert len(labels) == len(tracks)
         # At least axis rows + separator
-        assert len(lines) >= 3
+        assert len(labels) >= 3
