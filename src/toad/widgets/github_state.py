@@ -8,6 +8,7 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
+from textual.timer import Timer
 from textual.widget import Widget
 from textual.widgets import Static
 
@@ -21,6 +22,8 @@ from toad.widgets.github_views.prs import PRsView
 from toad.widgets.github_views.status_overview import StatusOverview
 
 log = logging.getLogger(__name__)
+
+REFRESH_INTERVAL = 60
 
 
 class GitHubStateWidget(Widget, can_focus=True):
@@ -66,6 +69,8 @@ class GitHubStateWidget(Widget, can_focus=True):
         super().__init__(**kwargs)
         self._repo = repo
         self._project_path = project_path
+        self._refresh_timer: Timer | None = None
+        self._ready = False
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
@@ -94,6 +99,27 @@ class GitHubStateWidget(Widget, can_focus=True):
             self._show_error("Not authenticated — run: gh auth login")
             return
 
+        self._ready = True
+        await self._load_all()
+
+    def watch_display(self, visible: bool) -> None:
+        """Start/stop auto-refresh based on visibility."""
+        if not self._ready:
+            return
+        if visible:
+            if self._refresh_timer is None:
+                self._refresh_timer = self.set_interval(
+                    REFRESH_INTERVAL, self._auto_refresh
+                )
+        else:
+            self._stop_timer()
+
+    def _stop_timer(self) -> None:
+        if self._refresh_timer is not None:
+            self._refresh_timer.stop()
+            self._refresh_timer = None
+
+    async def _auto_refresh(self) -> None:
         await self._load_all()
 
     async def _load_all(self) -> None:

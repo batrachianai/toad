@@ -39,7 +39,8 @@ members = [
 #rich = { path = "../rich", editable = true }
 
 [project.scripts]
-toad = "toad.cli:main"
+canon = "toad.cli:main"
+canon-ctl = "toad.ctl:main"
 
 [build-system]
 requires = ["hatchling==1.28.0"]

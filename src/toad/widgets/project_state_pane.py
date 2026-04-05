@@ -188,16 +188,29 @@ class ProjectStatePane(Vertical):
         self._fetch_timeline()
 
     def watch_display(self, visible: bool) -> None:
-        """Start/stop auto-refresh timer based on visibility."""
+        """Stop timer when entire pane is hidden."""
+        if not visible:
+            self._stop_timeline_timer()
+
+    def _sync_timeline_timer(
+        self, section_id: str, *, visible: bool
+    ) -> None:
+        """Start/stop the refresh timer when the GitHub section toggles."""
+        if section_id != SECTION_GITHUB:
+            return
         if visible:
+            self._fetch_timeline()
             if self._refresh_timer is None:
                 self._refresh_timer = self.set_interval(
                     self.REFRESH_INTERVAL, self._fetch_timeline
                 )
         else:
-            if self._refresh_timer is not None:
-                self._refresh_timer.stop()
-                self._refresh_timer = None
+            self._stop_timeline_timer()
+
+    def _stop_timeline_timer(self) -> None:
+        if self._refresh_timer is not None:
+            self._refresh_timer.stop()
+            self._refresh_timer = None
 
     # ------------------------------------------------------------------
     # Toolbar — generic button handler
@@ -234,17 +247,20 @@ class ProjectStatePane(Vertical):
         """Show a section by its ID."""
         self.query_one(f"#{section_id}").display = True
         self._sync_toolbar()
+        self._sync_timeline_timer(section_id, visible=True)
 
     def hide_section(self, section_id: str) -> None:
         """Hide a section by its ID."""
         self.query_one(f"#{section_id}").display = False
         self._sync_toolbar()
+        self._sync_timeline_timer(section_id, visible=False)
 
     def toggle_section(self, section_id: str) -> None:
         """Toggle a section's visibility."""
         widget = self.query_one(f"#{section_id}")
         widget.display = not widget.display
         self._sync_toolbar()
+        self._sync_timeline_timer(section_id, visible=widget.display)
 
     def hide_all_sections(self) -> None:
         """Hide every section."""
