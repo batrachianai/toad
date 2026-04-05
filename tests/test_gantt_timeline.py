@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from unittest.mock import patch
+
 from toad.widgets.gantt_timeline import (
     ACTIVE_STYLE,
     BAR_CHAR,
@@ -21,6 +23,7 @@ from toad.widgets.gantt_timeline import (
     DONE_STYLE,
     LABEL_WIDTH,
     PENDING_STYLE,
+    TODAY_CHAR,
     _item_bar_style,
     _status_indicator,
     compute_bar_position,
@@ -29,6 +32,7 @@ from toad.widgets.gantt_timeline import (
     render_date_axis,
     render_gantt,
     render_group_header,
+    render_today_row,
 )
 from toad.widgets.github_views.timeline_data import (
     GateMarker,
@@ -324,3 +328,132 @@ class TestScrollToTodayPosition:
         visible = 80
         target = max(0, pos - visible // 2)
         assert target == 0
+
+
+class TestRenderTodayRow:
+    """render_today_row produces a today-marker row when in range."""
+
+    def test_returns_none_when_before_range(self) -> None:
+        data = TimelineData(
+            start_date=date(2026, 6, 1), total_days=30
+        )
+        with patch(
+            "toad.widgets.gantt_timeline.date"
+        ) as mock_date:
+            mock_date.today.return_value = date(2026, 5, 1)
+            mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+            result = render_today_row(data, track_width=60)
+        assert result is None
+
+    def test_returns_none_when_after_range(self) -> None:
+        data = TimelineData(
+            start_date=date(2026, 4, 1), total_days=10
+        )
+        with patch(
+            "toad.widgets.gantt_timeline.date"
+        ) as mock_date:
+            mock_date.today.return_value = date(2026, 5, 1)
+            mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+            result = render_today_row(data, track_width=60)
+        assert result is None
+
+    def test_returns_label_and_track_when_in_range(self) -> None:
+        data = TimelineData(
+            start_date=date(2026, 4, 1), total_days=30
+        )
+        with patch(
+            "toad.widgets.gantt_timeline.date"
+        ) as mock_date:
+            mock_date.today.return_value = date(2026, 4, 15)
+            mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+            result = render_today_row(data, track_width=60)
+        assert result is not None
+        label, track = result
+        assert "TODAY" in label.plain
+        assert len(label.plain) == LABEL_WIDTH
+        assert TODAY_CHAR in track.plain
+
+    def test_today_marker_position(self) -> None:
+        """Marker at day 15 of 30 maps to midpoint of track."""
+        data = TimelineData(
+            start_date=date(2026, 4, 1), total_days=30
+        )
+        with patch(
+            "toad.widgets.gantt_timeline.date"
+        ) as mock_date:
+            mock_date.today.return_value = date(2026, 4, 16)
+            mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+            result = render_today_row(data, track_width=60)
+        assert result is not None
+        _label, track = result
+        pos = track.plain.index(TODAY_CHAR)
+        assert pos == 30  # day 15 / 30 days * 60 width = 30
+
+
+class TestRenderGanttLabelTrackAlignment:
+    """Labels and tracks stay aligned across all render outputs."""
+
+    def test_all_labels_have_label_width(self) -> None:
+        """Every label row has exactly LABEL_WIDTH characters."""
+        data = TimelineData(
+            start_date=date(2026, 4, 1),
+            total_days=30,
+            groups=[
+                MilestoneGroup(
+                    title="Sprint 1",
+                    due_date=date(2026, 4, 15),
+                    items=[
+                        _ti("A", ItemStatus.DONE, 0, 5),
+                        _ti("B", ItemStatus.IN_PROGRESS, 5, 10),
+                    ],
+                ),
+            ],
+        )
+        track_width = compute_track_width(data.total_days)
+        labels, tracks = render_gantt(data, track_width)
+        for i, label in enumerate(labels):
+            assert len(label.plain) == LABEL_WIDTH, (
+                f"Row {i} label width {len(label.plain)} != {LABEL_WIDTH}"
+            )
+
+    def test_labels_and_tracks_same_length(self) -> None:
+        """Label list and track list have equal row count."""
+        data = TimelineData(
+            start_date=date(2026, 4, 1),
+            total_days=60,
+            groups=[
+                MilestoneGroup(
+                    title="M1",
+                    items=[_ti("X", ItemStatus.TODO, 0, 10)],
+                ),
+                MilestoneGroup(
+                    title="M2",
+                    items=[_ti("Y", ItemStatus.DONE, 20, 5)],
+                ),
+            ],
+        )
+        track_width = compute_track_width(data.total_days)
+        labels, tracks = render_gantt(data, track_width)
+        assert len(labels) == len(tracks)
+
+    def test_track_width_uses_chars_per_week(self) -> None:
+        """render_gantt with computed track_width uses fixed sizing."""
+        data = TimelineData(
+            start_date=date(2026, 4, 1),
+            total_days=30,
+            groups=[
+                MilestoneGroup(
+                    title="Sprint",
+                    items=[_ti("A", ItemStatus.TODO, 0, 10)],
+                ),
+            ],
+        )
+        track_width = compute_track_width(data.total_days)
+        expected = 5 * CHARS_PER_WEEK  # ceil(30/7) = 5
+        assert track_width == expected
+        labels, tracks = render_gantt(data, track_width)
+        # Track rows should fill track_width
+        for i, track in enumerate(tracks):
+            assert len(track.plain) >= track_width, (
+                f"Row {i} track len {len(track.plain)} < {track_width}"
+            )
