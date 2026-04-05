@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import date
 
 from rich.text import Text
@@ -30,10 +31,27 @@ DUE_STYLE = "bold magenta"
 
 # Layout
 LABEL_WIDTH = 22
+CHARS_PER_WEEK = 10
 BAR_CHAR = "\u2588"  # █
 BAR_DIM = "\u2591"  # ░
 TODAY_CHAR = "\u2502"  # │
 DIAMOND = "\u25c6"  # ◆
+
+def compute_track_width(
+    total_days: int,
+    chars_per_week: int = CHARS_PER_WEEK,
+) -> int:
+    """Compute track width from timeline span using fixed chars per week.
+
+    Returns:
+        Character width = ceil(total_days / 7) * chars_per_week,
+        with a minimum of chars_per_week (one week).
+    """
+    if total_days <= 0:
+        return chars_per_week
+    weeks = math.ceil(total_days / 7)
+    return max(chars_per_week, weeks * chars_per_week)
+
 
 # Priority → style suffix
 _PRIORITY_BORDER: dict[Priority, str] = {
@@ -332,8 +350,7 @@ class GanttTimeline(Static):
         if not self.timeline_data:
             self.update("No timeline data")
             return
-        width = self.size.width if self.size.width > 0 else 80
-        track_width = max(40, width - LABEL_WIDTH - 4)
+        track_width = compute_track_width(self.timeline_data.total_days)
         labels, track_parts = render_gantt(
             self.timeline_data, track_width
         )

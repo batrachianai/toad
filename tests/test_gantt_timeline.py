@@ -17,12 +17,14 @@ from toad.widgets.gantt_timeline import (
     ACTIVE_STYLE,
     BAR_CHAR,
     BAR_DIM,
+    CHARS_PER_WEEK,
     DONE_STYLE,
     LABEL_WIDTH,
     PENDING_STYLE,
     _item_bar_style,
     _status_indicator,
     compute_bar_position,
+    compute_track_width,
     render_bar_row,
     render_date_axis,
     render_gantt,
@@ -95,6 +97,33 @@ class TestComputeBarPosition:
             start_day=95, days=20, total_days=100, track_width=100
         )
         assert offset + width <= 100
+
+
+class TestComputeTrackWidth:
+    """compute_track_width uses ceil(total_days / 7) * chars_per_week."""
+
+    def test_exact_weeks(self) -> None:
+        assert compute_track_width(14) == 2 * CHARS_PER_WEEK
+
+    def test_partial_week_rounds_up(self) -> None:
+        # 15 days = 3 weeks (ceil)
+        assert compute_track_width(15) == 3 * CHARS_PER_WEEK
+
+    def test_one_day(self) -> None:
+        assert compute_track_width(1) == CHARS_PER_WEEK
+
+    def test_zero_days_returns_minimum(self) -> None:
+        assert compute_track_width(0) == CHARS_PER_WEEK
+
+    def test_negative_days_returns_minimum(self) -> None:
+        assert compute_track_width(-5) == CHARS_PER_WEEK
+
+    def test_custom_chars_per_week(self) -> None:
+        assert compute_track_width(14, chars_per_week=8) == 16
+
+    def test_large_timeline(self) -> None:
+        # 365 days = 53 weeks (ceil)
+        assert compute_track_width(365) == 53 * CHARS_PER_WEEK
 
 
 class TestItemBarStyle:
