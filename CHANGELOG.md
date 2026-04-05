@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Changed
+- Horizontal Scroll for Gantt Timeline (`20260405-gantt-hscroll`) — 2026-04-05
+
 - Live GitHub Timeline (replace static timeline.json) (`20260403-live-github-timeline`) — 2026-04-04
 
 - Canon Builder + Automation sections for Toad TUI (`canon-sections`) — 2026-03-30
