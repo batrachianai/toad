@@ -30,7 +30,7 @@ context — all in one screen.
 
 | Tab | Content | Source |
 |-----|---------|--------|
-| Timeline | Gantt chart (existing GanttTimeline widget) | `timeline.json` via dega-core.yaml URL |
+| Timeline | Gantt chart (existing GanttTimeline widget) | Live GitHub API via `gh` CLI |
 | GitHub | PRs + Issues dashboard (existing GitHubStateWidget) | GitHub API via `gh` CLI |
 
 The Timeline tab is the existing ProjectStatePane content. The GitHub tab

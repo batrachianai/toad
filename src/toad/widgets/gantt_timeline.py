@@ -1,51 +1,65 @@
-"""Gantt Timeline — JSON-driven Gantt chart rendered with Rich Text."""
+"""Gantt Timeline — renders a Gantt chart from TimelineData model."""
 
 from __future__ import annotations
 
-import json
 import logging
-from datetime import date, datetime
-from pathlib import Path
-from typing import Any
+from datetime import date
 
 from rich.text import Text
 from textual.reactive import reactive
 from textual.widgets import Static
 
+from toad.widgets.github_views.timeline_data import (
+    MilestoneGroup,
+    TimelineData,
+    TimelineItem,
+)
+from toad.widgets.github_views.timeline_provider import ItemStatus, Priority
+
 log = logging.getLogger(__name__)
 
-# Two-tone palette: completed vs pending. Ignore per-bar colors from JSON.
-COMPLETED_STYLE = "green"
+# Palette
+DONE_STYLE = "green"
+ACTIVE_STYLE = "yellow"
 PENDING_STYLE = "bright_black"
-
 GATE_STYLE = "bold yellow"
-EVENT_STYLE = "bold yellow"
 TODAY_STYLE = "bold green"
 AXIS_STYLE = "bright_black"
-LABEL_WIDTH = 20
+GROUP_STYLE = "bold cyan"
+DUE_STYLE = "bold magenta"
+
+# Layout
+LABEL_WIDTH = 22
 BAR_CHAR = "\u2588"  # █
-BAR_CHAR_DIM = "\u2591"  # ░
+BAR_DIM = "\u2591"  # ░
 TODAY_CHAR = "\u2502"  # │
+DIAMOND = "\u25c6"  # ◆
 
-STATUS_DONE = "done"
-STATUS_ACTIVE = "active"
-STATUS_PENDING = "pending"
+# Priority → style suffix
+_PRIORITY_BORDER: dict[Priority, str] = {
+    Priority.P1: "bold red",
+    Priority.P2: "bold yellow",
+    Priority.P3: "",
+    Priority.P4: "dim",
+}
 
 
-def _bar_style(status: str) -> str:
-    """Return the bar style based on status — completed or pending."""
-    if status == STATUS_DONE:
-        return COMPLETED_STYLE
+def _item_bar_style(item: TimelineItem) -> str:
+    """Return bar style based on status."""
+    if item.status is ItemStatus.DONE:
+        return DONE_STYLE
+    if item.status is ItemStatus.IN_PROGRESS:
+        return ACTIVE_STYLE
     return PENDING_STYLE
 
 
-def _parse_start_date(meta: dict[str, Any]) -> date | None:
-    """Parse the startDate from meta, returning None on failure."""
-    raw = meta.get("startDate", "")
-    try:
-        return datetime.strptime(raw, "%Y-%m-%d").date()
-    except (ValueError, TypeError):
-        return None
+def _status_indicator(status: ItemStatus) -> str:
+    """Return a status prefix character."""
+    if status is ItemStatus.DONE:
+        return "\u2713 "  # ✓
+    if status is ItemStatus.IN_PROGRESS:
+        return "\u25b6 "  # ▶
+    return "  "
 
 
 def compute_bar_position(
@@ -63,40 +77,33 @@ def compute_bar_position(
         return (0, 0)
     offset = int((start_day / total_days) * track_width)
     width = max(1, int((days / total_days) * track_width))
-    # Clamp to track bounds
     offset = min(offset, track_width - 1)
     width = min(width, track_width - offset)
     return (offset, width)
 
 
 def render_date_axis(
-    meta: dict[str, Any],
-    gates: list[dict[str, Any]],
+    data: TimelineData,
     track_width: int,
 ) -> list[Text]:
-    """Build date axis rows: dates on top, gate/event markers below."""
-    total_days = meta.get("totalDays", 1)
-    start = _parse_start_date(meta)
+    """Build date axis rows: dates on top, gate markers below."""
+    total_days = data.total_days
+    start = data.start_date
 
-    # --- Row 1: date tick marks ---
+    # Row 1: date tick marks
     date_track = [" "] * track_width
-    # Space ticks so labels (~6 chars) don't overlap
     tick_interval = max(7, total_days // max(1, track_width // 10))
     for day in range(0, total_days, tick_interval):
         pos = int((day / total_days) * track_width)
         if pos + 6 >= track_width:
             break
-        if start:
-            d = (
-                start
-                if day == 0
-                else date.fromordinal(start.toordinal() + day)
-            )
-            label = d.strftime("%b %d")
-        else:
-            label = f"D{day}"
-        # Only place if it won't overlap previous label
-        if all(date_track[pos + i] == " " for i in range(len(label)) if pos + i < track_width):
+        d = date.fromordinal(start.toordinal() + day)
+        label = d.strftime("%b %d")
+        if all(
+            date_track[pos + i] == " "
+            for i in range(len(label))
+            if pos + i < track_width
+        ):
             for i, ch in enumerate(label):
                 idx = pos + i
                 if idx < track_width:
@@ -105,100 +112,87 @@ def render_date_axis(
     date_line = Text(" " * LABEL_WIDTH)
     date_line.append("".join(date_track), style=f"bold {AXIS_STYLE}")
 
-    # --- Row 2: gate / event markers ---
+    # Row 2: gate markers
     gate_track = [" "] * track_width
-    gate_line = Text(" " * LABEL_WIDTH)
-
-    for gate in sorted(gates, key=lambda g: g.get("day", 0)):
-        day = gate.get("day", 0)
-        pos = int((day / total_days) * track_width) if total_days > 0 else 0
+    for gate in data.gates:
+        pos = int((gate.day / total_days) * track_width) if total_days > 0 else 0
         pos = min(pos, track_width - 1)
-        marker = gate.get("label", "?")
-        style = GATE_STYLE if gate.get("type") == "gate" else EVENT_STYLE
-        # Place marker text, preceded by a diamond
-        tag = f"\u25c6{marker}"
+        tag = f"{DIAMOND}{gate.label}"
         for i, ch in enumerate(tag):
             idx = pos + i
             if idx < track_width:
                 gate_track[idx] = ch
 
-    # Build styled gate line segment by segment
     gate_str = "".join(gate_track)
     gate_text = Text(gate_str, style=AXIS_STYLE)
-    # Re-style each gate marker with its color
-    for gate in sorted(gates, key=lambda g: g.get("day", 0)):
-        day = gate.get("day", 0)
-        pos = int((day / total_days) * track_width) if total_days > 0 else 0
+    for gate in data.gates:
+        pos = int((gate.day / total_days) * track_width) if total_days > 0 else 0
         pos = min(pos, track_width - 1)
-        tag = f"\u25c6{gate.get('label', '?')}"
-        style = GATE_STYLE if gate.get("type") == "gate" else EVENT_STYLE
+        tag = f"{DIAMOND}{gate.label}"
         end = min(pos + len(tag), track_width)
-        gate_text.stylize(style, pos, end)
+        gate_text.stylize(GATE_STYLE, pos, end)
 
+    gate_line = Text(" " * LABEL_WIDTH)
     gate_line.append_text(gate_text)
 
     return [date_line, gate_line]
 
 
 def render_today_row(
-    meta: dict[str, Any],
+    data: TimelineData,
     track_width: int,
 ) -> Text | None:
     """Build a today-marker row if today falls within the timeline range."""
-    total_days = meta.get("totalDays", 1)
-    start = _parse_start_date(meta)
-    if not start or total_days <= 0:
-        return None
-
     today = date.today()
-    day_offset = (today - start).days
-    if day_offset < 0 or day_offset >= total_days:
+    day_offset = (today - data.start_date).days
+    if day_offset < 0 or day_offset >= data.total_days:
         return None
 
-    pos = int((day_offset / total_days) * track_width)
+    pos = int((day_offset / data.total_days) * track_width)
     pos = min(pos, track_width - 1)
 
     label_part = Text("TODAY".ljust(LABEL_WIDTH), style=TODAY_STYLE)
-    track = Text(" " * pos + TODAY_CHAR + " " * (track_width - pos - 1), style=TODAY_STYLE)
+    track = Text(
+        " " * pos + TODAY_CHAR + " " * (track_width - pos - 1),
+        style=TODAY_STYLE,
+    )
     label_part.append_text(track)
     return label_part
 
 
-def _status_indicator(status: str) -> str:
-    """Return a status prefix character."""
-    if status == STATUS_DONE:
-        return "\u2713 "  # ✓
-    if status == STATUS_ACTIVE:
-        return "\u25b6 "  # ▶
-    return "  "
-
-
 def render_bar_row(
-    bar: dict[str, Any],
+    item: TimelineItem,
     total_days: int,
     track_width: int,
 ) -> Text:
     """Render one Gantt bar row: [status] [label] [positioned bar]."""
-    status = bar.get("status", STATUS_PENDING)
-    raw_label = bar.get("label", "")
-    indicator = _status_indicator(status)
-    label = (indicator + raw_label)[:LABEL_WIDTH - 1].ljust(LABEL_WIDTH)
-    style = _bar_style(status)
+    indicator = _status_indicator(item.status)
+    raw_label = item.title
+    label = (indicator + raw_label)[: LABEL_WIDTH - 1].ljust(LABEL_WIDTH)
+    style = _item_bar_style(item)
 
     offset, width = compute_bar_position(
-        bar.get("startDay", 0),
-        bar.get("days", 1),
+        item.start_day,
+        item.days,
         total_days,
         track_width,
     )
 
-    completed = status == STATUS_DONE
-    char = BAR_CHAR if completed else BAR_CHAR_DIM
-    label_style = f"dim {style}" if completed else style
+    done = item.status is ItemStatus.DONE
+    char = BAR_CHAR if done else BAR_DIM
+
+    # Priority styling on the label
+    priority_style = ""
+    if item.priority and item.priority in _PRIORITY_BORDER:
+        priority_style = _PRIORITY_BORDER[item.priority]
+    label_style = priority_style or (f"dim {style}" if done else style)
+
+    # Risk items get underlined bars
+    bar_style = f"underline {style}" if item.risk_labels else style
 
     line = Text(label, style=label_style)
     line.append(" " * offset)
-    line.append(char * width, style=style)
+    line.append(char * width, style=bar_style)
 
     remaining = track_width - offset - width
     if remaining > 0:
@@ -207,20 +201,50 @@ def render_bar_row(
     return line
 
 
+def render_group_header(
+    group: MilestoneGroup,
+    data: TimelineData,
+    track_width: int,
+) -> Text:
+    """Render a milestone group header with optional due-date marker."""
+    title = f"\u2501\u2501 {group.title} "
+    header = Text(title[: LABEL_WIDTH - 1].ljust(LABEL_WIDTH), style=GROUP_STYLE)
+
+    track = ["\u2500"] * track_width
+    if group.due_date:
+        day_offset = (group.due_date - data.start_date).days
+        if 0 <= day_offset < data.total_days:
+            pos = int((day_offset / data.total_days) * track_width)
+            pos = min(pos, track_width - 1)
+            due_label = f"{DIAMOND}{group.due_date.strftime('%b %d')}"
+            for i, ch in enumerate(due_label):
+                idx = pos + i
+                if idx < track_width:
+                    track[idx] = ch
+
+    track_text = Text("".join(track), style=AXIS_STYLE)
+    if group.due_date:
+        day_offset = (group.due_date - data.start_date).days
+        if 0 <= day_offset < data.total_days:
+            pos = int((day_offset / data.total_days) * track_width)
+            pos = min(pos, track_width - 1)
+            due_label = f"{DIAMOND}{group.due_date.strftime('%b %d')}"
+            end = min(pos + len(due_label), track_width)
+            track_text.stylize(DUE_STYLE, pos, end)
+
+    header.append_text(track_text)
+    return header
+
+
 def render_gantt(
-    data: dict[str, Any],
+    data: TimelineData,
     track_width: int = 60,
 ) -> list[Text]:
     """Render the full Gantt chart as a list of Rich Text lines."""
-    meta = data.get("meta", {})
-    bars = data.get("ganttBars", [])
-    gates = data.get("gates", [])
-    total_days = meta.get("totalDays", 1)
-
     lines: list[Text] = []
 
     # Date axis (dates + gate markers = 2 rows)
-    lines.extend(render_date_axis(meta, gates, track_width))
+    lines.extend(render_date_axis(data, track_width))
 
     # Separator
     sep = Text(" " * LABEL_WIDTH, style=AXIS_STYLE)
@@ -228,19 +252,23 @@ def render_gantt(
     lines.append(sep)
 
     # Today marker
-    today_line = render_today_row(meta, track_width)
+    today_line = render_today_row(data, track_width)
     if today_line:
         lines.append(today_line)
 
-    # Bar rows
-    for bar in bars:
-        lines.append(render_bar_row(bar, total_days, track_width))
+    # Milestone groups with headers
+    for group in data.groups:
+        lines.append(render_group_header(group, data, track_width))
+        for item in group.items:
+            lines.append(
+                render_bar_row(item, data.total_days, track_width)
+            )
 
     return lines
 
 
 class GanttTimeline(Static):
-    """A Textual widget that renders a Gantt chart from JSON timeline data."""
+    """A Textual widget that renders a Gantt chart from TimelineData."""
 
     DEFAULT_CSS = """
     GanttTimeline {
@@ -249,39 +277,7 @@ class GanttTimeline(Static):
     }
     """
 
-    timeline_data: reactive[dict[str, Any] | None] = reactive(None)
-
-    def __init__(
-        self,
-        data: dict[str, Any] | None = None,
-        data_path: str | Path | None = None,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(**kwargs)
-        if data is not None:
-            self._initial_data = data
-        elif data_path is not None:
-            self._initial_data = self._load_file(Path(data_path))
-        else:
-            self._initial_data = None
-
-    def on_mount(self) -> None:
-        """Defer initial render until layout is ready."""
-        if self._initial_data is not None:
-            self.set_timer(0.1, self._deferred_load)
-
-    def _deferred_load(self) -> None:
-        """Load data after layout has settled."""
-        self.timeline_data = self._initial_data
-
-    @staticmethod
-    def _load_file(path: Path) -> dict[str, Any] | None:
-        """Load timeline JSON from a file path."""
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            log.warning("Failed to load timeline data from %s: %s", path, exc)
-            return None
+    timeline_data: reactive[TimelineData | None] = reactive(None)
 
     def watch_timeline_data(self) -> None:
         """Re-render when data changes."""
@@ -301,30 +297,3 @@ class GanttTimeline(Static):
         track_width = max(40, width - LABEL_WIDTH - 4)
         lines = render_gantt(self.timeline_data, track_width)
         self.update(Text("\n").join(lines))
-
-    def reload_from_file(self, path: str | Path) -> None:
-        """Reload timeline data from a JSON file."""
-        self.timeline_data = self._load_file(Path(path))
-
-
-if __name__ == "__main__":
-    from textual.app import App, ComposeResult
-
-    DEMO_PATH = Path(__file__).resolve().parents[4] / "timeline.json"
-    # Fallback to the canon-docs reference data
-    REFERENCE_PATH = Path(
-        "/Users/cerratoa/dega/canon-docs/ace/deliverables/site/data.json"
-    )
-
-    class GanttApp(App):
-        CSS = """
-        Screen {
-            overflow-y: auto;
-        }
-        """
-
-        def compose(self) -> ComposeResult:
-            path = DEMO_PATH if DEMO_PATH.exists() else REFERENCE_PATH
-            yield GanttTimeline(data_path=path)
-
-    GanttApp().run()

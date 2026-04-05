@@ -50,41 +50,31 @@ Full protocol docs: [socket-controller.md](socket-controller.md)
 A toggleable right-side split pane showing a Gantt timeline.
 
 - **Toggle**: `ctrl+g` or `toad-ctl.sh action "screen.toggle_project_state"`
-- **Auto-refresh**: fetches fresh data every 30 seconds while visible
-- **Data source**: reads from a remote URL (GitHub raw), falls back to
-  local `timeline.json`
+- **Auto-refresh**: fetches fresh data every 60 seconds while visible
+- **Data source**: live GitHub Issues API + Projects API via `gh` CLI
 
 ### Timeline configuration
 
-The pane reads its data URL from `dega-core.yaml` in the project root:
+The pane reads its timeline config from `dega-core.yaml` in the project root:
 
 ```yaml
 timeline:
   repo: DEGAorg/claude-code-config
-  branch: develop
-  path: data/timeline.json
+  project_number: 8
 ```
 
-This builds the raw URL:
-`https://raw.githubusercontent.com/{repo}/{branch}/{path}`
+The provider fetches milestones, issues, and project board items from the
+configured repo. Gantt bars are derived from Start Date → Target Date per
+issue, grouped by milestone, colored by project board Status.
 
-If no `dega-core.yaml` is found, it falls back to the default DEGAorg
-timeline. If the remote fetch fails, it tries `timeline.json` in the
-project directory.
+If no `dega-core.yaml` is found or `gh` is not authenticated, the timeline
+shows an error message.
 
-### Updating the timeline
+### Refreshing the timeline
 
-The timeline is updated via the `/timeline` slash command in Claude Code
-(from the `claude-code-config` repo). This is a producer/consumer split:
-
-- **Producer**: Claude Code + `/timeline` command → writes to GitHub repo
-- **Consumer**: Toad → reads from GitHub raw URL, renders in pane
+The timeline auto-refreshes every 60 seconds. To trigger an immediate refresh:
 
 ```bash
-# In Claude Code (any repo with dega-core.yaml):
-/timeline mark Conductor as done, MCP Server is active
-
-# Then in Toad (or it auto-refreshes in 30s):
 tools/toad-ctl.sh action "screen.refresh_timeline"
 ```
 
@@ -99,13 +89,13 @@ The context file lives at `src/toad/data/agent_context.md`.
 ## Architecture
 
 ```
-claude-code-config (producer)          conductor-view / Toad (consumer)
+GitHub Issues + Projects API           conductor-view / Toad (consumer)
 ┌──────────────────────┐              ┌──────────────────────────────┐
-│ /timeline command    │   GitHub     │ ProjectStatePane             │
-│ updates              ├─── push ───►│ fetches raw URL every 30s   │
-│ data/timeline.json   │   raw URL   │ renders GanttTimeline widget │
-│ on develop branch    │              │                              │
-└──────────────────────┘              │ Socket controller            │
+│ Milestones, Issues,  │   gh CLI    │ ProjectStatePane             │
+│ Project board items  ├───────────►│ fetches via provider / 60s   │
+│                      │              │ renders GanttTimeline widget │
+└──────────────────────┘              │                              │
+                                      │ Socket controller            │
                                       │ /tmp/toad-{pid}.sock        │
          Agent / Script               │ ◄── JSON commands           │
          ┌──────────┐                 │ ──► JSON responses          │

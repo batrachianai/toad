@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+import yaml
 from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -18,35 +19,38 @@ from toad.widgets.builder_view import BuilderView
 from toad.widgets.canon_state import CanonStateWidget
 from toad.widgets.gantt_timeline import GanttTimeline
 from toad.widgets.github_state import GitHubStateWidget
+from toad.widgets.github_views.github_timeline_provider import (
+    GitHubTimelineProvider,
+)
+from toad.widgets.github_views.timeline_data import build_timeline
 
 log = logging.getLogger(__name__)
 
-DEFAULT_TIMELINE_URL = (
-    "https://raw.githubusercontent.com/DEGAorg"
-    "/claude-code-config/develop/data/timeline.json"
-)
 
+def _read_timeline_config(
+    project_path: Path,
+) -> dict[str, Any] | None:
+    """Read timeline config from dega-core.yaml.
 
-def _read_timeline_url(project_path: Path) -> str:
-    """Read timeline URL from dega-core.yaml, fallback to default."""
+    Returns:
+        Dict with ``repo`` and ``project_number`` keys, or None.
+    """
     config_path = project_path / "dega-core.yaml"
-    if config_path.exists():
-        try:
-            import yaml
-
-            config = yaml.safe_load(config_path.read_text("utf-8"))
-            tl = config.get("timeline", {})
-            repo = tl.get("repo")
-            branch = tl.get("branch")
-            path = tl.get("path")
-            if repo and branch and path:
-                return (
-                    f"https://raw.githubusercontent.com/{repo}"
-                    f"/{branch}/{path}"
-                )
-        except Exception as exc:
-            log.warning("Failed to read dega-core.yaml: %s", exc)
-    return DEFAULT_TIMELINE_URL
+    if not config_path.exists():
+        return None
+    try:
+        config = yaml.safe_load(config_path.read_text("utf-8"))
+        tl = config.get("timeline", {})
+        repo = tl.get("repo")
+        project_number = tl.get("project_number")
+        if repo and project_number is not None:
+            return {
+                "repo": str(repo),
+                "project_number": int(project_number),
+            }
+    except Exception as exc:
+        log.warning("Failed to read timeline config: %s", exc)
+    return None
 
 
 # Section IDs — used as TabbedContent widget IDs and toolbar button suffix
@@ -129,7 +133,7 @@ class ProjectStatePane(Vertical):
     }
     """
 
-    REFRESH_INTERVAL = 30
+    REFRESH_INTERVAL = 60
 
     def __init__(
         self,
@@ -139,7 +143,7 @@ class ProjectStatePane(Vertical):
         super().__init__(**kwargs)
         self._project_path = project_path or Path(".").resolve()
         self._refresh_timer: Timer | None = None
-        self._timeline_url = _read_timeline_url(self._project_path)
+        self._provider = self._make_provider()
 
     def compose(self) -> ComposeResult:
         # Toolbar with one button per section
@@ -263,48 +267,37 @@ class ProjectStatePane(Vertical):
         log.warning("Tab %r not found in ProjectStatePane", tab_id)
 
     # ------------------------------------------------------------------
-    # Timeline fetch
+    # Provider setup
     # ------------------------------------------------------------------
 
-    @work(thread=True, exit_on_error=False)
-    def _fetch_timeline(self) -> None:
-        """Fetch timeline from remote URL, fallback to local file."""
-        data = self._fetch_remote()
-        if data is None:
-            data = self._load_local()
-        if data is not None:
-            self.app.call_from_thread(self._apply_data, data)
+    def _make_provider(self) -> GitHubTimelineProvider | None:
+        """Create a provider from dega-core.yaml config."""
+        cfg = _read_timeline_config(self._project_path)
+        if cfg is None:
+            log.warning("No timeline config in dega-core.yaml")
+            return None
+        return GitHubTimelineProvider(
+            repo=cfg["repo"],
+            project_number=cfg["project_number"],
+        )
 
-    def _apply_data(self, data: dict) -> None:
-        gantt = self.query_one("#pane-gantt", GanttTimeline)
-        gantt.timeline_data = data
+    # ------------------------------------------------------------------
+    # Timeline fetch — async provider pipeline
+    # ------------------------------------------------------------------
 
-    def _fetch_remote(self) -> dict | None:
+    @work(exclusive=True, exit_on_error=False)
+    async def _fetch_timeline(self) -> None:
+        """Fetch timeline via provider, transform, and update widget."""
+        if self._provider is None:
+            return
         try:
-            import httpx
-
-            resp = httpx.get(
-                self._timeline_url, timeout=5, follow_redirects=True
-            )
-            resp.raise_for_status()
-            return resp.json()
+            milestones = await self._provider.fetch_milestones()
+            items = await self._provider.fetch_items()
+            timeline = build_timeline(milestones, items)
+            gantt = self.query_one("#pane-gantt", GanttTimeline)
+            gantt.timeline_data = timeline
         except Exception as exc:
-            log.warning(
-                "Failed to fetch timeline from %s: %s",
-                self._timeline_url,
-                exc,
-            )
-            return None
-
-    def _load_local(self) -> dict | None:
-        path = self._project_path / "timeline.json"
-        if not path.exists():
-            return None
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            log.warning("Failed to load local timeline: %s", exc)
-            return None
+            log.warning("Timeline fetch failed: %s", exc)
 
     def refresh_timeline(self) -> None:
         """Re-fetch timeline data. Called via socket controller."""
