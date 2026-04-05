@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import date
 
 from rich.text import Text
+from textual.app import ComposeResult
+from textual.containers import Horizontal, HorizontalScroll
 from textual.reactive import reactive
+from textual.widget import Widget
 from textual.widgets import Static
 
 from toad.widgets.github_views.timeline_data import (
@@ -30,10 +34,27 @@ DUE_STYLE = "bold magenta"
 
 # Layout
 LABEL_WIDTH = 22
+CHARS_PER_WEEK = 10
 BAR_CHAR = "\u2588"  # █
 BAR_DIM = "\u2591"  # ░
 TODAY_CHAR = "\u2502"  # │
 DIAMOND = "\u25c6"  # ◆
+
+def compute_track_width(
+    total_days: int,
+    chars_per_week: int = CHARS_PER_WEEK,
+) -> int:
+    """Compute track width from timeline span using fixed chars per week.
+
+    Returns:
+        Character width = ceil(total_days / 7) * chars_per_week,
+        with a minimum of chars_per_week (one week).
+    """
+    if total_days <= 0:
+        return chars_per_week
+    weeks = math.ceil(total_days / 7)
+    return max(chars_per_week, weeks * chars_per_week)
+
 
 # Priority → style suffix
 _PRIORITY_BORDER: dict[Priority, str] = {
@@ -85,8 +106,12 @@ def compute_bar_position(
 def render_date_axis(
     data: TimelineData,
     track_width: int,
-) -> list[Text]:
-    """Build date axis rows: dates on top, gate markers below."""
+) -> list[tuple[Text, Text]]:
+    """Build date axis rows: dates on top, gate markers below.
+
+    Returns:
+        List of (label, track) pairs — one per axis row.
+    """
     total_days = data.total_days
     start = data.start_date
 
@@ -109,13 +134,19 @@ def render_date_axis(
                 if idx < track_width:
                     date_track[idx] = ch
 
-    date_line = Text(" " * LABEL_WIDTH)
-    date_line.append("".join(date_track), style=f"bold {AXIS_STYLE}")
+    date_label = Text(" " * LABEL_WIDTH)
+    date_track_text = Text(
+        "".join(date_track), style=f"bold {AXIS_STYLE}"
+    )
 
     # Row 2: gate markers
     gate_track = [" "] * track_width
     for gate in data.gates:
-        pos = int((gate.day / total_days) * track_width) if total_days > 0 else 0
+        pos = (
+            int((gate.day / total_days) * track_width)
+            if total_days > 0
+            else 0
+        )
         pos = min(pos, track_width - 1)
         tag = f"{DIAMOND}{gate.label}"
         for i, ch in enumerate(tag):
@@ -126,23 +157,30 @@ def render_date_axis(
     gate_str = "".join(gate_track)
     gate_text = Text(gate_str, style=AXIS_STYLE)
     for gate in data.gates:
-        pos = int((gate.day / total_days) * track_width) if total_days > 0 else 0
+        pos = (
+            int((gate.day / total_days) * track_width)
+            if total_days > 0
+            else 0
+        )
         pos = min(pos, track_width - 1)
         tag = f"{DIAMOND}{gate.label}"
         end = min(pos + len(tag), track_width)
         gate_text.stylize(GATE_STYLE, pos, end)
 
-    gate_line = Text(" " * LABEL_WIDTH)
-    gate_line.append_text(gate_text)
+    gate_label = Text(" " * LABEL_WIDTH)
 
-    return [date_line, gate_line]
+    return [(date_label, date_track_text), (gate_label, gate_text)]
 
 
 def render_today_row(
     data: TimelineData,
     track_width: int,
-) -> Text | None:
-    """Build a today-marker row if today falls within the timeline range."""
+) -> tuple[Text, Text] | None:
+    """Build a today-marker row if today falls within the timeline range.
+
+    Returns:
+        (label, track) pair, or None if today is outside the range.
+    """
     today = date.today()
     day_offset = (today - data.start_date).days
     if day_offset < 0 or day_offset >= data.total_days:
@@ -151,24 +189,29 @@ def render_today_row(
     pos = int((day_offset / data.total_days) * track_width)
     pos = min(pos, track_width - 1)
 
-    label_part = Text("TODAY".ljust(LABEL_WIDTH), style=TODAY_STYLE)
+    label = Text("TODAY".ljust(LABEL_WIDTH), style=TODAY_STYLE)
     track = Text(
         " " * pos + TODAY_CHAR + " " * (track_width - pos - 1),
         style=TODAY_STYLE,
     )
-    label_part.append_text(track)
-    return label_part
+    return (label, track)
 
 
 def render_bar_row(
     item: TimelineItem,
     total_days: int,
     track_width: int,
-) -> Text:
-    """Render one Gantt bar row: [status] [label] [positioned bar]."""
+) -> tuple[Text, Text]:
+    """Render one Gantt bar row: label and positioned bar track.
+
+    Returns:
+        (label, track) pair.
+    """
     indicator = _status_indicator(item.status)
     raw_label = item.title
-    label = (indicator + raw_label)[: LABEL_WIDTH - 1].ljust(LABEL_WIDTH)
+    label_str = (indicator + raw_label)[: LABEL_WIDTH - 1].ljust(
+        LABEL_WIDTH
+    )
     style = _item_bar_style(item)
 
     offset, width = compute_bar_position(
@@ -190,27 +233,33 @@ def render_bar_row(
     # Risk items get underlined bars
     bar_style = f"underline {style}" if item.risk_labels else style
 
-    line = Text(label, style=label_style)
-    line.append(" " * offset)
-    line.append(char * width, style=bar_style)
+    label = Text(label_str, style=label_style)
 
+    track = Text(" " * offset)
+    track.append(char * width, style=bar_style)
     remaining = track_width - offset - width
     if remaining > 0:
-        line.append(" " * remaining)
+        track.append(" " * remaining)
 
-    return line
+    return (label, track)
 
 
 def render_group_header(
     group: MilestoneGroup,
     data: TimelineData,
     track_width: int,
-) -> Text:
-    """Render a milestone group header with optional due-date marker."""
-    title = f"\u2501\u2501 {group.title} "
-    header = Text(title[: LABEL_WIDTH - 1].ljust(LABEL_WIDTH), style=GROUP_STYLE)
+) -> tuple[Text, Text]:
+    """Render a milestone group header with optional due-date marker.
 
-    track = ["\u2500"] * track_width
+    Returns:
+        (label, track) pair.
+    """
+    title = f"\u2501\u2501 {group.title} "
+    label = Text(
+        title[: LABEL_WIDTH - 1].ljust(LABEL_WIDTH), style=GROUP_STYLE
+    )
+
+    track_chars = ["\u2500"] * track_width
     if group.due_date:
         day_offset = (group.due_date - data.start_date).days
         if 0 <= day_offset < data.total_days:
@@ -220,9 +269,9 @@ def render_group_header(
             for i, ch in enumerate(due_label):
                 idx = pos + i
                 if idx < track_width:
-                    track[idx] = ch
+                    track_chars[idx] = ch
 
-    track_text = Text("".join(track), style=AXIS_STYLE)
+    track = Text("".join(track_chars), style=AXIS_STYLE)
     if group.due_date:
         day_offset = (group.due_date - data.start_date).days
         if 0 <= day_offset < data.total_days:
@@ -230,54 +279,87 @@ def render_group_header(
             pos = min(pos, track_width - 1)
             due_label = f"{DIAMOND}{group.due_date.strftime('%b %d')}"
             end = min(pos + len(due_label), track_width)
-            track_text.stylize(DUE_STYLE, pos, end)
+            track.stylize(DUE_STYLE, pos, end)
 
-    header.append_text(track_text)
-    return header
+    return (label, track)
 
 
 def render_gantt(
     data: TimelineData,
     track_width: int = 60,
-) -> list[Text]:
-    """Render the full Gantt chart as a list of Rich Text lines."""
-    lines: list[Text] = []
+) -> tuple[list[Text], list[Text]]:
+    """Render the full Gantt chart as parallel label and track lists.
+
+    Returns:
+        (labels, tracks) — same-length lists for the label column
+        and the scrollable track column.
+    """
+    labels: list[Text] = []
+    tracks: list[Text] = []
 
     # Date axis (dates + gate markers = 2 rows)
-    lines.extend(render_date_axis(data, track_width))
+    for lbl, trk in render_date_axis(data, track_width):
+        labels.append(lbl)
+        tracks.append(trk)
 
     # Separator
-    sep = Text(" " * LABEL_WIDTH, style=AXIS_STYLE)
-    sep.append("\u2500" * track_width, style=AXIS_STYLE)
-    lines.append(sep)
+    labels.append(Text(" " * LABEL_WIDTH, style=AXIS_STYLE))
+    tracks.append(Text("\u2500" * track_width, style=AXIS_STYLE))
 
     # Today marker
-    today_line = render_today_row(data, track_width)
-    if today_line:
-        lines.append(today_line)
+    today = render_today_row(data, track_width)
+    if today:
+        labels.append(today[0])
+        tracks.append(today[1])
 
     # Milestone groups with headers
     for group in data.groups:
-        lines.append(render_group_header(group, data, track_width))
+        lbl, trk = render_group_header(group, data, track_width)
+        labels.append(lbl)
+        tracks.append(trk)
         for item in group.items:
-            lines.append(
-                render_bar_row(item, data.total_days, track_width)
+            lbl, trk = render_bar_row(
+                item, data.total_days, track_width
             )
+            labels.append(lbl)
+            tracks.append(trk)
 
-    return lines
+    return (labels, tracks)
 
 
-class GanttTimeline(Static):
-    """A Textual widget that renders a Gantt chart from TimelineData."""
+class GanttTimeline(Widget):
+    """A Textual widget that renders a Gantt chart from TimelineData.
+
+    Uses a frozen label column on the left and a horizontally
+    scrollable track column on the right.
+    """
 
     DEFAULT_CSS = """
     GanttTimeline {
         height: auto;
         padding: 0 1;
     }
+    GanttTimeline #gantt-labels {
+        width: auto;
+        height: auto;
+    }
+    GanttTimeline #gantt-track-scroll {
+        height: auto;
+    }
+    GanttTimeline #gantt-tracks {
+        width: auto;
+        height: auto;
+    }
     """
 
     timeline_data: reactive[TimelineData | None] = reactive(None)
+
+    def compose(self) -> ComposeResult:
+        """Build the frozen-label + scrollable-track layout."""
+        with Horizontal():
+            yield Static("", id="gantt-labels")
+            with HorizontalScroll(id="gantt-track-scroll"):
+                yield Static("", id="gantt-tracks")
 
     def watch_timeline_data(self) -> None:
         """Re-render when data changes."""
@@ -291,9 +373,52 @@ class GanttTimeline(Static):
     def _render_chart(self) -> None:
         """Render the Gantt chart into this widget."""
         if not self.timeline_data:
-            self.update("No timeline data")
+            try:
+                labels_widget = self.query_one(
+                    "#gantt-labels", Static
+                )
+                labels_widget.update("No timeline data")
+            except Exception:
+                pass
             return
-        width = self.size.width if self.size.width > 0 else 80
-        track_width = max(40, width - LABEL_WIDTH - 4)
-        lines = render_gantt(self.timeline_data, track_width)
-        self.update(Text("\n").join(lines))
+
+        data = self.timeline_data
+        track_width = compute_track_width(data.total_days)
+        labels, tracks = render_gantt(data, track_width)
+
+        labels_widget = self.query_one("#gantt-labels", Static)
+        tracks_widget = self.query_one("#gantt-tracks", Static)
+
+        labels_widget.update(
+            Text("\n").join(labels)
+        )
+        tracks_widget.update(
+            Text("\n").join(tracks)
+        )
+
+        self._scroll_to_today(data, track_width)
+
+    def _scroll_to_today(
+        self,
+        data: TimelineData,
+        track_width: int,
+    ) -> None:
+        """Auto-scroll the track pane so the today marker is visible."""
+        today = date.today()
+        day_offset = (today - data.start_date).days
+        if day_offset < 0 or day_offset >= data.total_days:
+            return
+        pos = int((day_offset / data.total_days) * track_width)
+        scroll_container = self.query_one(
+            "#gantt-track-scroll", HorizontalScroll
+        )
+        # Center the today marker in the visible area.  Use
+        # call_after_refresh so the container knows its content size.
+        def _do_scroll() -> None:
+            visible = scroll_container.size.width
+            target = max(0, pos - visible // 2)
+            scroll_container.scroll_to(
+                x=target, animate=False
+            )
+
+        self.call_after_refresh(_do_scroll)
