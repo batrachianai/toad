@@ -660,17 +660,35 @@ class Agent(AgentBase):
 
     @staticmethod
     def _load_agent_context() -> str:
-        """Load Toad agent context instructions."""
+        """Load agent context: Conductor prompt + socket commands.
+
+        Reads ``~/.claude/agents/conductor.md`` (if core is installed)
+        and merges it with the bundled socket-commands reference in
+        ``agent_context.md``.  Falls back to socket commands only when
+        the Conductor prompt is absent.
+        """
         from importlib.resources import files
 
+        conductor_text = ""
+        conductor_path = Path.home() / ".claude" / "agents" / "conductor.md"
         try:
-            return (
+            conductor_text = conductor_path.read_text("utf-8")
+        except OSError:
+            pass
+
+        socket_text = ""
+        try:
+            socket_text = (
                 files("toad.data")
                 .joinpath("agent_context.md")
                 .read_text("utf-8")
             )
         except Exception:
-            return ""
+            pass
+
+        if conductor_text and socket_text:
+            return f"{conductor_text}\n\n{socket_text}"
+        return conductor_text or socket_text
 
     async def acp_initialize(self):
         """Initialize agent."""
