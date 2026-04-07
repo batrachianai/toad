@@ -26,23 +26,13 @@ Your tools.
 Your workflow.
 Your codebase, evolving at thought speed.
 
-## Panel Commands
-
-Claude Code can control Conductor's side panels via the `/panel` command:
-
-- `/panel github` — open the Project Status panel (issues, PRs, plans)
-- `/panel github close` — close it
-- `/panel list` — list available panels
-
-When the user asks to see project state, issues, or PRs, use `/panel github` to open the Project Status panel.
-
 ---
 [ACP adapter for Claude Code](https://github.com/zed-industries/claude-code-acp) by Zed Industries.
 
 '''
 
 welcome = '''
-Running inside Conductor. Press ctrl+g to toggle the Project Status panel.
+Running inside Conductor. Use socket commands (canon-ctl) to control the TUI. Press ctrl+g to toggle the project panel.
 '''
 
 

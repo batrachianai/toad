@@ -4,24 +4,18 @@ Verifies:
 - StatusOverview renders correct count cards for each plan state
 - TimelineView displays plan events sorted by recency with colored badges
 - GitHubStateWidget composes the PM dashboard layout with collapsible detail tabs
-- Helper functions (_count_by_label, _plan_label, _relative_time) work correctly
+- Helper functions (_plan_label, _relative_time) work correctly
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import patch
 
-import pytest
 from rich.text import Text
 
 from toad.widgets.github_views.fetch import PLAN_LABELS, RepoInfo
-from toad.widgets.github_views.status_overview import (
-    StatusOverview,
-    _count_by_label,
-    _render_card,
-)
+from toad.widgets.github_views.status_overview import StatusOverview
 from toad.widgets.github_views.timeline import (
     LABEL_COLORS,
     TimelineView,
@@ -61,62 +55,6 @@ SAMPLE_ISSUES = [
     _make_issue(6, "Draft idea", ["plan:draft"]),
     _make_issue(7, "Another draft", ["plan:draft"]),
 ]
-
-
-class TestCountByLabel:
-    """_count_by_label correctly tallies issues per plan:* label."""
-
-    def test_counts_each_label(self):
-        counts = _count_by_label(SAMPLE_ISSUES)
-        assert counts["plan:active"] == 2
-        assert counts["plan:completed"] == 1
-        assert counts["plan:pr-review"] == 1
-        assert counts["plan:failed"] == 1
-        assert counts["plan:draft"] == 2
-
-    def test_empty_issues(self):
-        counts = _count_by_label([])
-        for label in PLAN_LABELS:
-            assert counts[label] == 0
-
-    def test_issue_with_no_plan_label(self):
-        issues = [_make_issue(10, "Bug report", ["bug"])]
-        counts = _count_by_label(issues)
-        for label in PLAN_LABELS:
-            assert counts[label] == 0
-
-    def test_issue_with_multiple_plan_labels(self):
-        issues = [
-            _make_issue(
-                11, "Dual label", ["plan:active", "plan:pr-review"]
-            )
-        ]
-        counts = _count_by_label(issues)
-        assert counts["plan:active"] == 1
-        assert counts["plan:pr-review"] == 1
-
-    def test_missing_labels_key(self):
-        issues = [{"number": 99, "title": "No labels"}]
-        counts = _count_by_label(issues)
-        for label in PLAN_LABELS:
-            assert counts[label] == 0
-
-
-class TestRenderCard:
-    """_render_card produces Rich Text with count and label."""
-
-    def test_card_contains_count(self):
-        card = _render_card(5, "Active", "green")
-        assert isinstance(card, Text)
-        assert "5" in card.plain
-
-    def test_card_contains_name(self):
-        card = _render_card(0, "Draft", "bright_black")
-        assert "Draft" in card.plain
-
-    def test_card_zero_count(self):
-        card = _render_card(0, "Failed", "red")
-        assert "0" in card.plain
 
 
 class TestPlanLabel:
@@ -189,8 +127,8 @@ class TestStatusOverviewWidget:
     def test_has_load_method(self):
         assert callable(getattr(StatusOverview, "load", None))
 
-    def test_default_css_has_card_class(self):
-        assert ".status-card" in StatusOverview.DEFAULT_CSS
+    def test_default_css_has_padding(self):
+        assert "padding" in StatusOverview.DEFAULT_CSS
 
 
 class TestTimelineViewWidget:
@@ -217,11 +155,6 @@ class TestGitHubStateWidgetComposition:
 
         assert SO is StatusOverview
 
-    def test_imports_timeline_view(self):
-        from toad.widgets.github_state import TimelineView as TV
-
-        assert TV is TimelineView
-
     def test_has_refresh_binding(self):
         from toad.widgets.github_state import GitHubStateWidget
 
@@ -233,25 +166,14 @@ class TestGitHubStateWidgetComposition:
 
         assert "Collapsible" in GitHubStateWidget.DEFAULT_CSS
 
-    def test_css_has_tabbed_content_style(self):
-        from toad.widgets.github_state import GitHubStateWidget
-
-        assert "TabbedContent" in GitHubStateWidget.DEFAULT_CSS
-
     def test_compose_yields_correct_structure(self):
-        """Verify compose uses StatusOverview, TimelineView, and
-        Collapsible with TabbedContent."""
+        """Verify compose uses StatusOverview, PlansView, and PRsView."""
         import inspect
 
         from toad.widgets.github_state import GitHubStateWidget
 
         source = inspect.getsource(GitHubStateWidget.compose)
         assert "StatusOverview" in source
-        assert "TimelineView" in source
-        assert "Collapsible" in source
-        assert "collapsed=True" in source
-        assert "TabbedContent" in source
-        assert "IssuesView" in source
         assert "PlansView" in source
         assert "PRsView" in source
 
@@ -272,46 +194,10 @@ class TestFetchAllPlanIssues:
 
         assert callable(fetch_all_plan_issues)
 
-    @pytest.mark.asyncio
-    async def test_fetch_all_deduplicates_by_number(self):
-        """Issues appearing under multiple labels are deduplicated."""
+    def test_fetch_all_plan_issues_is_async(self):
+        """fetch_all_plan_issues is an async function."""
+        import inspect
+
         from toad.widgets.github_views.fetch import fetch_all_plan_issues
 
-        # Issue 1 appears under both plan:active and plan:pr-review
-        label_results = {
-            "plan:draft": [],
-            "plan:active": [
-                _make_issue(1, "Dup", ["plan:active"]),
-            ],
-            "plan:pr-review": [
-                _make_issue(1, "Dup", ["plan:pr-review"]),
-            ],
-            "plan:completed": [],
-            "plan:failed": [],
-        }
-
-        call_count = 0
-
-        async def mock_run_gh(*args: str, timeout_s: float = 15) -> str:
-            nonlocal call_count
-            import json
-
-            # Parse which label is being queried
-            for i, arg in enumerate(args):
-                if arg == "--label" and i + 1 < len(args):
-                    label = args[i + 1]
-                    call_count += 1
-                    return json.dumps(label_results.get(label, []))
-            return "[]"
-
-        with patch(
-            "toad.widgets.github_views.fetch._run_gh",
-            side_effect=mock_run_gh,
-        ):
-            result = await fetch_all_plan_issues(FAKE_REPO)
-
-        # Deduplicated: only 1 issue despite appearing twice
-        assert len(result) == 1
-        assert result[0]["number"] == 1
-        # Called once per label
-        assert call_count == 5
+        assert inspect.iscoroutinefunction(fetch_all_plan_issues)

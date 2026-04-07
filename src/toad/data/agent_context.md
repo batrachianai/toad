@@ -8,17 +8,17 @@ controller is available at `/tmp/toad-*.sock` for controlling the TUI.
 Run these via your terminal tool to control the TUI:
 
 ```bash
-# Show GitHub PRs / plans dashboard
+# Open GitHub PRs / plans dashboard (open-only)
 canon-ctl action "screen.show_github"
 
-# Show project timeline (Gantt chart)
+# Open project timeline / Gantt chart (open-only)
 canon-ctl action "screen.show_timeline"
 
-# Show canon builder (phase, iteration, build logs)
+# Open canon builder — phase, iteration, build logs (open-only)
 canon-ctl action "screen.show_builder"
 
-# Show canon automation (status, metrics, run logs)
-canon-ctl action "screen.show_automation"
+# Open project state overview (open-only)
+canon-ctl action "screen.show_state"
 
 # Toggle the entire right pane open/closed
 canon-ctl action "screen.toggle_project_state"
@@ -27,17 +27,22 @@ canon-ctl action "screen.toggle_project_state"
 canon-ctl action "screen.refresh_timeline"
 ```
 
+## Behavior
+
+- **`show_*` commands are open-only** — they open (or switch to) their
+  section but never close it. Call them to ensure a view is visible.
+- **`toggle_project_state` is a true toggle** — it opens the right pane
+  if closed, or closes it if open.
+- Multiple sections can be visible at once (they share height evenly).
+  Hiding all sections auto-closes the pane.
+
 ## When to use
 
 - User asks about PRs, plans, or GitHub status → show_github
 - User asks about project timeline, milestones, or schedule → show_timeline
 - User asks about canon build progress, phases, or iterations → show_builder
-- User asks about canon automation, metrics, or run status → show_automation
-- User asks to see project state, status, or dashboard → toggle_project_state
-- User asks to close or hide the panel → toggle_project_state
+- User asks about project state or status overview → show_state
+- User asks to see or hide the project panel → toggle_project_state
 - After updating the timeline → refresh_timeline
-
-Each command opens only its section. Multiple sections can be visible
-at once (they share height evenly). Hiding all sections auto-closes the pane.
 
 Use your terminal tool to run `canon-ctl`. Do NOT output `/panel` text.
