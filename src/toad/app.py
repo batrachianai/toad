@@ -306,8 +306,8 @@ class ToadApp(App, inherit_bindings=False):
     scrollbar: reactive[str] = reactive("normal")
     last_ctrl_c_time = reactive(0.0)
     update_required: reactive[bool] = reactive(False)
-    terminal_title: var[str] = var("Toad")
-    terminal_title_icon: var[str] = var("🐸")
+    terminal_title: var[str] = var("Canon")
+    terminal_title_icon: var[str] = var("◆")
     terminal_title_flash = var(0)
     terminal_title_blink = var(False)
     project_dir = var(Path)
@@ -404,7 +404,7 @@ class ToadApp(App, inherit_bindings=False):
             anon_id = str(uuid.uuid4())
             self.settings.set("anon_id", anon_id)
             self._save_settings()
-            self.call_later(self.capture_event, "toad-install")
+            self.call_later(self.capture_event, "canon-install")
         return anon_id
 
     @property
@@ -532,7 +532,7 @@ class ToadApp(App, inherit_bindings=False):
         width, height = self.size
 
         event_properties = {
-            "toad_version": self.version,
+            "canon_version": self.version,
             "term_program": self.term_program,
             "term_width": width,
             "term_height": height,
@@ -580,7 +580,7 @@ class ToadApp(App, inherit_bindings=False):
         notification = Notify()
         notification.message = message
         notification.title = title
-        notification.application_name = "🐸 Toad" if toad.os == "macos" else "Toad"
+        notification.application_name = "Canon" if toad.os == "macos" else "Canon"
         if sound and self.settings.get("notifications.enable_sounds", bool):
             sound_path = str(files("toad.data").joinpath(f"sounds/{sound}.wav"))
             notification.audio = sound_path
@@ -724,7 +724,7 @@ class ToadApp(App, inherit_bindings=False):
         try:
             import setproctitle
 
-            setproctitle.setproctitle("toad")
+            setproctitle.setproctitle("canon")
         except Exception:
             pass
 
@@ -750,7 +750,7 @@ class ToadApp(App, inherit_bindings=False):
                     version_meta.upgrade_message,
                     style="magenta",
                     border_style="dim green",
-                    title="🐸 [bold green not dim]Update available![/] 🐸",
+                    title="◆ [bold green not dim]Update available![/] ◆",
                     expand=False,
                     padding=(1, 2),
                 )
