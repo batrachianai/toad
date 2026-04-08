@@ -1755,7 +1755,6 @@ class Conversation(containers.Vertical):
             MenuItem("Open as S[u]V[/]G", "export_to_svg", "v"),
         ]
 
-        print(repr(block))
         if block.allow_maximize:
             menu_options.append(MenuItem("[u]M[/u]aximize", "maximize_block", "m"))
 
