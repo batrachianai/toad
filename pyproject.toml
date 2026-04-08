@@ -1,7 +1,7 @@
 [project]
-name = "batrachian-toad"
+name = "canon-tui"
 version = "0.6.12"
-description = "A unified experience for AI in your terminal."
+description = "Canon TUI — a unified experience for AI in your terminal."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -26,6 +26,12 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "pyyaml>=6.0.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/DEGAorg/canon-tui"
+Repository = "https://github.com/DEGAorg/canon-tui"
+Issues = "https://github.com/DEGAorg/canon-tui/issues"
+Changelog = "https://github.com/DEGAorg/canon-tui/blob/main/CHANGELOG.md"
 
 [tool.uv.workspace]
 members = [
