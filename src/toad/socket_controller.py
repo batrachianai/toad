@@ -18,6 +18,7 @@ Protocol (JSON lines, one request per connection):
 
 from __future__ import annotations
 
+import atexit
 import asyncio
 import json
 import os
@@ -161,6 +162,8 @@ async def start_socket_server(app: App) -> asyncio.AbstractServer:
         lambda r, w: _handle_client(app, r, w),
         path=str(path),
     )
+    # Safety net: clean up socket file on interpreter exit (crash, SIGTERM)
+    atexit.register(lambda p=path: p.unlink(missing_ok=True))
     app.log.info(f"Socket controller listening on {path}")
     return server
 

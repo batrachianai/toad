@@ -10,12 +10,31 @@ import sys
 
 
 def find_socket() -> str:
-    """Find the first Canon/Toad socket in /tmp/."""
-    socks = glob.glob("/tmp/toad-*.sock")
+    """Find a live Canon/Toad socket in /tmp/.
+
+    Tries each matching socket, removes stale ones (no listener),
+    and returns the first that accepts a connection.
+    """
+    socks = sorted(glob.glob("/tmp/toad-*.sock"))
     if not socks:
         print("error: no canon socket found in /tmp/", file=sys.stderr)
         sys.exit(1)
-    return socks[0]
+
+    for path in socks:
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+                probe.settimeout(2)
+                probe.connect(path)
+            return path
+        except (ConnectionRefusedError, OSError):
+            # Stale socket — remove it
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    print("error: no live canon socket found in /tmp/", file=sys.stderr)
+    sys.exit(1)
 
 
 def build_payload(args: list[str]) -> str:
