@@ -270,7 +270,7 @@ def get_sessions_screen() -> SessionsScreen:
 
 
 class ToadApp(App, inherit_bindings=False):
-    """The top level app."""
+    """The top level Canon TUI app."""
 
     CSS_PATH = "toad.tcss"
     SCREENS = {
@@ -307,7 +307,7 @@ class ToadApp(App, inherit_bindings=False):
     last_ctrl_c_time = reactive(0.0)
     update_required: reactive[bool] = reactive(False)
     terminal_title: var[str] = var("Canon")
-    terminal_title_icon: var[str] = var("◆")
+    terminal_title_icon: var[str] = var("🎛️")
     terminal_title_flash = var(0)
     terminal_title_blink = var(False)
     project_dir = var(Path)
@@ -323,13 +323,12 @@ class ToadApp(App, inherit_bindings=False):
         project_dir: str | None = None,
         mode: str | None = None,
     ) -> None:
-        """Toad app.
+        """Canon TUI app.
 
         Args:
             agent_data: Agent data to run.
             project_dir: Project directory.
             mode: Initial mode.
-            agent: Agent identity or shor name.
         """
         self.settings_changed_signal: Signal[tuple[int, object]] = Signal(
             self, "settings_changed"
@@ -699,7 +698,7 @@ class ToadApp(App, inherit_bindings=False):
         return session_details
 
     async def on_mount(self) -> None:
-        self.capture_event("toad-run")
+        self.capture_event("canon-run")
         self.anon_id  # Created on frst reference
         if mode := self._initial_mode:
             self.switch_mode(mode)
