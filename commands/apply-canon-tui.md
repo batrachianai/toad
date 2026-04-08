@@ -8,7 +8,7 @@ Works from any directory — no need to clone the repo. Installs `canon` and
 
 ## Source
 
-Package: `batrachian-toad` from `DEGAorg/canon-tui` (conductor branch)
+Package: `canon-tui` from `DEGAorg/canon-tui` (conductor branch)
 
 ```
 git+https://github.com/DEGAorg/canon-tui.git@conductor

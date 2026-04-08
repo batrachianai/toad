@@ -33,7 +33,7 @@ Tell your AI coding agent:
 Or install manually:
 
 ```bash
-uv tool install "batrachian-toad @ git+https://github.com/DEGAorg/canon-tui.git@conductor" --force --reinstall
+uv tool install "canon-tui @ git+https://github.com/DEGAorg/canon-tui.git@conductor" --force --reinstall
 ```
 
 ---
@@ -60,5 +60,5 @@ canon-ctl        # Manage Canon TUI configuration
 Run `/apply-canon-tui` from any directory, or:
 
 ```bash
-uv tool install "batrachian-toad @ git+https://github.com/DEGAorg/canon-tui.git@conductor" --force --reinstall
+uv tool install "canon-tui @ git+https://github.com/DEGAorg/canon-tui.git@conductor" --force --reinstall
 ```
