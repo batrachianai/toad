@@ -1,6 +1,5 @@
 from textual.reactive import var
 from textual.widget import Widget
-from textual.widgets import Markdown
 from textual.widgets.markdown import MarkdownStream
 
 from toad.conversation_markdown import ConversationMarkdown

@@ -2,7 +2,6 @@ from contextlib import suppress
 from dataclasses import dataclass
 from itertools import zip_longest
 from pathlib import Path
-from random import shuffle
 from typing import Literal, Self
 
 from textual.binding import Binding

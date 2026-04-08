@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, Iterator, Literal
+from typing import Iterator, Literal
 from fractions import Fraction
 
 import rich.repr
@@ -16,7 +16,6 @@ from textual.style import Style
 from toad._loop import loop_last
 
 
-from textual._profile import timer
 
 
 @rich.repr.auto

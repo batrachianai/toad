@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual import getters
 
 from textual.content import Content
-from textual.reactive import reactive, var
+from textual.reactive import var
 from textual.css.query import NoMatches
 from textual import containers
 from textual.widgets import Static, Markdown

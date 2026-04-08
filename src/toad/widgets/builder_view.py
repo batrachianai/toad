@@ -10,7 +10,6 @@ from textual.widget import Widget
 from textual.widgets import Static
 
 from toad.widgets.canon_state import (
-    BUILD_PHASES,
     CanonState,
     CanonStateWidget,
     LogEntry,

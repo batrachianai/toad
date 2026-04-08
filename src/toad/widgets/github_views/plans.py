@@ -6,13 +6,11 @@ import logging
 import re
 from typing import Any
 
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.widgets import DataTable, Static
 
 from toad.widgets.github_views.fetch import (
     GitHubFetchError,
-    PLAN_LABELS,
     RepoInfo,
     fetch_issues,
     fetch_plan_issues,

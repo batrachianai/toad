@@ -11,14 +11,13 @@ from collections import deque
 from dataclasses import dataclass
 import struct
 import termios
-from typing import Iterable, Mapping
+from typing import Mapping
 
 from textual.content import Content
 from textual.reactive import var
 
 from toad.shell_read import shell_read
 from toad.widgets.terminal import Terminal
-from toad.menus import MenuItem
 
 
 @dataclass
