@@ -411,11 +411,11 @@ class StoreScreen(Screen):
     def get_info(self) -> Content:
         toad_version = toad.get_version()
         content = Content.assemble(
-            Content.from_markup("🐸 Toad"),
+            Content.from_markup("[b]Canon[/]"),
             pill(f"v{toad_version}", "$primary-muted", "$text-primary"),
-            ("\nThe universal interface for AI in your terminal", "$text-success"),
+            ("\nA unified experience for AI in your terminal", "$text-success"),
             (
-                "\nSoftware lovingly crafted by hand (with a dash of AI) in Edinburgh, Scotland",
+                "\nBased on Toad by Will McGugan (AGPL-3.0)",
                 "dim",
             ),
             "\n",
@@ -427,9 +427,9 @@ class StoreScreen(Screen):
             "\n\n",
             (
                 Content.from_markup(
-                    "[dim]Code: [@click=screen.url('https://github.com/batrachianai/toad')]Repository[/] • "
-                    "Bugs: [@click=screen.url('https://github.com/batrachianai/toad/discussions')]Discussions[/] • "
-                    "Sponsor: [@click=screen.url('https://github.com/sponsors/willmcgugan')]@willmcgugan[/]"
+                    "[dim]Code: [@click=screen.url('https://github.com/DEGAorg/canon-tui')]Repository[/] • "
+                    "Bugs: [@click=screen.url('https://github.com/DEGAorg/canon-tui/discussions')]Discussions[/] • "
+                    "Upstream: [@click=screen.url('https://github.com/batrachian/toad')]Toad[/]"
                 )
             ),
         )

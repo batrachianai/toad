@@ -33,7 +33,7 @@ class CommandEditModal(ModalScreen[str | None]):
                     classes="instructions",
                 )
             yield widgets.Static(
-                "Toad will run the following command (edit if you need to).",
+                "Canon will run the following command (edit if you need to).",
                 classes="instructions",
             )
             yield widgets.TextArea(
