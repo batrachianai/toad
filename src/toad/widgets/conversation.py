@@ -87,7 +87,7 @@ Note that some agents require an ACP adapter to be installed to work with Canon.
 
 Some agents may require you to restart your shell (open a new terminal) after installing.
 
-If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!
+If that fails, ask for help in [Discussions](https://github.com/DEGAorg/canon-tui/discussions)!
 """,
     "no_resume": """\
 ## Agent does not support resume
@@ -96,16 +96,16 @@ The agent or ACP adapter does not support resuming sessions.
 
 Try updating to see if support has been added.
 
-- Exit the app, and run `toad` again
+- Exit the app, and run `canon` again
 - Select the agent and hit ENTER
 - Click the dropdown, select "Update" or "Install" again
 - Repeat the process to update the ACP adapter (if required)
 
-If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!
+If that fails, ask for help in [Discussions](https://github.com/DEGAorg/canon-tui/discussions)!
 """,
 }
 
-HELP_URL = "https://github.com/batrachianai/toad/discussions"
+HELP_URL = "https://github.com/DEGAorg/canon-tui/discussions"
 
 INTERNAL_EROR = f"""\
 ## Internal error
@@ -116,7 +116,7 @@ The agent reported an internal error:
 $ERROR
 ```
 
-This is likely an issue with the agent, and not Toad.
+This is likely an issue with the agent, and not Canon.
 
 - Try the prompt again
 - Report the issue to the Agent developer
@@ -1324,30 +1324,30 @@ class Conversation(containers.Vertical):
 
     def _build_slash_commands(self) -> list[SlashCommand]:
         slash_commands = [
-            SlashCommand("/toad:about", "About Toad"),
+            SlashCommand("/canon:about", "About Canon"),
             SlashCommand(
-                "/toad:clear",
+                "/canon:clear",
                 "Clear conversation window",
                 "<optional number of lines to preserve>",
             ),
             SlashCommand(
-                "/toad:rename",
+                "/canon:rename",
                 "Give the current session a friendly name",
                 "<session name>",
             ),
             SlashCommand(
-                "/toad:session-close",
+                "/canon:session-close",
                 "Close the current session",
             ),
             SlashCommand(
-                "/toad:session-new",
+                "/canon:session-new",
                 "Open a new session in the current working directory",
                 "<initial prompt or command>",
             ),
             SlashCommand(
-                "/toad:testimonial",
-                "Tweet a testimonial regarding Toad",
-                "<what you think of toad>",
+                "/canon:testimonial",
+                "Share a testimonial about Canon",
+                "<what you think of Canon>",
             ),
         ]
 
@@ -1835,7 +1835,7 @@ class Conversation(containers.Vertical):
         )
         console.print(render)
         path = platformdirs.user_pictures_dir()
-        svg_filename = generate_datetime_filename("Toad", ".svg", None)
+        svg_filename = generate_datetime_filename("Canon", ".svg", None)
         svg_path = os.path.expanduser(os.path.join(path, svg_filename))
         console.save_svg(svg_path)
         import webbrowser

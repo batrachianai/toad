@@ -259,7 +259,7 @@ SCHEMA: list[SchemaDict] = [
             {
                 "key": "expand",
                 "title": "Tool call expand",
-                "help": "When should Toad expand tool calls?",
+                "help": "When should Canon expand tool calls?",
                 "type": "choices",
                 "default": "fail",
                 "choices": [
@@ -295,7 +295,7 @@ SCHEMA: list[SchemaDict] = [
             {
                 "key": "warn_dangerous",
                 "title": "Warn against potentially destructive commands?",
-                "help": "If enabled, Toad will highlight potentially destructive commands that may modify the filesystem outside of the project directory.\n\nNote that false positive [i]and[/] false negatives are possible.",
+                "help": "If enabled, Canon will highlight potentially destructive commands that may modify the filesystem outside of the project directory.\n\nNote that false positive [i]and[/] false negatives are possible.",
                 "type": "boolean",
                 "default": True,
             },
@@ -365,7 +365,7 @@ SCHEMA: list[SchemaDict] = [
             {
                 "key": "allow_collect",
                 "title": "Allow collection of anonymous usage data?",
-                "help": "Toad can collect basic usage data (number of installs, OS version, agents used, session length etc). This information is associated with a randomly generated UUID (see it in /about:toad) and contains no personal information.\n\nCollecting this information will help me (Will McGugan) convince big tech to take this project seriously. I would appreciate if you left this on, but it is entirely up to you.",
+                "help": "Canon can collect basic usage data (number of installs, OS version, agents used, session length etc). This information is associated with a randomly generated UUID (see it in /about:canon) and contains no personal information.\n\nCollecting this information helps the development team improve Canon. We would appreciate if you left this on, but it is entirely up to you.",
                 "type": "boolean",
                 "default": True,
             },
