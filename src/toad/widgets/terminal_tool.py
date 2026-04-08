@@ -253,7 +253,7 @@ class TerminalTool(Terminal):
         return_code = self._return_code = await process.wait()
 
         if return_code == 0:
-            self.add_class("-success")
+            self.display = False
         else:
             self.add_class("-error")
             self.border_title = Content.assemble(
