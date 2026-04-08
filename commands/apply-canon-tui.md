@@ -49,7 +49,7 @@ package's `requires-python` constraint.
 Run the install command:
 
 ```bash
-uv tool install "batrachian-toad @ git+https://github.com/DEGAorg/canon-tui.git@conductor" --force --reinstall --quiet
+uv tool install "canon-tui @ git+https://github.com/DEGAorg/canon-tui.git@conductor" --force --reinstall --quiet
 ```
 
 - `--force` — overwrite any existing installation
