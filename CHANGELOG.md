@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Changed
+- Clean up Canon TUI output (`clean-tui-output`) — 2026-04-08
+
 - Auto-detect ACP adapter and skip install dialog (`auto-detect-acp`) — 2026-04-08
 
 - Bootstrap install pattern for Canon TUI (`bootstrap-install`) — 2026-04-08
