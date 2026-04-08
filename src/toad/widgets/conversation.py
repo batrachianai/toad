@@ -931,11 +931,26 @@ class Conversation(containers.Vertical):
     async def on_update_status_line(self, message: acp_messages.UpdateStatusLine):
         self.status = message.status_line
 
+    @staticmethod
+    def _is_json_noise(text: str) -> bool:
+        """Return True if text is a bare JSON object with no prose."""
+        stripped = text.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
+            try:
+                import json
+
+                json.loads(stripped)
+                return True
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return False
+
     @on(acp_messages.Update)
     async def on_acp_agent_message(self, message: acp_messages.Update):
         message.stop()
         self._agent_thought = None
-        if message.text.strip():
+        text = message.text.strip()
+        if text and not self._is_json_noise(text):
             await self.post_agent_response(message.text)
 
     @on(acp_messages.UserMessage)
