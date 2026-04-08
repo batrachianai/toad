@@ -187,8 +187,7 @@ Your favorite agents.
 - **1-9 a-f** Select agent
 - **cursor keys** navigate agents
 - **tab / shift+tab** Move to next / previous section
-- **space** Launch highlighted agent
-- **enter** Open agent details
+- **enter / space** Launch agent (auto-installs if needed)
 - **i** Open agent info modal
 """
     BINDING_GROUP_TITLE = "Launcher"
@@ -198,14 +197,14 @@ Your favorite agents.
         Binding(
             "enter",
             "select",
-            "Details",
-            tooltip="Open agent details",
+            "Launch",
+            tooltip="Launch agent (auto-installs if needed)",
         ),
         Binding(
             "space",
             "launch",
             "Launch",
-            tooltip="Launch highlighted agent",
+            tooltip="Launch agent (auto-installs if needed)",
         ),
         Binding(
             "i",
@@ -241,11 +240,7 @@ Your favorite agents.
             self.app.settings.set("launcher.agents", "\n".join(agents))
 
     def action_launch(self) -> None:
-        if self.highlighted is None:
-            return
-        child = self.children[self.highlighted]
-        assert isinstance(child, LauncherItem)
-        self.screen.post_message(messages.LaunchAgent(child.agent["identity"]))
+        self.action_select()
 
 
 class Launcher(containers.VerticalGroup):
@@ -337,13 +332,12 @@ class AgentGridSelect(GridSelect):
 
 - **cursor keys** Navigate agents
 - **tab / shift+tab** Move to next / previous section
-- **enter** Open agent details
-- **space** Launch the agent (if installed)
+- **enter / space** Launch agent (auto-installs if needed)
 - **i** Open agent info modal
 """
     BINDINGS = [
-        Binding("enter", "select", "Details", tooltip="Open agent details"),
-        Binding("space", "launch", "Launch", tooltip="Launch highlighted agent"),
+        Binding("enter", "select", "Launch", tooltip="Launch agent (auto-installs if needed)"),
+        Binding("space", "launch", "Launch", tooltip="Launch agent (auto-installs if needed)"),
         Binding("i", "info", "Agent Info", tooltip="Open agent info modal"),
     ]
     BINDING_GROUP_TITLE = "Agent Select"
@@ -356,13 +350,7 @@ class AgentGridSelect(GridSelect):
             self.post_message(StoreScreen.OpenAgentDetails(child.agent["identity"]))
 
     def action_launch(self) -> None:
-        if self.highlighted is None:
-            return
-        child = self.children[self.highlighted]
-        if not isinstance(child, AgentItem):
-            self.app.open_url("https://github.com/sponsors/willmcgugan")
-            return
-        self.post_message(messages.LaunchAgent(child.agent["identity"]))
+        self.action_select()
 
 
 class Container(containers.VerticalScroll):
@@ -586,13 +574,7 @@ class StoreScreen(Screen):
         if not isinstance(event.widget, AgentItem):
             self.app.open_url("https://github.com/sponsors/willmcgugan")
             return
-        assert isinstance(event.widget, AgentItem)
-        from toad.screens.agent_modal import AgentModal
-
-        modal_response = await self.app.push_screen_wait(AgentModal(event.widget.agent))
-        await self.app.save_settings()
-        if modal_response == "launch":
-            self.post_message(messages.LaunchAgent(event.widget.agent["identity"]))
+        await self._auto_install_and_launch(event.widget.agent)
 
     @on(OpenAgentDetails)
     @work
@@ -613,15 +595,7 @@ class StoreScreen(Screen):
     async def on_launcher_selected(self, event: GridSelect.Selected):
         launcher_item = event.widget
         assert isinstance(launcher_item, LauncherItem)
-
-        from toad.screens.agent_modal import AgentModal
-
-        modal_response = await self.app.push_screen_wait(
-            AgentModal(launcher_item.agent)
-        )
-        await self.app.save_settings()
-        if modal_response == "launch":
-            self.post_message(messages.LaunchAgent(launcher_item.agent["identity"]))
+        await self._auto_install_and_launch(launcher_item.agent)
 
     @on(ChangeDirectory)
     def on_change_directory(self, event: ChangeDirectory) -> None:
