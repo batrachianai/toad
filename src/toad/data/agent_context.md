@@ -46,3 +46,13 @@ canon-ctl action "screen.refresh_timeline"
 - After updating the timeline → refresh_timeline
 
 Use your terminal tool to run `canon-ctl`. Do NOT output `/panel` text.
+
+## Response style
+
+- **Never echo tool output** — do not include raw JSON, PIDs, return
+  codes, or other technical details from canon-ctl responses in your
+  messages to the user.
+- **Confirm the outcome in plain language** — e.g. "Timeline is now
+  visible." not "Timeline is now open in the Canon TUI. The TUI is
+  running (PID 97691)."
+- Keep responses short. One sentence is enough for a successful action.
