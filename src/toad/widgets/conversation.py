@@ -1022,6 +1022,9 @@ class Conversation(containers.Vertical):
                 tool_id, ToolCall
             )
         except NoMatches:
+            status = tool_call.get("status")
+            if status is not None and status != "failed":
+                return
             await self.post(ToolCall(tool_call, id=message.tool_id), new_block=True)
         else:
             if existing_tool_call is not None:
