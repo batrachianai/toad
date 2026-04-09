@@ -54,8 +54,8 @@ def _read_timeline_config(
 
 
 # Section IDs — used as TabbedContent widget IDs and toolbar button suffix
-SECTION_GITHUB = "section-github"
-SECTION_BUILDER = "section-builder"
+SECTION_PLANNING = "section-planning"
+SECTION_STATE = "section-state"
 
 
 @dataclass
@@ -68,8 +68,8 @@ class _SectionDef:
 
 # Ordered list of sections — add new ones here
 SECTIONS: list[_SectionDef] = [
-    _SectionDef(SECTION_BUILDER, "State"),
-    _SectionDef(SECTION_GITHUB, "GitHub"),
+    _SectionDef(SECTION_STATE, "State"),
+    _SectionDef(SECTION_PLANNING, "Planning"),
 ]
 
 
@@ -151,9 +151,7 @@ class ProjectStatePane(Vertical):
                 )
 
         # --- GitHub / Timeline section ---
-        with TabbedContent(
-            id=SECTION_GITHUB, classes="pane-section"
-        ):
+        with TabbedContent(id=SECTION_PLANNING, classes="pane-section"):
             with TabPane("GitHub", id="tab-github"):
                 yield GitHubStateWidget(
                     project_path=str(self._project_path),
@@ -169,16 +167,14 @@ class ProjectStatePane(Vertical):
         )
 
         # --- State section (canon build + run) ---
-        with TabbedContent(
-            id=SECTION_BUILDER, classes="pane-section"
-        ):
+        with TabbedContent(id=SECTION_STATE, classes="pane-section"):
             with TabPane("State", id="tab-builder"):
                 yield BuilderView(id="builder-view")
 
     def on_mount(self) -> None:
         # GitHub hidden by default, State visible
-        self.query_one(f"#{SECTION_GITHUB}").display = False
-        self.query_one(f"#{SECTION_BUILDER}").display = False
+        self.query_one(f"#{SECTION_PLANNING}").display = False
+        self.query_one(f"#{SECTION_STATE}").display = False
         self._sync_toolbar()
         self._fetch_timeline()
 
@@ -187,11 +183,9 @@ class ProjectStatePane(Vertical):
         if not visible:
             self._stop_timeline_timer()
 
-    def _sync_timeline_timer(
-        self, section_id: str, *, visible: bool
-    ) -> None:
+    def _sync_timeline_timer(self, section_id: str, *, visible: bool) -> None:
         """Start/stop the refresh timer when the GitHub section toggles."""
-        if section_id != SECTION_GITHUB:
+        if section_id != SECTION_PLANNING:
             return
         if visible:
             self._fetch_timeline()

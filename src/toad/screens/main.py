@@ -299,42 +299,42 @@ class MainScreen(Screen, can_focus=False):
         for view in pane.query(BuilderView):
             view._render_state(state)
 
+    def action_show_planning(self) -> None:
+        """Open pane and show Planning section (GitHub tab)."""
+        self._show_section_tab("section-planning", "tab-github")
+
     def action_show_github(self) -> None:
-        """Open pane and show GitHub tab."""
-        self._show_section_tab("section-github", "tab-github")
+        """Open pane and show GitHub tab inside Planning."""
+        self._show_section_tab("section-planning", "tab-github")
 
     def action_show_timeline(self) -> None:
-        """Open pane and show Timeline tab."""
-        self._show_section_tab("section-github", "tab-timeline")
-
-    def action_show_builder(self) -> None:
-        """Open pane and show Builder tab."""
-        self._show_section_tab("section-builder", "tab-builder")
+        """Open pane and show Timeline tab inside Planning."""
+        self._show_section_tab("section-planning", "tab-timeline")
 
     def action_show_state(self) -> None:
-        """Open pane and show State tab."""
-        self._show_section_tab("section-builder", "tab-builder")
+        """Open pane and show State section."""
+        self._show_section_tab("section-state", "tab-builder")
 
     def _hide_section(self, section_id: str) -> None:
         """Hide a section by ID."""
         pane = self.query_one("#project_state_pane", ProjectStatePane)
         pane.hide_section(section_id)
 
+    def action_hide_planning(self) -> None:
+        """Hide the Planning section."""
+        self._hide_section("section-planning")
+
     def action_hide_github(self) -> None:
-        """Hide the GitHub section (includes timeline tab)."""
-        self._hide_section("section-github")
+        """Hide Planning section (GitHub is a tab inside it)."""
+        self._hide_section("section-planning")
 
     def action_hide_timeline(self) -> None:
-        """Hide the GitHub section (timeline lives inside it)."""
-        self._hide_section("section-github")
-
-    def action_hide_builder(self) -> None:
-        """Hide the Builder/State section."""
-        self._hide_section("section-builder")
+        """Hide Planning section (Timeline is a tab inside it)."""
+        self._hide_section("section-planning")
 
     def action_hide_state(self) -> None:
-        """Hide the Builder/State section."""
-        self._hide_section("section-builder")
+        """Hide the State section."""
+        self._hide_section("section-state")
 
     # ------------------------------------------------------------------
     # Canon auto-show logic
@@ -374,18 +374,20 @@ class MainScreen(Screen, can_focus=False):
 
     # Map ACP panel IDs to (section_id, tab_id)
     _PANEL_MAP: dict[str, tuple[str, str]] = {
-        "github": ("section-github", "tab-github"),
-        "timeline": ("section-github", "tab-timeline"),
-        "state": ("section-builder", "tab-builder"),
-        "builder": ("section-builder", "tab-builder"),
+        "planning": ("section-planning", "tab-github"),
+        "github": ("section-planning", "tab-github"),
+        "timeline": ("section-planning", "tab-timeline"),
+        "state": ("section-state", "tab-builder"),
+        "builder": ("section-state", "tab-builder"),
     }
 
     # Map ACP panel IDs to section_id for close
     _PANEL_SECTION_MAP: dict[str, str] = {
-        "github": "section-github",
-        "timeline": "section-github",
-        "state": "section-builder",
-        "builder": "section-builder",
+        "planning": "section-planning",
+        "github": "section-planning",
+        "timeline": "section-planning",
+        "state": "section-state",
+        "builder": "section-state",
     }
 
     @on(acp_messages.OpenPanel)
