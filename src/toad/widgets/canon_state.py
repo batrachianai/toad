@@ -33,6 +33,16 @@ class LogEntry:
 
 
 @dataclass(frozen=True)
+class FlowState:
+    """Pipeline flow state from .canon/flow.json."""
+
+    steps: tuple[str, ...] = ()
+    labels: tuple[tuple[str, str], ...] = ()
+    active: str = ""
+    completed: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class CanonState:
     """Parsed canon state from .canon/state.json."""
 
@@ -42,6 +52,7 @@ class CanonState:
     error: str | None = None
     logs: tuple[LogEntry, ...] = ()
     metrics: tuple[tuple[str, str], ...] = ()
+    flow: FlowState | None = None
 
     @property
     def is_build_phase(self) -> bool:
@@ -52,7 +63,22 @@ class CanonState:
         return self.phase in RUN_PHASES
 
 
-def _parse_state(data: dict) -> CanonState:
+def _parse_flow(data: dict) -> FlowState:
+    """Parse .canon/flow.json into a FlowState."""
+    labels_raw = data.get("labels", {})
+    labels = tuple((str(k), str(v)) for k, v in labels_raw.items())
+    return FlowState(
+        steps=tuple(data.get("steps", [])),
+        labels=labels,
+        active=data.get("active", ""),
+        completed=tuple(data.get("completed", [])),
+    )
+
+
+def _parse_state(
+    data: dict,
+    flow_data: dict | None = None,
+) -> CanonState:
     """Parse .canon/state.json into a CanonState."""
     logs_raw = data.get("logs", [])
     logs = tuple(
@@ -69,6 +95,8 @@ def _parse_state(data: dict) -> CanonState:
         (str(k), str(v)) for k, v in metrics_raw.items()
     )
 
+    flow = _parse_flow(flow_data) if flow_data else None
+
     return CanonState(
         phase=data.get("phase", ""),
         status=data.get("status", ""),
@@ -76,6 +104,7 @@ def _parse_state(data: dict) -> CanonState:
         error=data.get("error"),
         logs=logs,
         metrics=metrics,
+        flow=flow,
     )
 
 
@@ -116,6 +145,7 @@ class CanonStateWidget(Widget):
         self._project_path = project_path or Path(".").resolve()
         self._canon_dir = self._project_path / ".canon"
         self._state_path = self._canon_dir / "state.json"
+        self._flow_path = self._canon_dir / "flow.json"
         self._detected = False
         self._last_raw: str | None = None
         self._watcher: DirectoryWatcher | None = None
@@ -161,7 +191,7 @@ class CanonStateWidget(Widget):
     # ------------------------------------------------------------------
 
     def _poll_state(self) -> None:
-        """Read .canon/state.json and refresh state."""
+        """Read .canon/state.json (+ flow.json) and refresh state."""
         if self._watcher is None or not self._watcher.enabled:
             self._start_watching()
 
@@ -169,25 +199,41 @@ class CanonStateWidget(Widget):
             return
 
         try:
-            raw = self._state_path.read_text(encoding="utf-8")
+            state_raw = self._state_path.read_text(encoding="utf-8")
         except OSError as exc:
             log.warning("Failed to read .canon/state.json: %s", exc)
             return
 
-        if raw == self._last_raw:
+        # Read flow.json alongside state.json
+        flow_raw = ""
+        if self._flow_path.is_file():
+            try:
+                flow_raw = self._flow_path.read_text(encoding="utf-8")
+            except OSError:
+                pass
+
+        combined = state_raw + flow_raw
+        if combined == self._last_raw:
             return
-        self._last_raw = raw
+        self._last_raw = combined
 
         try:
-            data = json.loads(raw)
+            data = json.loads(state_raw)
         except json.JSONDecodeError as exc:
             log.warning("Invalid JSON in .canon/state.json: %s", exc)
             return
+
+        flow_data = None
+        if flow_raw:
+            try:
+                flow_data = json.loads(flow_raw)
+            except json.JSONDecodeError:
+                pass
 
         if not self._detected:
             self._detected = True
             self.post_message(self.CanonStateDetected())
 
-        new_state = _parse_state(data)
+        new_state = _parse_state(data, flow_data)
         self.state = new_state
         self.post_message(self.CanonStateUpdated(new_state))

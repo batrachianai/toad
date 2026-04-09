@@ -14,6 +14,7 @@ from toad.widgets.canon_state import (
     CanonStateWidget,
     LogEntry,
 )
+from toad.widgets.pipeline_view import PipelineView
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +127,7 @@ class BuilderView(Widget, can_focus=True):
             id="builder-status-bar",
         )
         yield Static(id="builder-error")
+        yield PipelineView(id="builder-pipeline")
         with VerticalScroll():
             yield Static(
                 "Waiting for build activity…",
@@ -157,6 +159,10 @@ class BuilderView(Widget, can_focus=True):
         else:
             error_widget.display = False
 
+        # Pipeline flow
+        pipeline = self.query_one("#builder-pipeline", PipelineView)
+        pipeline.render_flow(state.flow)
+
         # Logs
         scroll = self.query_one(VerticalScroll)
         scroll.remove_children()
@@ -173,6 +179,7 @@ class BuilderView(Widget, can_focus=True):
         else:
             for entry in logs:
                 scroll.mount(Static(_render_log(entry)))
+            scroll.scroll_end(animate=False)
 
         # Metrics
         metrics_widget = self.query_one("#builder-metrics", Static)
