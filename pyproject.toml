@@ -10,7 +10,7 @@ dependencies = [
     "tree-sitter>=0.24.0",
     "httpx>=0.28.1",
     "platformdirs>=4.9.4",
-    "rich>=14.3.3",
+    "rich>=15.0.0",
     "typeguard==4.4.4",
     "xdg-base-dirs>=6.0.2",
     "textual-serve>=1.1.2",
