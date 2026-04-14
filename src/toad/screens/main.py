@@ -293,11 +293,11 @@ class MainScreen(Screen, can_focus=False):
         pane.show_section(section_id)
         pane.activate_tab(tab_id)
 
-    def _forward_canon_state(self, state: "CanonState") -> None:
+    async def _forward_canon_state(self, state: "CanonState") -> None:
         """Forward canon state directly to State view."""
         pane = self.query_one("#project_state_pane", ProjectStatePane)
         for view in pane.query(BuilderView):
-            view._render_state(state)
+            await view._render_state(state)
 
     def action_show_planning(self) -> None:
         """Open pane and show Planning section (GitHub tab)."""
@@ -351,13 +351,13 @@ class MainScreen(Screen, can_focus=False):
         self.call_later(self._forward_canon_state, canon.state)
 
     @on(CanonStateWidget.CanonStateUpdated)
-    def _on_canon_updated(
+    async def _on_canon_updated(
         self,
         event: CanonStateWidget.CanonStateUpdated,
     ) -> None:
         """Auto-switch between Builder and Automation on phase change."""
         event.stop()
-        self._forward_canon_state(event.state)
+        await self._forward_canon_state(event.state)
 
     def watch_split_enabled(self, enabled: bool) -> None:
         """Show/hide the project state pane."""

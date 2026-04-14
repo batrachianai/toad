@@ -91,21 +91,23 @@ class PipelineView(Widget):
                 id="pipeline-placeholder",
             )
 
-    def render_flow(self, flow: FlowState | None) -> None:
+    async def render_flow(self, flow: FlowState | None) -> None:
         """Rebuild the pipeline boxes from flow state."""
         row = self.query_one("#pipeline-row", Horizontal)
-        row.remove_children()
+        await row.remove_children()
 
         if not flow or not flow.steps:
-            row.mount(
+            await row.mount(
                 Static("[dim]No flow data[/]", id="pipeline-placeholder")
             )
             return
 
+        widgets: list[Static] = []
         for i, step in enumerate(flow.steps):
             if i > 0:
-                row.mount(Static(" → ", classes="step-arrow"))
+                widgets.append(Static(" → ", classes="step-arrow"))
 
             label = _label_for(step, flow.labels)
             css_class = _step_class(step, flow.active, flow.completed)
-            row.mount(Static(label, classes=css_class))
+            widgets.append(Static(label, classes=css_class))
+        await row.mount_all(widgets)
