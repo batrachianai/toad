@@ -68,6 +68,7 @@ class TerminalTool(Terminal):
         classes: str | None = None,
         disabled: bool = False,
         minimum_terminal_width: int = -1,
+        quiet: bool = False,
     ):
         super().__init__(
             name=name,
@@ -77,6 +78,7 @@ class TerminalTool(Terminal):
             minimum_terminal_width=minimum_terminal_width,
         )
         self._command = command
+        self._quiet = quiet
         self._output_byte_limit = output_byte_limit
         self._command_task: asyncio.Task | None = None
         self._output: deque[bytes] = deque()
@@ -242,8 +244,7 @@ class TerminalTool(Terminal):
                 data = await shell_read(reader, BUFFER_SIZE)
                 if process_data := unicode_decoder.decode(data, final=not data):
                     self._record_output(data)
-                    if await self.write(process_data):
-                        self.display = True
+                    await self.write(process_data)
                 if not data:
                     break
         finally:
@@ -252,9 +253,8 @@ class TerminalTool(Terminal):
         self.finalize()
         return_code = self._return_code = await process.wait()
 
-        if return_code == 0:
-            self.display = False
-        else:
+        if return_code != 0:
+            self.display = True
             self.add_class("-error")
             self.border_title = Content.assemble(
                 f"{command} [{return_code}]",
