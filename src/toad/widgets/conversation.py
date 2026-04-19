@@ -1286,12 +1286,10 @@ class Conversation(containers.Vertical):
             before: Content of file before edit.
             after: Content of file after edit.
         """
-        from toad.widgets.diff_view import DiffView
 
-        diff_view = DiffView(path, path, before or "", after, classes="block")
-        diff_view_setting = self.app.settings.get("diff.view", str)
-        diff_view.split = diff_view_setting == "split"
-        diff_view.auto_split = diff_view_setting == "auto"
+        from toad.widgets.diff_view import make_diff
+
+        diff_view = make_diff(path, path, before, after, classes="block")
         await self.post(diff_view)
 
     def ask(

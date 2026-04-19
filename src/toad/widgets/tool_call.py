@@ -243,9 +243,9 @@ class ToolCall(containers.VerticalGroup):
                     "oldText": old_text,
                     "newText": new_text,
                 }:
-                    from toad.widgets.diff_view import DiffView
+                    from toad.widgets.diff_view import make_diff
 
-                    yield (diff_view := DiffView(path, path, old_text or "", new_text))
+                    yield (diff_view := make_diff(path, path, old_text, new_text))
 
                     if isinstance(self.app, ToadApp):
                         diff_view_setting = self.app.settings.get("diff.view", str)

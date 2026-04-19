@@ -9,13 +9,11 @@ from textual.content import Content
 from textual.screen import Screen
 from textual.reactive import var, Initialize
 
+from textual.widgets import OptionList, Footer, Static, Select
+from textual.widgets.option_list import Option
 
 from toad.answer import Answer
 from toad.widgets.question import Question
-from toad.widgets.diff_view import DiffView
-
-from textual.widgets import OptionList, Footer, Static, Select
-from textual.widgets.option_list import Option
 
 from toad.app import ToadApp
 
@@ -277,13 +275,11 @@ class PermissionsScreen(Screen[Answer]):
     ) -> None:
         self.index += 1
         option_id = f"item-{self.index}"
-        diff_view = DiffView(path1, path2, before or "", after, id=option_id)
+        from toad.widgets.diff_view import make_diff
+
+        diff_view = make_diff(path1, path2, before, after, id=option_id)
         await diff_view.prepare()
-        app = self.app
-        if isinstance(app, ToadApp):
-            diff_view_setting = app.settings.get("diff.view", str)
-            diff_view.split = diff_view_setting == "split"
-            diff_view.auto_split = diff_view_setting == "auto"
+
         await self.tool_container.mount(diff_view)
 
         option_text = f"📄 {os.path.basename(path1)}"
@@ -303,6 +299,8 @@ class PermissionsScreen(Screen[Answer]):
     @on(Select.Changed, "#diff-select")
     def on_diff_select(self, event: Select.Changed) -> None:
         diff_type = event.value
+        from textual_diff_view import DiffView
+
         for diff_view in self.query(DiffView):
             diff_view.auto_split = diff_type == "auto"
             diff_view.split = diff_type == "split"

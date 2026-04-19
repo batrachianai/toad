@@ -323,7 +323,24 @@ SCHEMA: list[SchemaDict] = [
                     ("Split", "split"),
                     ("Best fit", "auto"),
                 ],
-            }
+            },
+            {
+                "key": "annotations",
+                "title": "Show annotations (+/- symbols)?",
+                "type": "boolean",
+                "default": False,
+            },
+            {
+                "key": "wrap",
+                "title": "Wrap code?",
+                "help": "If wrapping is disabled you can horizontal scroll with the trackpad or the mouse wheel plus shift.",
+                "type": "choices",
+                "default": "no-wrap",
+                "choices": [
+                    ("Don't wrap", "no-wrap"),
+                    ("Wrap long lines", "wrap"),
+                ],
+            },
         ],
     },
     {

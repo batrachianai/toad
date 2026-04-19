@@ -35,6 +35,6 @@ class ACPToolCallContent(containers.VerticalGroup):
                     "newText": new_text,
                     "path": path,
                 }:
-                    from toad.widgets.diff_view import DiffView
+                    from toad.widgets.diff_view import make_diff
 
-                    yield DiffView(path, path, old_text or "", new_text)
+                    yield make_diff(path, path, old_text, new_text)

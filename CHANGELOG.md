@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- Added textual-diff-view, which started life here
+
+### Added
+
+- Added diff settings for annotations and wrapping
+
 ## [0.6.15] - 2026-04-05
 
 ### Changed
