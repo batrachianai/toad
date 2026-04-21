@@ -27,3 +27,6 @@ sandbox/
 
 # DEGA Core — personal focus config for planner loop
 focus.yaml
+
+# Local scratch: personal notes, runbooks, test checklists — not for commit
+.local/
