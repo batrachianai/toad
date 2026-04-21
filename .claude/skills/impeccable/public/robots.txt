@@ -1,6 +1,0 @@
-# robots.txt for impeccable.style
-
-User-agent: *
-Allow: /
-
-Sitemap: https://impeccable.style/sitemap.xml
