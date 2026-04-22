@@ -537,6 +537,11 @@ def verify_imports(verbose: bool = False) -> bool:
         "toad.widgets.filter_toolbar",
         "toad.screens.task_detail_screen",
         "toad.widgets.subagent_tab_section",
+        "toad.widgets.plan_dep_graph",
+        "toad.widgets.plan_status_rail",
+        "toad.widgets.plan_worker_log_pane",
+        "toad.widgets.plan_execution_tab",
+        "toad.widgets.plan_execution_section",
     ]
     for mod in modules:
         try:
