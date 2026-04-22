@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Changed
+- Canon TUI data layer — PlanExecutionModel (`20260422-plan-execution-model`) — 2026-04-22
+
 - Clean up Canon TUI output (`clean-tui-output`) — 2026-04-08
 
 - Auto-detect ACP adapter and skip install dialog (`auto-detect-acp`) — 2026-04-08
