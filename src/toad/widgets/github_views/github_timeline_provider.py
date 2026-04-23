@@ -272,6 +272,27 @@ class GitHubTimelineProvider:
         self._cached_fields = fields
         return fields
 
+    async def fetch_task_details(
+        self, issue_number: int
+    ) -> dict[str, Any]:
+        """Fetch body, comments, labels, assignees, and linked PRs for an issue.
+
+        Returns the raw ``gh issue view --json`` payload so callers can
+        decide how to render it. Kept on the timeline provider so callers
+        with a single provider handle can still drill into issue details.
+        """
+        raw = await _run_gh(
+            "issue",
+            "view",
+            str(issue_number),
+            "--repo",
+            self._repo,
+            "--json",
+            "number,body,comments,labels,assignees,url,closedByPullRequestsReferences",
+        )
+        result: dict[str, Any] = json.loads(raw)
+        return result
+
     async def _fetch_issues_and_project(
         self,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:

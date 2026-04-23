@@ -9,7 +9,7 @@ activity. It provides `canon` and `canon-ctl` binaries via `uv tool install`.
 
 1. Fetch the installer command:
    ```
-   https://raw.githubusercontent.com/DEGAorg/canon-tui/conductor/commands/apply-canon-tui.md
+   https://raw.githubusercontent.com/DEGAorg/canon-tui/main/commands/apply-canon-tui.md
    ```
 
 2. Read the fetched content — it contains the full installation procedure.
@@ -28,12 +28,12 @@ No cloning required. Everything is installed directly from GitHub.
 
 Tell your AI coding agent:
 
-> Install Canon TUI from https://raw.githubusercontent.com/DEGAorg/canon-tui/conductor/INSTALL.md
+> Install Canon TUI from https://raw.githubusercontent.com/DEGAorg/canon-tui/main/INSTALL.md
 
 Or install manually:
 
 ```bash
-uv tool install "canon-tui @ git+https://github.com/DEGAorg/canon-tui.git@conductor" --force --reinstall
+uv tool install "canon-tui @ git+https://github.com/DEGAorg/canon-tui.git@main" --force --reinstall
 ```
 
 ---
@@ -60,5 +60,5 @@ canon-ctl        # Manage Canon TUI configuration
 Run `/apply-canon-tui` from any directory, or:
 
 ```bash
-uv tool install "canon-tui @ git+https://github.com/DEGAorg/canon-tui.git@conductor" --force --reinstall
+uv tool install "canon-tui @ git+https://github.com/DEGAorg/canon-tui.git@main" --force --reinstall
 ```

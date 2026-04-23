@@ -14,6 +14,7 @@ from toad.widgets.canon_state import (
     CanonStateWidget,
     LogEntry,
 )
+from toad.widgets.pipeline_view import PipelineView
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +127,7 @@ class BuilderView(Widget, can_focus=True):
             id="builder-status-bar",
         )
         yield Static(id="builder-error")
+        yield PipelineView(id="builder-pipeline")
         with VerticalScroll():
             yield Static(
                 "Waiting for build activity…",
@@ -134,14 +136,14 @@ class BuilderView(Widget, can_focus=True):
             )
         yield Static("[dim]  No metrics[/]", id="builder-metrics")
 
-    def on_canon_state_widget_canon_state_updated(
+    async def on_canon_state_widget_canon_state_updated(
         self,
         event: CanonStateWidget.CanonStateUpdated,
     ) -> None:
         """Refresh view when canon state changes."""
-        self._render_state(event.state)
+        await self._render_state(event.state)
 
-    def _render_state(self, state: CanonState) -> None:
+    async def _render_state(self, state: CanonState) -> None:
         """Rebuild the builder view from canon state."""
         # Status bar: phase + status
         status_bar = self.query_one("#builder-status-bar", Static)
@@ -157,13 +159,17 @@ class BuilderView(Widget, can_focus=True):
         else:
             error_widget.display = False
 
+        # Pipeline flow
+        pipeline = self.query_one("#builder-pipeline", PipelineView)
+        await pipeline.render_flow(state.flow)
+
         # Logs
         scroll = self.query_one(VerticalScroll)
-        scroll.remove_children()
+        await scroll.remove_children()
 
         logs = state.logs[-MAX_LOG_LINES:]
         if not logs:
-            scroll.mount(
+            await scroll.mount(
                 Static(
                     "No build logs",
                     classes="empty-state",
@@ -171,8 +177,9 @@ class BuilderView(Widget, can_focus=True):
                 )
             )
         else:
-            for entry in logs:
-                scroll.mount(Static(_render_log(entry)))
+            widgets = [Static(_render_log(entry)) for entry in logs]
+            await scroll.mount_all(widgets)
+            scroll.scroll_end(animate=False)
 
         # Metrics
         metrics_widget = self.query_one("#builder-metrics", Static)

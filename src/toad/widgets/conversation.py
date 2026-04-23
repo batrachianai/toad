@@ -152,6 +152,116 @@ Need help? Ask on {HELP_URL}
 """
 
 
+_PANEL_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
+    # (keywords, panel_id) — order matters; more-specific first.
+    (("pull requests", "pull request", " prs ", " pr "), "prs"),
+    (("the board", "board"), "board"),
+    (("tasks", "issues"), "board"),
+    (("plans",), "plans"),
+    (("the plan", "execution plan", "plan"), "plan"),
+    (("bugs",), "bugs"),
+    (("features",), "features"),
+    (("timeline", "gantt"), "timeline"),
+    (("files", "file tree", "project files"), "files"),
+    (("build state", "builder", "run state", "the state"), "state"),
+)
+
+
+_PRIORITY_PATTERN = (
+    ("p1", "P1"),
+    ("p2", "P2"),
+    ("p3", "P3"),
+    ("p4", "P4"),
+)
+
+_STATUS_PATTERN = (
+    ("in progress", "in_progress"),
+    ("in-progress", "in_progress"),
+    ("todo", "todo"),
+    ("to do", "todo"),
+    ("done", "done"),
+)
+
+
+def _detect_panel_intent(text: str) -> tuple[str, dict[str, str] | None] | None:
+    """Parse user text for a 'show me X' intent → (panel_id, filters) | None.
+
+    Handles phrases like "show me the board", "open the plan", "show me P1
+    tasks", "show me done PRs". Returns ``None`` when the text doesn't look
+    like a panel request, so the agent can handle it.
+    """
+    lower = f" {text.lower().strip()} "
+    trigger = any(
+        phrase in lower
+        for phrase in (
+            "show me",
+            "show the",
+            "open the",
+            "open ",
+            "go to ",
+            "switch to ",
+        )
+    )
+    if not trigger:
+        return None
+    panel_id: str | None = None
+    for keywords, pid in _PANEL_KEYWORDS:
+        if any(kw in lower for kw in keywords):
+            panel_id = pid
+            break
+    if panel_id is None:
+        return None
+    filters: dict[str, str] = {}
+    for needle, value in _PRIORITY_PATTERN:
+        if f" {needle} " in lower or f" {needle}s " in lower:
+            filters["priority"] = value
+            break
+    for needle, value in _STATUS_PATTERN:
+        if f" {needle} " in lower:
+            filters["status"] = value
+            break
+    return (panel_id, filters or None)
+
+
+def _detect_close_intent(text: str) -> str | None:
+    """Parse user text for a 'close the X / hide the X' intent → panel_id.
+
+    Returns the panel_id to close, ``"project_state"`` for "close the
+    right panel" / "close everything", or ``None`` if no close intent.
+    """
+    lower = f" {text.lower().strip()} "
+    trigger = any(
+        phrase in lower
+        for phrase in (
+            "close the",
+            "close ",
+            "hide the",
+            "hide ",
+            "dismiss",
+            "collapse the",
+            "collapse ",
+        )
+    )
+    if not trigger:
+        return None
+    # Whole-pane phrasings → project_state (hides everything).
+    for phrase in (
+        "right panel",
+        "right pane",
+        "project state",
+        "everything",
+        "it all",
+        " all panels",
+    ):
+        if phrase in lower:
+            return "project_state"
+    # Otherwise match the same panel keywords as the open path.
+    for keywords, pid in _PANEL_KEYWORDS:
+        if any(kw in lower for kw in keywords):
+            return pid
+    return None
+
+
 class Loading(Static):
     """Tiny widget to show loading indicator."""
 
@@ -812,6 +922,22 @@ class Conversation(containers.Vertical):
             if text.startswith("/") and await self.slash_command(text):
                 # Canon has processed the slash command.
                 return
+            # Client-side panel routing: if the user asks to open or close a
+            # panel, post the event ourselves so the UI reacts instantly
+            # regardless of whether the agent chooses to emit one.
+            close_target = _detect_close_intent(text)
+            if close_target is not None:
+                self.post_message(acp_messages.ClosePanel(panel_id=close_target))
+            else:
+                panel_intent = _detect_panel_intent(text)
+                if panel_intent is not None:
+                    panel_id, filters = panel_intent
+                    self.post_message(
+                        acp_messages.OpenPanel(
+                            panel_id=panel_id,
+                            context={"filters": filters} if filters else None,
+                        )
+                    )
             await self.post(UserInput(text))
             self.window.scroll_end(animate=False)
             self._loading = await self.post(Loading("Please wait..."), loading=True)
@@ -931,12 +1057,47 @@ class Conversation(containers.Vertical):
     async def on_update_status_line(self, message: acp_messages.UpdateStatusLine):
         self.status = message.status_line
 
+    @staticmethod
+    def _strip_json_lines(text: str) -> str:
+        """Remove lines that are bare JSON objects (tool noise)."""
+        import json
+
+        kept: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("{") and stripped.endswith("}"):
+                try:
+                    json.loads(stripped)
+                    continue
+                except json.JSONDecodeError:
+                    pass
+            kept.append(line)
+        return "\n".join(kept)
+
+    def _is_canon_quiet(self) -> bool:
+        """Check if agent prose should be suppressed for the active phase."""
+        if not self.app.settings.get("agent.quiet", bool):
+            return False
+        from toad.widgets.canon_state import CanonStateWidget
+        try:
+            canon = self.app.query_one("#canon-state", CanonStateWidget)
+        except NoMatches:
+            return False
+        state = canon.state
+        return (
+            state.status in ("running", "in_progress")
+            and state.phase in ("init", "scaffold", "develop", "run")
+        )
+
     @on(acp_messages.Update)
     async def on_acp_agent_message(self, message: acp_messages.Update):
         message.stop()
         self._agent_thought = None
-        if message.text.strip():
-            await self.post_agent_response(message.text)
+        if self._is_canon_quiet():
+            return
+        text = self._strip_json_lines(message.text)
+        if text.strip():
+            await self.post_agent_response(text)
 
     @on(acp_messages.UserMessage)
     async def on_acp_user_message(self, message: acp_messages.UserMessage):
@@ -1004,6 +1165,8 @@ class Conversation(containers.Vertical):
                 tool_id, ToolCall
             )
         except NoMatches:
+            if tool_call.get("status") != "failed":
+                return
             await self.post(ToolCall(tool_call, id=message.tool_id), new_block=True)
         else:
             if existing_tool_call is not None:
@@ -1076,6 +1239,7 @@ class Conversation(containers.Vertical):
             output_byte_limit=message.output_byte_limit,
             id=message.terminal_id,
             minimum_terminal_width=width,
+            quiet=self._is_canon_quiet(),
         )
         self.terminals[message.terminal_id] = terminal
         terminal.display = False
@@ -1755,7 +1919,6 @@ class Conversation(containers.Vertical):
             MenuItem("Open as S[u]V[/]G", "export_to_svg", "v"),
         ]
 
-        print(repr(block))
         if block.allow_maximize:
             menu_options.append(MenuItem("[u]M[/u]aximize", "maximize_block", "m"))
 

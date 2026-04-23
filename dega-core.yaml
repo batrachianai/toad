@@ -1,5 +1,6 @@
 # DEGA Core config — edit to match your project
 version: 1
+provider: github
 max_iterations: 20
 
 budget:

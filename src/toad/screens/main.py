@@ -1,5 +1,6 @@
 from functools import partial
 from pathlib import Path
+from typing import Any
 import random
 
 from textual import on
@@ -25,7 +26,6 @@ from toad.widgets.plan import Plan
 from toad.widgets.throbber import Throbber
 from toad.widgets.conversation import Conversation
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
-from toad.widgets.side_bar import SideBar
 from toad.widgets.builder_view import BuilderView
 from toad.widgets.canon_state import CanonState, CanonStateWidget
 from toad.widgets.project_state_pane import ProjectStatePane
@@ -96,7 +96,6 @@ class MainScreen(Screen, can_focus=False):
     busy_count = var(0)
     throbber: getters.query_one[Throbber] = getters.query_one("#throbber")
     conversation = getters.query_one(Conversation)
-    side_bar = getters.query_one(SideBar)
     project_directory_tree = getters.query_one("#project_directory_tree")
 
     column = reactive(False)
@@ -129,13 +128,13 @@ class MainScreen(Screen, can_focus=False):
 
     def get_loading_widget(self) -> Widget:
         throbber = self.app.settings.get("ui.throbber", str)
-        if throbber == "quotes":
-            from toad.app import QUOTES
+        if throbber == "status":
+            from toad.app import STATUS_MESSAGES
             from toad.widgets.future_text import FutureText
 
-            quotes = QUOTES.copy()
-            random.shuffle(quotes)
-            return FutureText([Content(quote) for quote in quotes])
+            messages = STATUS_MESSAGES.copy()
+            random.shuffle(messages)
+            return FutureText([Content(msg) for msg in messages])
         return super().get_loading_widget()
 
     def _on_screen_resume(self, event: ScreenResume) -> None:
@@ -144,17 +143,6 @@ class MainScreen(Screen, can_focus=False):
     def compose(self) -> ComposeResult:
         with containers.Horizontal(id="main-split"):
             with containers.Center():
-                yield SideBar(
-                    SideBar.Panel("Plan", Plan([])),
-                    SideBar.Panel(
-                        "Project",
-                        ProjectDirectoryTree(
-                            self.project_path,
-                            id="project_directory_tree",
-                        ),
-                        flex=True,
-                    ),
-                )
                 yield Conversation(
                     self.project_path,
                     self._agent,
@@ -177,7 +165,6 @@ class MainScreen(Screen, can_focus=False):
     def update_node_styles(self, animate: bool = True) -> None:
         self.conversation.update_node_styles(animate=animate)
         self.query_one(Footer).update_node_styles(animate=animate)
-        self.query_one(SideBar).update_node_styles(animate=animate)
 
     def action_session_previous(self) -> None:
         if self.screen.id is not None:
@@ -207,7 +194,7 @@ class MainScreen(Screen, can_focus=False):
             )
             for entry in message.entries
         ]
-        self.query_one("SideBar Plan", Plan).entries = entries
+        self.query_one(Plan).entries = entries
 
     @on(messages.SessionUpdate)
     async def on_session_update(self, event: messages.SessionUpdate) -> None:
@@ -263,12 +250,18 @@ class MainScreen(Screen, can_focus=False):
             self.conversation.prompt.suggest(event.option.id)
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        if action == "show_sidebar" and self.side_bar.has_focus_within:
-            return False
         return True
 
     def action_show_sidebar(self) -> None:
-        self.side_bar.query_one("Collapsible CollapsibleTitle").focus()
+        """Legacy keybinding — now opens the Context section in the right pane."""
+        self.split_enabled = True
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        pane.show_section("section-context")
+        pane.activate_tab("tab-plan")
+        try:
+            pane.query_one(Plan).focus()
+        except Exception:
+            pass
 
     def action_toggle_project_state(self) -> None:
         """Toggle the right-side project state pane.
@@ -286,36 +279,55 @@ class MainScreen(Screen, can_focus=False):
         pane = self.query_one("#project_state_pane", ProjectStatePane)
         pane.refresh_timeline()
 
-    def _show_section_tab(
-        self, section_id: str, tab_id: str
-    ) -> None:
+    def _show_section_tab(self, section_id: str, tab_id: str) -> None:
         """Open pane, show a section, and activate a tab."""
         self.split_enabled = True
         pane = self.query_one("#project_state_pane", ProjectStatePane)
         pane.show_section(section_id)
         pane.activate_tab(tab_id)
 
-    def _forward_canon_state(self, state: "CanonState") -> None:
+    async def _forward_canon_state(self, state: "CanonState") -> None:
         """Forward canon state directly to State view."""
         pane = self.query_one("#project_state_pane", ProjectStatePane)
         for view in pane.query(BuilderView):
-            view._render_state(state)
+            await view._render_state(state)
+
+    def action_show_planning(self) -> None:
+        """Open pane and show Planning section (Board tab)."""
+        self._show_section_tab("section-planning", "tab-tasks")
 
     def action_show_github(self) -> None:
-        """Open pane and show GitHub tab."""
-        self._show_section_tab("section-github", "tab-github")
+        """Open pane and show the Plans tab inside Planning."""
+        self._show_section_tab("section-planning", "tab-gh-plans")
 
     def action_show_timeline(self) -> None:
-        """Open pane and show Timeline tab."""
-        self._show_section_tab("section-github", "tab-timeline")
-
-    def action_show_builder(self) -> None:
-        """Open pane and show Builder tab."""
-        self._show_section_tab("section-builder", "tab-builder")
+        """Open pane and show Timeline tab inside Planning."""
+        self._show_section_tab("section-planning", "tab-timeline")
 
     def action_show_state(self) -> None:
-        """Open pane and show State tab."""
-        self._show_section_tab("section-builder", "tab-builder")
+        """Open pane and show State section."""
+        self._show_section_tab("section-state", "tab-builder")
+
+    def _hide_section(self, section_id: str) -> None:
+        """Hide a section by ID."""
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        pane.hide_section(section_id)
+
+    def action_hide_planning(self) -> None:
+        """Hide the Planning section."""
+        self._hide_section("section-planning")
+
+    def action_hide_github(self) -> None:
+        """Hide Planning section (GitHub is a tab inside it)."""
+        self._hide_section("section-planning")
+
+    def action_hide_timeline(self) -> None:
+        """Hide Planning section (Timeline is a tab inside it)."""
+        self._hide_section("section-planning")
+
+    def action_hide_state(self) -> None:
+        """Hide the State section."""
+        self._hide_section("section-state")
 
     # ------------------------------------------------------------------
     # Canon auto-show logic
@@ -332,13 +344,13 @@ class MainScreen(Screen, can_focus=False):
         self.call_later(self._forward_canon_state, canon.state)
 
     @on(CanonStateWidget.CanonStateUpdated)
-    def _on_canon_updated(
+    async def _on_canon_updated(
         self,
         event: CanonStateWidget.CanonStateUpdated,
     ) -> None:
         """Auto-switch between Builder and Automation on phase change."""
         event.stop()
-        self._forward_canon_state(event.state)
+        await self._forward_canon_state(event.state)
 
     def watch_split_enabled(self, enabled: bool) -> None:
         """Show/hide the project state pane."""
@@ -353,51 +365,60 @@ class MainScreen(Screen, can_focus=False):
         message.stop()
         self.split_enabled = False
 
-    # Map ACP panel IDs to (section_id, tab_id)
-    _PANEL_MAP: dict[str, tuple[str, str]] = {
-        "github": ("section-github", "tab-github"),
-        "timeline": ("section-github", "tab-timeline"),
-        "state": ("section-builder", "tab-builder"),
-        "builder": ("section-builder", "tab-builder"),
-    }
-
-    # Map ACP panel IDs to section_id for close
-    _PANEL_SECTION_MAP: dict[str, str] = {
-        "github": "section-github",
-        "timeline": "section-github",
-        "state": "section-builder",
-        "builder": "section-builder",
-    }
-
     @on(acp_messages.OpenPanel)
     def on_acp_open_panel(self, message: acp_messages.OpenPanel) -> None:
-        """Agent requests opening a panel."""
+        """Agent requests opening a panel.
+
+        The panel ID is looked up in ``PANEL_ROUTES`` (declared in
+        ``project_state_pane``). Optional ``message.context`` may carry
+        ``filters`` — a dict applied to the panel after it opens (see
+        the ``canon-panel-routing`` skill).
+
+        Alias IDs like ``plans`` / ``prs`` route to the Board tab with the
+        matching type chip pre-activated.
+        """
+        from toad.widgets.project_state_pane import (
+            PANEL_ROUTES,
+            PANEL_TYPE_PRESETS,
+        )
+
         message.stop()
         panel_id = message.panel_id
         if panel_id == "project_state":
             self.split_enabled = True
             return
-        mapping = self._PANEL_MAP.get(panel_id)
-        if mapping:
-            self._show_section_tab(*mapping)
+        mapping = PANEL_ROUTES.get(panel_id)
+        if not mapping:
+            return
+        self._show_section_tab(*mapping)
+        # Combine explicit filters from context with the alias's type preset.
+        combined_filters: dict[str, Any] = {}
+        preset_type = PANEL_TYPE_PRESETS.get(panel_id)
+        if preset_type:
+            combined_filters["type"] = preset_type
+        if message.context:
+            ctx_filters = message.context.get("filters")
+            if isinstance(ctx_filters, dict):
+                combined_filters.update(ctx_filters)
+        if combined_filters and mapping[1] == "tab-tasks":
+            pane = self.query_one("#project_state_pane", ProjectStatePane)
+            pane.apply_task_filters(combined_filters)
 
     @on(acp_messages.ClosePanel)
     def on_acp_close_panel(self, message: acp_messages.ClosePanel) -> None:
         """Agent requests closing a panel."""
+        from toad.widgets.project_state_pane import PANEL_ROUTES
+
         message.stop()
         panel_id = message.panel_id
         if panel_id == "project_state":
-            pane = self.query_one(
-                "#project_state_pane", ProjectStatePane
-            )
+            pane = self.query_one("#project_state_pane", ProjectStatePane)
             pane.hide_all_sections()
             return
-        section_id = self._PANEL_SECTION_MAP.get(panel_id)
-        if section_id:
-            pane = self.query_one(
-                "#project_state_pane", ProjectStatePane
-            )
-            pane.hide_section(section_id)
+        mapping = PANEL_ROUTES.get(panel_id)
+        if mapping:
+            pane = self.query_one("#project_state_pane", ProjectStatePane)
+            pane.hide_section(mapping[0])
 
     def action_focus_prompt(self) -> None:
         self.conversation.focus_prompt()
@@ -408,10 +429,6 @@ class MainScreen(Screen, can_focus=False):
         await self.app.save_settings()
         await self.app.switch_mode("store")
 
-    @on(SideBar.Dismiss)
-    def on_side_bar_dismiss(self, message: SideBar.Dismiss):
-        message.stop()
-        self.conversation.focus_prompt()
 
     def watch_column(self, column: bool) -> None:
         self.conversation.styles.max_width = (

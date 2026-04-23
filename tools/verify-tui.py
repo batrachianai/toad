@@ -6,6 +6,7 @@ Usage:
     uv run python tools/verify-tui.py --verbose
     uv run python tools/verify-tui.py --widget gantt
     uv run python tools/verify-tui.py --widget github
+    uv run python tools/verify-tui.py --widget tasks
 
 Runs the app or individual widgets headless and reports layout,
 scroll behavior, and rendering issues. Exit code 0 = all checks pass.
@@ -14,6 +15,8 @@ scroll behavior, and rendering issues. Exit code 0 = all checks pass.
 from __future__ import annotations
 
 import argparse
+import asyncio
+import subprocess
 import sys
 from datetime import date
 
@@ -183,8 +186,8 @@ def verify_pane_no_default(verbose: bool = False) -> bool:
     from textual.app import App, ComposeResult
     from toad.widgets.project_state_pane import (
         ProjectStatePane,
-        SECTION_GITHUB,
-        SECTION_BUILDER,
+        SECTION_PLANNING,
+        SECTION_STATE,
     )
 
     errors: list[str] = []
@@ -204,16 +207,20 @@ def verify_pane_no_default(verbose: bool = False) -> bool:
 
         def _check(self) -> None:
             pane = self.query_one("#psp", ProjectStatePane)
-            github = pane.query_one(f"#{SECTION_GITHUB}")
-            builder = pane.query_one(f"#{SECTION_BUILDER}")
+            planning = pane.query_one(f"#{SECTION_PLANNING}")
+            state = pane.query_one(f"#{SECTION_STATE}")
 
-            results["github_visible"] = github.display
-            results["builder_visible"] = builder.display
+            results["planning_visible"] = planning.display
+            results["state_visible"] = state.display
 
-            if github.display:
-                errors.append("GitHub section visible on mount (should be hidden)")
-            if builder.display:
-                errors.append("Builder section visible on mount (should be hidden)")
+            if planning.display:
+                errors.append(
+                    "Planning section visible on mount (should be hidden)"
+                )
+            if state.display:
+                errors.append(
+                    "State section visible on mount (should be hidden)"
+                )
 
             self.exit()
 
@@ -222,6 +229,208 @@ def verify_pane_no_default(verbose: bool = False) -> bool:
     if verbose:
         for key, val in results.items():
             console.print(f"  {key}: {val}")
+
+    return len(errors) == 0, errors, results
+
+
+def verify_tasks(verbose: bool = False) -> bool:
+    """Verify Tasks widget stack: mount + down/enter/escape interaction."""
+    from datetime import datetime
+
+    from textual.app import App, ComposeResult
+    from textual.containers import Horizontal
+    from textual.widgets import ContentSwitcher, DataTable
+
+    from toad.widgets.github_views.task_provider import TaskDetailData, TaskItem
+    from toad.widgets.github_views.timeline_provider import ItemStatus, Priority
+    from toad.widgets.filter_toolbar import FilterToolbar, filter_tasks
+    from toad.widgets.task_detail import TaskDetail
+    from toad.widgets.task_table import TaskTable
+    from toad.screens.task_detail_screen import TaskDetailScreen
+
+    errors: list[str] = []
+    results: dict[str, object] = {}
+
+    tasks = [
+        TaskItem(
+            id="101",
+            number=101,
+            title="Wire Tasks tab",
+            status=ItemStatus.IN_PROGRESS,
+            milestone_id="1",
+            milestone_title="M1 — UI",
+            priority=Priority.P1,
+            assignees=["alberto"],
+            effort="2",
+            labels=["p1-must-ship"],
+            comments_count=4,
+            created_at=datetime(2026, 4, 10, 12, 0),
+            updated_at=datetime(2026, 4, 15, 9, 0),
+            url="https://github.com/acme/proj/issues/101",
+        ),
+        TaskItem(
+            id="102",
+            number=102,
+            title="Document widgets",
+            status=ItemStatus.DONE,
+            milestone_id=None,
+            milestone_title="",
+            priority=Priority.P3,
+            assignees=[],
+            effort=None,
+            labels=["p3"],
+            comments_count=0,
+            url="https://github.com/acme/proj/issues/102",
+        ),
+    ]
+    details = TaskDetailData(
+        number=101,
+        body="# body\n\nrendered markdown here.",
+        comments_count=2,
+        linked_prs=[{"number": 200, "title": "PR"}],
+        labels=["p1-must-ship"],
+        assignees=["alberto"],
+        url="https://github.com/acme/proj/issues/101",
+    )
+
+    # --- Test 1: Filter predicate still wired ---
+    filtered = filter_tasks(tasks, status=ItemStatus.IN_PROGRESS)
+    if [t.number for t in filtered] != [101]:
+        errors.append(
+            f"filter_tasks: expected [101], got {[t.number for t in filtered]}"
+        )
+
+    # --- Test 2: All three widgets mount + interaction flow ---
+    class TasksHarness(App[None]):
+        CSS = "Screen { overflow: hidden; }"
+
+        def compose(self) -> ComposeResult:
+            yield FilterToolbar(id="tb")
+            with Horizontal(id="body"):
+                yield TaskTable(id="tbl")
+                yield TaskDetail(id="detail")
+
+        async def on_mount(self) -> None:
+            tbl = self.query_one(TaskTable)
+            tbl.set_tasks(tasks)
+            tbl.focus()
+
+        def on_data_table_row_selected(
+            self, event: DataTable.RowSelected
+        ) -> None:
+            key = event.row_key.value
+            if key is None:
+                return
+            match = next((t for t in tasks if t.id == str(key)), None)
+            if match is not None:
+                self.query_one(TaskDetail).show_task(match)
+
+    async def _run_interaction() -> None:
+        app = TasksHarness()
+        async with app.run_test(size=(120, 30)) as pilot:
+            await pilot.pause()
+            # Confirm all three widgets mounted.
+            app.query_one(FilterToolbar)
+            tbl = app.query_one(TaskTable)
+            detail = app.query_one(TaskDetail)
+            switcher = detail.query_one(ContentSwitcher)
+
+            results["row_count"] = tbl.row_count
+            results["initial_switcher"] = switcher.current
+
+            if tbl.row_count != len(tasks):
+                errors.append(
+                    f"table row_count={tbl.row_count}, expected {len(tasks)}"
+                )
+            if switcher.current != "empty":
+                errors.append(
+                    f"initial switcher={switcher.current}, expected 'empty'"
+                )
+
+            await pilot.press("down", "enter")
+            await pilot.pause()
+            results["after_enter_switcher"] = switcher.current
+            if switcher.current != "detail":
+                errors.append(
+                    f"after enter switcher={switcher.current}, expected 'detail'"
+                )
+
+            # Escape on list screen should be a no-op (no screen pushed).
+            await pilot.press("escape")
+            await pilot.pause()
+            results["after_escape_screen"] = type(app.screen).__name__
+            if isinstance(app.screen, TaskDetailScreen):
+                errors.append(
+                    "escape unexpectedly left TaskDetailScreen active on list"
+                )
+
+            # Push + escape round-trip: confirms screen-stack pop works.
+            app.push_screen(TaskDetailScreen(tasks[0], details))
+            await pilot.pause()
+            if not isinstance(app.screen, TaskDetailScreen):
+                errors.append("push_screen(TaskDetailScreen) did not activate")
+            await pilot.press("escape")
+            await pilot.pause()
+            results["final_screen"] = type(app.screen).__name__
+            if isinstance(app.screen, TaskDetailScreen):
+                errors.append(
+                    "escape on TaskDetailScreen did not pop back to list"
+                )
+
+    asyncio.run(_run_interaction())
+
+    if verbose:
+        for key, val in results.items():
+            console.print(f"  {key}: {val}")
+
+    return len(errors) == 0, errors, results
+
+
+def verify_live_data_probe(verbose: bool = False) -> bool:
+    """Probe the real GitHub API through TaskProvider.
+
+    Skips gracefully if `gh` is not installed or not authenticated.
+    """
+    errors: list[str] = []
+    results: dict[str, object] = {}
+
+    # Probe `gh auth status` — skip if unauth'd or gh missing.
+    try:
+        proc = subprocess.run(
+            ["gh", "auth", "status"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except FileNotFoundError:
+        console.print("  [yellow]skipped: no gh auth[/yellow] (gh not installed)")
+        return True, [], {"status": "skipped-no-gh"}
+    except subprocess.TimeoutExpired:
+        console.print("  [yellow]skipped: no gh auth[/yellow] (timeout)")
+        return True, [], {"status": "skipped-timeout"}
+
+    if proc.returncode != 0:
+        console.print("  [yellow]skipped: no gh auth[/yellow]")
+        return True, [], {"status": "skipped-unauth"}
+
+    # Run the fetch.
+    from toad.widgets.github_views.task_provider import TaskProvider
+
+    async def _fetch() -> int:
+        provider = TaskProvider(
+            repo="DEGAorg/claude-code-config", project_number=8
+        )
+        tasks = await provider.fetch_tasks()
+        return len(tasks)
+
+    try:
+        count = asyncio.run(_fetch())
+        results["task_count"] = count
+        if verbose:
+            console.print(f"  fetched {count} tasks from live GitHub API")
+    except Exception as exc:  # noqa: BLE001 - probe surfaces any parser break
+        errors.append(f"live fetch failed: {exc.__class__.__name__}: {exc}")
 
     return len(errors) == 0, errors, results
 
@@ -237,6 +446,11 @@ def verify_imports(verbose: bool = False) -> bool:
         "toad.widgets.github_views.timeline_provider",
         "toad.widgets.github_views.github_timeline_provider",
         "toad.widgets.github_views.timeline_data",
+        "toad.widgets.github_views.task_provider",
+        "toad.widgets.task_table",
+        "toad.widgets.task_detail",
+        "toad.widgets.filter_toolbar",
+        "toad.screens.task_detail_screen",
     ]
     for mod in modules:
         try:
@@ -252,7 +466,7 @@ def main() -> None:
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument(
         "--widget",
-        choices=["gantt", "imports", "pane", "all"],
+        choices=["gantt", "imports", "pane", "tasks", "live", "all"],
         default="all",
     )
     args = parser.parse_args()
@@ -261,8 +475,12 @@ def main() -> None:
         "imports": verify_imports,
         "gantt": verify_gantt,
         "pane": verify_pane_no_default,
+        "tasks": verify_tasks,
     }
-    if args.widget != "all":
+    # Live probe only runs when explicitly requested — it hits the network.
+    if args.widget == "live":
+        checks = {"live": verify_live_data_probe}
+    elif args.widget != "all":
         checks = {args.widget: checks[args.widget]}
 
     all_passed = True

@@ -19,8 +19,9 @@ SCHEMA: list[SchemaDict] = [
                 "title": "Theme",
                 "help": "One of the builtin Textual themes.",
                 "type": "choices",
-                "default": "dracula",
+                "default": "dega",
                 "choices": [
+                    "dega",
                     "conductor",
                     "atom-one-dark",
                     "atom-one-light",
@@ -126,10 +127,10 @@ SCHEMA: list[SchemaDict] = [
                 "title": "Thinking animation",
                 "help": "Animation to show while waiting for the agent to respond",
                 "type": "choices",
-                "default": "quotes",
+                "default": "status",
                 "choices": [
                     ("Pulse", "pulse"),
-                    ("Quotes", "quotes"),
+                    ("Status text", "status"),
                 ],
             },
             {
@@ -240,6 +241,16 @@ SCHEMA: list[SchemaDict] = [
                 "title": "Agent thoughts",
                 "help": "Show agent's 'thoughts' in the conversation?",
                 "type": "boolean",
+            },
+            {
+                "key": "quiet",
+                "title": "Quiet during canon phases",
+                "help": "Suppress agent prose in chat during active canon "
+                "phases (init, scaffold, develop, run). Status updates "
+                "flow through the state pane instead. Strategy phase "
+                "and errors always break through.",
+                "type": "boolean",
+                "default": True,
             },
             # {
             #     "key": "warn",

@@ -1,3 +1,4 @@
+import shutil
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import zip_longest
@@ -186,8 +187,8 @@ Your favorite agents.
 - **1-9 a-f** Select agent
 - **cursor keys** navigate agents
 - **tab / shift+tab** Move to next / previous section
-- **space** Launch highlighted agent
-- **enter** Open agent details
+- **enter / space** Launch agent (auto-installs if needed)
+- **i** Open agent info modal
 """
     BINDING_GROUP_TITLE = "Launcher"
 
@@ -196,16 +197,29 @@ Your favorite agents.
         Binding(
             "enter",
             "select",
-            "Details",
-            tooltip="Open agent details",
+            "Launch",
+            tooltip="Launch agent (auto-installs if needed)",
         ),
         Binding(
             "space",
             "launch",
             "Launch",
-            tooltip="Launch highlighted agent",
+            tooltip="Launch agent (auto-installs if needed)",
+        ),
+        Binding(
+            "i",
+            "info",
+            "Agent Info",
+            tooltip="Open agent info modal",
         ),
     ]
+
+    def action_info(self) -> None:
+        if self.highlighted is None:
+            return
+        child = self.children[self.highlighted]
+        assert isinstance(child, LauncherItem)
+        self.post_message(StoreScreen.OpenAgentDetails(child._agent["identity"]))
 
     def action_details(self) -> None:
         if self.highlighted is None:
@@ -226,11 +240,7 @@ Your favorite agents.
             self.app.settings.set("launcher.agents", "\n".join(agents))
 
     def action_launch(self) -> None:
-        if self.highlighted is None:
-            return
-        child = self.children[self.highlighted]
-        assert isinstance(child, LauncherItem)
-        self.screen.post_message(messages.LaunchAgent(child.agent["identity"]))
+        self.action_select()
 
 
 class Launcher(containers.VerticalGroup):
@@ -322,23 +332,25 @@ class AgentGridSelect(GridSelect):
 
 - **cursor keys** Navigate agents
 - **tab / shift+tab** Move to next / previous section
-- **enter** Open agent details
-- **space** Launch the agent (if installed)
+- **enter / space** Launch agent (auto-installs if needed)
+- **i** Open agent info modal
 """
     BINDINGS = [
-        Binding("enter", "select", "Details", tooltip="Open agent details"),
-        Binding("space", "launch", "Launch", tooltip="Launch highlighted agent"),
+        Binding("enter", "select", "Launch", tooltip="Launch agent (auto-installs if needed)"),
+        Binding("space", "launch", "Launch", tooltip="Launch agent (auto-installs if needed)"),
+        Binding("i", "info", "Agent Info", tooltip="Open agent info modal"),
     ]
     BINDING_GROUP_TITLE = "Agent Select"
 
-    def action_launch(self) -> None:
+    def action_info(self) -> None:
         if self.highlighted is None:
             return
         child = self.children[self.highlighted]
-        if not isinstance(child, AgentItem):
-            self.app.open_url("https://github.com/sponsors/willmcgugan")
-            return
-        self.post_message(messages.LaunchAgent(child.agent["identity"]))
+        if isinstance(child, AgentItem):
+            self.post_message(StoreScreen.OpenAgentDetails(child.agent["identity"]))
+
+    def action_launch(self) -> None:
+        self.action_select()
 
 
 class Container(containers.VerticalScroll):
@@ -460,6 +472,80 @@ class StoreScreen(Screen):
                     for agent in ordered_agents:
                         yield AgentItem(agent)
 
+    @staticmethod
+    def _detect_agent_readiness(
+        agent: Agent,
+    ) -> Literal["ready", "need_acp", "need_install"]:
+        """Check whether an agent's binary is on PATH.
+
+        Returns:
+            ``"ready"`` if the run command binary is found,
+            ``"need_acp"`` if an ``install_acp`` action exists,
+            ``"need_install"`` if only a full ``install`` action exists,
+            or ``"ready"`` as fallback when no install action is defined.
+        """
+        run_cmd = toad.get_os_matrix(agent["run_command"])
+        if run_cmd and shutil.which(run_cmd.split()[0]):
+            return "ready"
+        agent_actions = agent["actions"]
+        commands = agent_actions.get(toad.os) or agent_actions.get("*")
+        if commands:
+            if "install_acp" in commands:
+                return "need_acp"
+            if "install" in commands:
+                return "need_install"
+        return "ready"
+
+    async def _auto_install_and_launch(self, agent: Agent) -> None:
+        """Detect readiness, auto-install if needed, then launch.
+
+        If the agent binary is already on PATH, posts
+        ``LaunchAgent`` immediately. Otherwise shows an
+        ``ActionModal`` for the appropriate install action
+        and launches only on success.
+        """
+        readiness = self._detect_agent_readiness(agent)
+
+        if readiness == "ready":
+            self.post_message(messages.LaunchAgent(agent["identity"]))
+            return
+
+        action_name = (
+            "install_acp" if readiness == "need_acp" else "install"
+        )
+        agent_actions = agent["actions"]
+        commands = agent_actions.get(toad.os) or agent_actions.get("*")
+        if not commands or action_name not in commands:
+            self.notify(
+                f"No {action_name} action available on this platform",
+                title="Agent install",
+                severity="error",
+            )
+            return
+
+        command = commands[action_name]
+
+        from toad.screens.action_modal import ActionModal
+
+        return_code = await self.app.push_screen_wait(
+            ActionModal(
+                action_name,
+                agent["identity"],
+                command["description"],
+                command["command"],
+                bootstrap_uv=command.get("bootstrap_uv", False),
+            )
+        )
+
+        if return_code == 0:
+            self.post_message(messages.LaunchAgent(agent["identity"]))
+        else:
+            self.notify(
+                f"Installation failed (exit code {return_code})",
+                title="Agent install",
+                severity="error",
+            )
+
     def move_focus(self, direction: Literal[-1] | Literal[+1]) -> None:
         if isinstance(self.focused, GridSelect):
             focus_chain = list(self.query(GridSelect))
@@ -488,13 +574,7 @@ class StoreScreen(Screen):
         if not isinstance(event.widget, AgentItem):
             self.app.open_url("https://github.com/sponsors/willmcgugan")
             return
-        assert isinstance(event.widget, AgentItem)
-        from toad.screens.agent_modal import AgentModal
-
-        modal_response = await self.app.push_screen_wait(AgentModal(event.widget.agent))
-        await self.app.save_settings()
-        if modal_response == "launch":
-            self.post_message(messages.LaunchAgent(event.widget.agent["identity"]))
+        await self._auto_install_and_launch(event.widget.agent)
 
     @on(OpenAgentDetails)
     @work
@@ -515,15 +595,7 @@ class StoreScreen(Screen):
     async def on_launcher_selected(self, event: GridSelect.Selected):
         launcher_item = event.widget
         assert isinstance(launcher_item, LauncherItem)
-
-        from toad.screens.agent_modal import AgentModal
-
-        modal_response = await self.app.push_screen_wait(
-            AgentModal(launcher_item.agent)
-        )
-        await self.app.save_settings()
-        if modal_response == "launch":
-            self.post_message(messages.LaunchAgent(launcher_item.agent["identity"]))
+        await self._auto_install_and_launch(launcher_item.agent)
 
     @on(ChangeDirectory)
     def on_change_directory(self, event: ChangeDirectory) -> None:
