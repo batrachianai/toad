@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import yaml
@@ -35,8 +36,10 @@ from toad.widgets.github_views.github_timeline_provider import (
 )
 from toad.widgets.github_views.task_provider import TaskItem, TaskProvider
 from toad.widgets.github_views.timeline_data import build_timeline
+from toad.widgets.orchestrator_state import OrchestratorStateWidget
 from toad.widgets.outreach_cards import AccountDot, Histogram, RankedBar, StatLine
 from toad.widgets.plan import Plan
+from toad.widgets.plan_execution_section import ModelFactory, PlanExecutionSection
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
 from toad.widgets.subagent_tab_section import AgentFactory, SubagentTabSection
 from toad.widgets.task_detail import TaskDetail
@@ -285,6 +288,9 @@ class ProjectStatePane(Vertical):
         self._sections: list[_SectionDef] = list(SECTIONS)
         if self._outreach_provider is not None:
             self._sections.append(_SectionDef(SECTION_OUTREACH, "Outreach"))
+        self._plan_exec_section: PlanExecutionSection | None = None
+        self._plan_model_factory: ModelFactory | None = None
+        self._plan_agent_getter: Callable[[], str] | None = None
 
     def compose(self) -> ComposeResult:
         # Toolbar: one button per section + a stack-mode toggle
@@ -338,6 +344,14 @@ class ProjectStatePane(Vertical):
         yield CanonStateWidget(
             project_path=self._project_path,
             id="canon-state",
+        )
+
+        # Orchestrator state watcher (invisible): tails
+        # ``.orchestrator/master.json`` and posts ``PlansUpdated`` which
+        # drives auto-open of plan-execution tabs below.
+        yield OrchestratorStateWidget(
+            project_path=self._project_path,
+            id="orchestrator-state",
         )
 
         # --- State section (canon build + run) ---
@@ -548,6 +562,56 @@ class ProjectStatePane(Vertical):
             self.mount(section)
             self._subagent_section = section
         return self._subagent_section
+
+    # ------------------------------------------------------------------
+    # Public API — plan execution (auto-opened from master.json)
+    # ------------------------------------------------------------------
+
+    def configure_plan_execution(
+        self,
+        model_factory: ModelFactory,
+        get_current_agent: Callable[[], str] | None = None,
+    ) -> None:
+        """Register the Phase B model factory + agent getter.
+
+        Called by Canon's ACP bootstrap when the ``PlanExecutionModel``
+        factory is ready. Mounts the section lazily and pushes the
+        factory into it so subsequent ``PlansUpdated`` messages can
+        open tabs.
+        """
+        self._plan_model_factory = model_factory
+        self._plan_agent_getter = get_current_agent
+        section = self._ensure_plan_exec_section()
+        section.set_model_factory(model_factory)
+
+    def _ensure_plan_exec_section(self) -> PlanExecutionSection:
+        if self._plan_exec_section is None:
+            section = PlanExecutionSection(
+                model_factory=self._plan_model_factory,
+                get_current_agent=self._plan_agent_getter,
+                id=PlanExecutionSection.SECTION_ID,
+                classes="pane-section",
+            )
+            self.mount(section)
+            self._plan_exec_section = section
+        return self._plan_exec_section
+
+    @on(OrchestratorStateWidget.PlansUpdated)
+    def _on_plans_updated(
+        self, event: OrchestratorStateWidget.PlansUpdated
+    ) -> None:
+        """Auto-open a tab for every plan slug in ``master.json``.
+
+        Duplicate slugs are deduped by :meth:`PlanExecutionSection.open_tab`.
+        When no model factory is registered the section is a silent no-op.
+        """
+        event.stop()
+        if not event.plans:
+            return
+        section = self._ensure_plan_exec_section()
+        for plan in event.plans:
+            if plan.slug:
+                section.open_tab(plan.slug)
 
     def activate_tab(self, tab_id: str) -> None:
         """Switch to a specific tab by its pane id."""

@@ -663,6 +663,11 @@ def verify_imports(verbose: bool = False) -> bool:
         "toad.outreach.protocol",
         "toad.outreach.registry",
         "toad.widgets.outreach_cards",
+        "toad.widgets.plan_dep_graph",
+        "toad.widgets.plan_status_rail",
+        "toad.widgets.plan_worker_log_pane",
+        "toad.widgets.plan_execution_tab",
+        "toad.widgets.plan_execution_section",
     ]
     for mod in modules:
         try:

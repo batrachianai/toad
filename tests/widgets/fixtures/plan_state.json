@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "plan": "example-plan",
+  "issueNumber": 42,
+  "items": [
+    {
+      "id": 1,
+      "description": "Write tests and implement widget A",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": 2,
+      "description": "Write tests and implement widget B",
+      "deps": [1],
+      "status": "running"
+    },
+    {
+      "id": 3,
+      "description": "Write tests and implement widget C",
+      "deps": [2],
+      "status": "ready"
+    },
+    {
+      "id": 4,
+      "description": "Write tests and implement widget D",
+      "deps": [3],
+      "status": "queued"
+    },
+    {
+      "id": 5,
+      "description": "Verify the plan end-to-end",
+      "deps": [4],
+      "status": "failed"
+    },
+    {
+      "id": 6,
+      "description": "Review pass",
+      "deps": [5],
+      "status": "review"
+    }
+  ]
+}

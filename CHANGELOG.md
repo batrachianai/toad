@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Changed
+
 - Canon TUI view — PlanExecutionTab + dedicated section (`20260422-plan-execution-tab`) — 2026-04-23
 
 - Canon TUI data layer — PlanExecutionModel (`20260422-plan-execution-model`) — 2026-04-22
