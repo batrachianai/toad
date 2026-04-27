@@ -654,64 +654,61 @@ def verify_plan_execution(verbose: bool = False) -> bool:
     """
     import json
     import tempfile
-    from collections.abc import Callable
     from pathlib import Path
+    from typing import Any
 
     from textual.app import App, ComposeResult
 
-    from toad.widgets.plan_dep_graph import DepGraphItem
+    from toad.data.plan_execution_model import PlanExecutionModel
     from toad.widgets.plan_execution_section import PlanExecutionSection
     from toad.widgets.plan_execution_tab import PlanExecutionTab
     from toad.widgets.plan_status_rail import STATUS_GLYPHS, PlanStatusRail
     from toad.widgets.project_state_pane import ProjectStatePane
+
+    class _LateTarget:
+        """Proxies ``post_message`` to a real widget bound after mount."""
+
+        def __init__(self) -> None:
+            self.target: Any = None
+
+        def post_message(self, message: Any) -> bool:
+            if self.target is None:
+                return False
+            return bool(self.target.post_message(message))
+
+    late_target = _LateTarget()
+    built_models: list[PlanExecutionModel] = []
 
     errors: list[str] = []
     results: dict[str, object] = {}
 
     SLUG = "20260427-smoke"
 
-    class _StubModel:
-        def __init__(self, slug: str) -> None:
-            self.slug = slug
-            self.issue_number = 99
-            self.items = [
-                DepGraphItem(
-                    id=1, description="task", status="running", deps=()
-                )
-            ]
-            self.verdict = "running"
+    def _state_payload(status: str) -> dict[str, object]:
+        return {
+            "version": 1,
+            "plan": SLUG,
+            "issueNumber": 99,
+            "items": [
+                {
+                    "id": 1,
+                    "description": "task",
+                    "deps": [],
+                    "status": status,
+                }
+            ],
+        }
 
-        def subscribe_log(
-            self, item_id: int, callback: Callable[[str], None]
-        ) -> Callable[[], None]:
-            del item_id, callback
-            return lambda: None
-
-    def _factory(slug: str) -> _StubModel:
-        return _StubModel(slug)
+    def _write_state(plans_dir: Path, status: str) -> None:
+        (plans_dir / "state.json").write_text(
+            json.dumps(_state_payload(status)), encoding="utf-8"
+        )
 
     def _write_fixture(project: Path) -> None:
         plans_dir = project / ".orchestrator" / "plans" / SLUG
-        plans_dir.mkdir(parents=True)
+        (plans_dir / "logs").mkdir(parents=True)
+        _write_state(plans_dir, "running")
         state_path = plans_dir / "state.json"
-        state_path.write_text(
-            json.dumps(
-                {
-                    "version": 1,
-                    "plan": SLUG,
-                    "issueNumber": 99,
-                    "items": [
-                        {
-                            "id": 1,
-                            "description": "task",
-                            "deps": [],
-                            "status": "running",
-                        }
-                    ],
-                }
-            ),
-            encoding="utf-8",
-        )
         (project / ".orchestrator" / "master.json").write_text(
             json.dumps(
                 {
@@ -739,6 +736,7 @@ def verify_plan_execution(verbose: bool = False) -> bool:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             _write_fixture(project)
+            plans_dir = project / ".orchestrator" / "plans" / SLUG
 
             class Harness(App[None]):
                 CSS = "Screen { overflow: hidden; }"
@@ -750,6 +748,16 @@ def verify_plan_execution(verbose: bool = False) -> bool:
             async with app.run_test(size=(120, 40)) as pilot:
                 await pilot.pause()
                 pane = app.query_one(ProjectStatePane)
+
+                def _factory(slug: str) -> PlanExecutionModel | None:
+                    plan_dir = project / ".orchestrator" / "plans" / slug
+                    if not plan_dir.is_dir():
+                        return None
+                    model = PlanExecutionModel(plan_dir, target=late_target)
+                    model.start()
+                    built_models.append(model)
+                    return model
+
                 pane.configure_plan_execution(_factory)
                 await pilot.pause()
                 await pilot.pause()
@@ -784,6 +792,8 @@ def verify_plan_execution(verbose: bool = False) -> bool:
                         errors.append(
                             f"tab id={tab.id!r}, expected {expected_id!r}"
                         )
+                    # Bind the late target so model messages reach the tab.
+                    late_target.target = tab
 
                 rails = pane.query(PlanStatusRail)
                 if len(rails) != 1:
@@ -807,6 +817,25 @@ def verify_plan_execution(verbose: bool = False) -> bool:
                     if rail.verdict_label() != "running":
                         errors.append(
                             f"verdict={rail.verdict_label()!r}, expected 'running'"
+                        )
+
+                    # Mutate state.json — backstop interval (or watcher
+                    # event) should drive an ItemStatusChanged through to
+                    # the rail.
+                    _write_state(plans_dir, "done")
+                    await pilot.pause(3.0)
+
+                    glyphs_after = rail.glyphs_plain()
+                    results["rail_glyphs_after_mutation"] = glyphs_after
+                    if len(glyphs_after) != 1:
+                        errors.append(
+                            f"after mutation glyph count={len(glyphs_after)}, "
+                            f"expected 1"
+                        )
+                    elif glyphs_after[0] != STATUS_GLYPHS["done"]:
+                        errors.append(
+                            f"after mutation glyph={glyphs_after[0]!r}, "
+                            f"expected done {STATUS_GLYPHS['done']!r}"
                         )
 
     asyncio.run(_run())

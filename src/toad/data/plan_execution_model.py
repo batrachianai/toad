@@ -83,6 +83,10 @@ class PlanExecutionModel:
     # ------------------------------------------------------------------
 
     @property
+    def plan_dir(self) -> Path:
+        return self._plan_dir
+
+    @property
     def slug(self) -> str:
         return self._slug
 

@@ -19,16 +19,21 @@ The tab is intentionally dumb — data arrives through an injected model
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import TabbedContent
 
+from toad.data.plan_execution_model import PlanExecutionModel
+from toad.directory_watcher import DirectoryWatcher
 from toad.widgets.plan_dep_graph import DepGraphItem, PlanDepGraph
 from toad.widgets.plan_execution_tab import PlanExecutionTab
-from toad.widgets.plan_status_rail import PlanStatusRail
+from toad.widgets.plan_status_rail import STATUS_GLYPHS, PlanStatusRail
 from toad.widgets.plan_worker_log_pane import PlanWorkerLogPane
 
 
@@ -52,6 +57,7 @@ class _FakeModel:
     issue_number: int | None = 42
     items: list[DepGraphItem] = field(default_factory=list)
     verdict: str = "running"
+    plan_dir: Path = field(default_factory=lambda: Path("/nonexistent-fake-plan"))
     subscriptions: list[_Subscription] = field(default_factory=list)
 
     def subscribe_log(
@@ -64,6 +70,9 @@ class _FakeModel:
             sub.unsubscribed = True
 
         return _unsubscribe
+
+    def poll_now(self) -> None:
+        return None
 
 
 def _fixture_items() -> list[DepGraphItem]:
@@ -224,3 +233,157 @@ class TestPlanFinishedPersists:
             # Still mounted inside the TabbedContent.
             tabs = app.query_one(TabbedContent)
             assert tab.id in {pane.id for pane in tabs.query(PlanExecutionTab)}
+
+
+# ------------------------------------------------------------------
+# Live updates — directory watcher + interval backstop
+# ------------------------------------------------------------------
+
+
+def _state_payload(
+    items: list[dict[str, Any]],
+    *,
+    slug: str = "20260427-live-plan",
+    issue_number: int | None = 99,
+    verdict: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "version": 1,
+        "plan": slug,
+        "issueNumber": issue_number,
+        "items": items,
+    }
+    if verdict is not None:
+        payload["finalReview"] = {"verdict": verdict}
+    return payload
+
+
+def _write_state(plan_dir: Path, payload: dict[str, Any]) -> None:
+    (plan_dir / "state.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+@pytest.fixture
+def live_plan_dir(tmp_path: Path) -> Path:
+    pdir = tmp_path / ".orchestrator" / "plans" / "20260427-live-plan"
+    (pdir / "logs").mkdir(parents=True)
+    _write_state(
+        pdir,
+        _state_payload(
+            [
+                {"id": 1, "description": "alpha", "deps": [], "status": "queued"},
+                {"id": 2, "description": "beta", "deps": [1], "status": "queued"},
+            ]
+        ),
+    )
+    return pdir
+
+
+class _LateTarget:
+    """Defers ``post_message`` until a real widget is bound after mount."""
+
+    def __init__(self) -> None:
+        self.target: Any = None
+
+    def post_message(self, message: Any) -> bool:
+        if self.target is None:
+            return False
+        return bool(self.target.post_message(message))
+
+
+class _LiveHarness(App[None]):
+    def __init__(self, model: PlanExecutionModel) -> None:
+        super().__init__()
+        self._model = model
+
+    def compose(self) -> ComposeResult:
+        tabs = TabbedContent(id="plan-exec-tabs")
+        with tabs:
+            yield PlanExecutionTab(model=self._model, id="plan-tab-live")
+
+
+class TestLiveUpdates:
+    """Tab installs a watcher + interval on mount; mutations reach the rail."""
+
+    @pytest.mark.asyncio
+    async def test_on_mount_installs_timer_and_watcher(
+        self, live_plan_dir: Path
+    ) -> None:
+        target = _LateTarget()
+        model = PlanExecutionModel(live_plan_dir, target=target)
+        app = _LiveHarness(model)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            tab = app.query_one(PlanExecutionTab)
+            target.target = tab
+
+            # Backstop interval timer is installed.
+            assert tab._poll_timer is not None  # type: ignore[attr-defined]
+            # DirectoryWatcher is installed and points at the plan dir.
+            watcher = tab._watcher  # type: ignore[attr-defined]
+            assert isinstance(watcher, DirectoryWatcher)
+
+    @pytest.mark.asyncio
+    async def test_on_unmount_stops_timer_and_watcher(
+        self, live_plan_dir: Path
+    ) -> None:
+        target = _LateTarget()
+        model = PlanExecutionModel(live_plan_dir, target=target)
+        app = _LiveHarness(model)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            tab = app.query_one(PlanExecutionTab)
+            target.target = tab
+            assert tab._poll_timer is not None  # type: ignore[attr-defined]
+            assert tab._watcher is not None  # type: ignore[attr-defined]
+            tab.remove()
+            await pilot.pause()
+            assert tab._poll_timer is None  # type: ignore[attr-defined]
+            assert tab._watcher is None  # type: ignore[attr-defined]
+
+    @pytest.mark.asyncio
+    async def test_state_mutation_drives_status_change_to_rail(
+        self, live_plan_dir: Path
+    ) -> None:
+        target = _LateTarget()
+        model = PlanExecutionModel(live_plan_dir, target=target)
+        model.start()
+        app = _LiveHarness(model)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            tab = app.query_one(PlanExecutionTab)
+            target.target = tab
+            rail = tab.query_one(PlanStatusRail)
+
+            assert rail.glyphs_plain() == [
+                STATUS_GLYPHS["queued"],
+                STATUS_GLYPHS["queued"],
+            ]
+
+            # Backstop poll catches this even if watcher misses.
+            await pilot.pause()
+            _write_state(
+                live_plan_dir,
+                _state_payload(
+                    [
+                        {
+                            "id": 1,
+                            "description": "alpha",
+                            "deps": [],
+                            "status": "running",
+                        },
+                        {
+                            "id": 2,
+                            "description": "beta",
+                            "deps": [1],
+                            "status": "queued",
+                        },
+                    ]
+                ),
+            )
+            # Allow the 2.5s backstop to fire and the message to drain.
+            await pilot.pause(3.0)
+
+            assert rail.glyphs_plain() == [
+                STATUS_GLYPHS["running"],
+                STATUS_GLYPHS["queued"],
+            ]

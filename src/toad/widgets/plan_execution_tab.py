@@ -23,16 +23,22 @@ it from :class:`PlanExecutionSection`.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.message import Message
+from textual.timer import Timer
 from textual.widgets import Static, TabPane
 
+from toad.directory_watcher import DirectoryChanged, DirectoryWatcher
 from toad.widgets.plan_dep_graph import DepGraphItem, PlanDepGraph
 from toad.widgets.plan_status_rail import PlanStatusRail, RailItem
 from toad.widgets.plan_worker_log_pane import PlanWorkerLogPane
+
+
+_POLL_INTERVAL_SECONDS = 2.5
 
 
 __all__ = [
@@ -49,11 +55,15 @@ class PlanExecutionModel(Protocol):
     issue_number: int | None
     items: Sequence[DepGraphItem]
     verdict: str
+    plan_dir: Path
 
     def subscribe_log(
         self, item_id: int, callback: Callable[[str], None]
     ) -> Callable[[], None]:
         """Subscribe to a single item's log stream. Returns an unsubscribe."""
+
+    def poll_now(self) -> None:
+        """Rescan the plan directory and post any diffs."""
 
 
 _DEFAULT_AGENT = "—"
@@ -115,6 +125,33 @@ class PlanExecutionTab(TabPane):
         self._items: list[DepGraphItem] = list(model.items)
         self._verdict: str = model.verdict
         self._selected_item_id: int | None = None
+        self._poll_timer: Timer | None = None
+        self._watcher: DirectoryWatcher | None = None
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def on_mount(self) -> None:
+        plan_dir = self._model.plan_dir
+        if plan_dir.is_dir():
+            self._watcher = DirectoryWatcher(plan_dir, self)
+            self._watcher.daemon = True
+            self._watcher.start()
+        self._poll_timer = self.set_interval(
+            _POLL_INTERVAL_SECONDS, self._model.poll_now
+        )
+
+    def on_unmount(self) -> None:
+        if self._watcher is not None:
+            self._watcher.stop()
+            self._watcher = None
+        if self._poll_timer is not None:
+            self._poll_timer.stop()
+            self._poll_timer = None
+
+    def on_directory_changed(self, _event: DirectoryChanged) -> None:
+        self._model.poll_now()
 
     # ------------------------------------------------------------------
     # Compose
