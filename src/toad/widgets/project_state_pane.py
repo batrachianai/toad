@@ -575,14 +575,53 @@ class ProjectStatePane(Vertical):
         """Register the Phase B model factory + agent getter.
 
         Called by Canon's ACP bootstrap when the ``PlanExecutionModel``
-        factory is ready. Mounts the section lazily and pushes the
-        factory into it so subsequent ``PlansUpdated`` messages can
-        open tabs.
+        factory is ready. Mounts the section lazily, pushes the
+        factory into it, registers the ``Plans`` toolbar button, and
+        replays any plans already known to the orchestrator watcher
+        so tabs appear even if ``PlansUpdated`` fired before this call.
         """
         self._plan_model_factory = model_factory
         self._plan_agent_getter = get_current_agent
         section = self._ensure_plan_exec_section()
         section.set_model_factory(model_factory)
+        self._register_plan_exec_section()
+        self._replay_pending_plans(section)
+
+    def _register_plan_exec_section(self) -> None:
+        """Append the plan-exec section to ``_sections`` and mount its button."""
+        sec_id = PlanExecutionSection.SECTION_ID
+        if any(s.section_id == sec_id for s in self._sections):
+            return
+        sec_def = _SectionDef(sec_id, "Plans")
+        self._sections.append(sec_def)
+        try:
+            toolbar = self.query_one("#pane-toolbar", Horizontal)
+        except NoMatches:
+            return
+        btn = Button(sec_def.button_label, id=f"btn-{sec_id}")
+        try:
+            stack_btn = toolbar.query_one("#btn-stack-toggle", Button)
+            toolbar.mount(btn, before=stack_btn)
+        except NoMatches:
+            toolbar.mount(btn)
+        self._sync_toolbar()
+
+    def _replay_pending_plans(self, section: PlanExecutionSection) -> None:
+        """Open tabs for any plans already known to the orchestrator widget."""
+        try:
+            widget = self.query_one(
+                "#orchestrator-state", OrchestratorStateWidget
+            )
+        except NoMatches:
+            return
+        plans = list(widget.plans)
+        if not plans:
+            return
+        self.display = True
+        self.show_section(PlanExecutionSection.SECTION_ID)
+        for plan in plans:
+            if plan.slug:
+                section.open_tab(plan.slug)
 
     def _ensure_plan_exec_section(self) -> PlanExecutionSection:
         if self._plan_exec_section is None:
@@ -609,6 +648,8 @@ class ProjectStatePane(Vertical):
         if not event.plans:
             return
         section = self._ensure_plan_exec_section()
+        self.display = True
+        self.show_section(PlanExecutionSection.SECTION_ID)
         for plan in event.plans:
             if plan.slug:
                 section.open_tab(plan.slug)
