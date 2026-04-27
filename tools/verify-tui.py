@@ -643,6 +643,181 @@ def verify_outreach(verbose: bool = False) -> bool:
     return len(errors) == 0, errors, results
 
 
+def verify_plan_execution(verbose: bool = False) -> bool:
+    """Verify ProjectStatePane auto-opens a plan tab from master.json.
+
+    Writes a fixture project containing ``.orchestrator/master.json`` plus
+    one plan dir, mounts ``ProjectStatePane``, registers a stub model
+    factory, and asserts the pane reveals itself, the plan tab is
+    mounted under the expected id, and the status rail renders one glyph
+    per plan item with the correct running glyph.
+    """
+    import json
+    import tempfile
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from textual.app import App, ComposeResult
+
+    from toad.widgets.plan_dep_graph import DepGraphItem
+    from toad.widgets.plan_execution_section import PlanExecutionSection
+    from toad.widgets.plan_execution_tab import PlanExecutionTab
+    from toad.widgets.plan_status_rail import STATUS_GLYPHS, PlanStatusRail
+    from toad.widgets.project_state_pane import ProjectStatePane
+
+    errors: list[str] = []
+    results: dict[str, object] = {}
+
+    SLUG = "20260427-smoke"
+
+    class _StubModel:
+        def __init__(self, slug: str) -> None:
+            self.slug = slug
+            self.issue_number = 99
+            self.items = [
+                DepGraphItem(
+                    id=1, description="task", status="running", deps=()
+                )
+            ]
+            self.verdict = "running"
+
+        def subscribe_log(
+            self, item_id: int, callback: Callable[[str], None]
+        ) -> Callable[[], None]:
+            del item_id, callback
+            return lambda: None
+
+    def _factory(slug: str) -> _StubModel:
+        return _StubModel(slug)
+
+    def _write_fixture(project: Path) -> None:
+        plans_dir = project / ".orchestrator" / "plans" / SLUG
+        plans_dir.mkdir(parents=True)
+        state_path = plans_dir / "state.json"
+        state_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "plan": SLUG,
+                    "issueNumber": 99,
+                    "items": [
+                        {
+                            "id": 1,
+                            "description": "task",
+                            "deps": [],
+                            "status": "running",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        (project / ".orchestrator" / "master.json").write_text(
+            json.dumps(
+                {
+                    "plans": [
+                        {
+                            "slug": SLUG,
+                            "status": "running",
+                            "statePath": str(state_path),
+                            "startedAt": "2026-04-27T12:00:00Z",
+                            "updatedAt": "2026-04-27T12:00:00Z",
+                            "progress": {
+                                "total": 1,
+                                "done": 0,
+                                "running": 1,
+                                "failed": 0,
+                            },
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    async def _run() -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            _write_fixture(project)
+
+            class Harness(App[None]):
+                CSS = "Screen { overflow: hidden; }"
+
+                def compose(self) -> ComposeResult:
+                    yield ProjectStatePane(project_path=project)
+
+            app = Harness()
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pane = app.query_one(ProjectStatePane)
+                pane.configure_plan_execution(_factory)
+                await pilot.pause()
+                await pilot.pause()
+
+                results["pane_display"] = pane.display
+                if not pane.display:
+                    errors.append(
+                        "ProjectStatePane.display is False after configure_plan_execution"
+                    )
+
+                section = pane.query_one(PlanExecutionSection)
+                results["section_display"] = section.display
+                results["open_slugs"] = sorted(section.open_slugs)
+                if not section.display:
+                    errors.append("PlanExecutionSection hidden after bootstrap")
+                if SLUG not in section.open_slugs:
+                    errors.append(
+                        f"slug {SLUG!r} missing from open_slugs={section.open_slugs}"
+                    )
+
+                tabs = pane.query(PlanExecutionTab)
+                results["tab_count"] = len(tabs)
+                if len(tabs) != 1:
+                    errors.append(
+                        f"expected 1 PlanExecutionTab, found {len(tabs)}"
+                    )
+                else:
+                    tab = tabs.first()
+                    results["tab_id"] = tab.id
+                    expected_id = f"plan-tab-{SLUG}"
+                    if tab.id != expected_id:
+                        errors.append(
+                            f"tab id={tab.id!r}, expected {expected_id!r}"
+                        )
+
+                rails = pane.query(PlanStatusRail)
+                if len(rails) != 1:
+                    errors.append(
+                        f"expected 1 PlanStatusRail, found {len(rails)}"
+                    )
+                else:
+                    rail = rails.first()
+                    glyphs = rail.glyphs_plain()
+                    results["rail_glyphs"] = glyphs
+                    results["rail_verdict"] = rail.verdict_label()
+                    if len(glyphs) != 1:
+                        errors.append(
+                            f"status rail glyph count={len(glyphs)}, expected 1"
+                        )
+                    elif glyphs[0] != STATUS_GLYPHS["running"]:
+                        errors.append(
+                            f"glyph={glyphs[0]!r}, expected running "
+                            f"{STATUS_GLYPHS['running']!r}"
+                        )
+                    if rail.verdict_label() != "running":
+                        errors.append(
+                            f"verdict={rail.verdict_label()!r}, expected 'running'"
+                        )
+
+    asyncio.run(_run())
+
+    if verbose:
+        for key, val in results.items():
+            console.print(f"  {key}: {val}")
+
+    return len(errors) == 0, errors, results
+
+
 def verify_imports(verbose: bool = False) -> bool:
     """Verify all key modules import without error."""
     errors: list[str] = []
@@ -690,6 +865,7 @@ def main() -> None:
             "tasks",
             "subagents",
             "outreach",
+            "plan-execution",
             "live",
             "all",
         ],
@@ -704,6 +880,7 @@ def main() -> None:
         "tasks": verify_tasks,
         "subagents": verify_subagents,
         "outreach": verify_outreach,
+        "plan-execution": verify_plan_execution,
     }
     # Live probe only runs when explicitly requested — it hits the network.
     if args.widget == "live":

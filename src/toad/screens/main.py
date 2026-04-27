@@ -1,7 +1,13 @@
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import random
+
+if TYPE_CHECKING:
+    from toad.widgets.plan_execution_tab import (
+        PlanExecutionModel as PlanExecutionModelProtocol,
+    )
 
 from textual import on
 from textual.app import ComposeResult
@@ -241,6 +247,33 @@ class MainScreen(Screen, can_focus=False):
             tree.data_bind(path=MainScreen.project_path)
         for tree in self.query(DirectoryTree):
             tree.guide_depth = 3
+
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        pane.configure_plan_execution(self._make_plan_execution_factory(pane))
+
+    def _make_plan_execution_factory(
+        self, target: ProjectStatePane
+    ) -> Callable[[str], "PlanExecutionModelProtocol | None"]:
+        """Build the factory passed to ``ProjectStatePane.configure_plan_execution``.
+
+        The factory resolves ``.orchestrator/plans/<slug>/`` under the
+        current project path and constructs a live
+        :class:`PlanExecutionModel` rooted at it. Messages from the
+        model bubble up through the section to the active tab.
+        """
+        from typing import cast
+
+        from toad.data.plan_execution_model import PlanExecutionModel
+
+        def factory(slug: str) -> "PlanExecutionModelProtocol | None":
+            plan_dir = self.project_path / ".orchestrator" / "plans" / slug
+            if not plan_dir.is_dir():
+                return None
+            model = PlanExecutionModel(plan_dir, target=target)
+            model.start()
+            return cast("PlanExecutionModelProtocol", model)
+
+        return factory
 
     @on(OptionList.OptionHighlighted)
     def on_option_list_option_highlighted(

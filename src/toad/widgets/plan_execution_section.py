@@ -21,15 +21,24 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import TabbedContent
+from textual.widgets import Static, TabbedContent, TabPane
 
 from toad.widgets.plan_execution_tab import PlanExecutionModel, PlanExecutionTab
 
 
 __all__ = [
+    "EMPTY_PANE_ID",
     "ModelFactory",
     "PlanExecutionSection",
 ]
+
+
+EMPTY_PANE_ID = "plan-exec-empty"
+_EMPTY_PANE_TITLE = "Plans"
+_EMPTY_PLACEHOLDER_TEXT = (
+    "No plan execution running.\n\n"
+    "Start one with:  bash ~/.claude/scripts/orch-run.sh <slug>"
+)
 
 
 log = logging.getLogger(__name__)
@@ -57,6 +66,11 @@ class PlanExecutionSection(Vertical):
     PlanExecutionSection TabbedContent {
         height: 1fr;
     }
+
+    PlanExecutionSection .empty-state {
+        padding: 2 4;
+        color: $text-muted;
+    }
     """
 
     def __init__(
@@ -78,7 +92,16 @@ class PlanExecutionSection(Vertical):
     # ------------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
-        yield TabbedContent(id="plan-exec-tabs")
+        with TabbedContent(id="plan-exec-tabs"):
+            yield self._build_empty_pane()
+
+    @staticmethod
+    def _build_empty_pane() -> TabPane:
+        return TabPane(
+            _EMPTY_PANE_TITLE,
+            Static(_EMPTY_PLACEHOLDER_TEXT, classes="empty-state"),
+            id=EMPTY_PANE_ID,
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -121,6 +144,8 @@ class PlanExecutionSection(Vertical):
             id=tab_id,
         )
         tabs = self.query_one("#plan-exec-tabs", TabbedContent)
+        if not self._open_slugs:
+            self._remove_empty_pane(tabs)
         tabs.add_pane(tab)
         self._open_slugs.add(slug)
         self.display = True
@@ -128,14 +153,19 @@ class PlanExecutionSection(Vertical):
         return tab_id
 
     def close_tab(self, slug: str) -> None:
-        """Close a plan tab. No-op if ``slug`` is unknown."""
+        """Close a plan tab. No-op if ``slug`` is unknown.
+
+        ``master.json`` dropping a slug is *not* a close trigger — finished
+        runs keep their tab mounted. The user (or test) calls this method
+        explicitly.
+        """
         if slug not in self._open_slugs:
             return
         self._open_slugs.remove(slug)
         tabs = self.query_one("#plan-exec-tabs", TabbedContent)
         tabs.remove_pane(self._tab_id(slug))
         if not self._open_slugs:
-            self.display = False
+            tabs.add_pane(self._build_empty_pane())
 
     # ------------------------------------------------------------------
     # Internals
@@ -144,6 +174,14 @@ class PlanExecutionSection(Vertical):
     def _activate(self, tab_id: str) -> None:
         tabs = self.query_one("#plan-exec-tabs", TabbedContent)
         tabs.active = tab_id
+
+    @staticmethod
+    def _remove_empty_pane(tabs: TabbedContent) -> None:
+        try:
+            tabs.query_one(f"#{EMPTY_PANE_ID}", TabPane)
+        except Exception:
+            return
+        tabs.remove_pane(EMPTY_PANE_ID)
 
     @staticmethod
     def _tab_id(slug: str) -> str:
