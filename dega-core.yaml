@@ -15,11 +15,11 @@ reviewer_prompt: ~/.claude/scripts/ralph-reviewer-prompt.md
 
 github:
   sync: true
-  repo: DEGAorg/conductor-view
+  repo: DEGAorg/canon-tui
   labels: true
   comments: true
   close_on_ship: false
-  pr_target: conductor
+  pr_target: canon
 
 timeline:
   repo: DEGAorg/claude-code-config

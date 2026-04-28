@@ -435,6 +435,428 @@ def verify_live_data_probe(verbose: bool = False) -> bool:
     return len(errors) == 0, errors, results
 
 
+def verify_subagents(verbose: bool = False) -> bool:
+    """Verify SubagentTabSection: mount hidden, open reveals, close hides."""
+    from pathlib import Path
+    from unittest.mock import MagicMock
+
+    from textual.app import App, ComposeResult
+    from textual.widgets import Static, TabbedContent
+
+    from toad.widgets.subagent_tab_section import SubagentTabSection
+
+    errors: list[str] = []
+    results: dict[str, object] = {}
+
+    def _factory(name: str, objective: str):
+        return Static(f"{name}: {objective}"), MagicMock()
+
+    async def _run() -> None:
+        class Harness(App[None]):
+            CSS = "Screen { overflow: hidden; }"
+
+            def compose(self) -> ComposeResult:
+                yield SubagentTabSection(
+                    project_path=Path("/tmp/verify-subagents"),
+                    agent_factory=_factory,
+                    id="section-subagents",
+                )
+
+        app = Harness()
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.pause()
+            section = app.query_one(SubagentTabSection)
+
+            results["initial_display"] = section.display
+            results["initial_empty"] = section.is_empty
+            if section.display:
+                errors.append("section visible on mount (should be hidden)")
+            if not section.is_empty:
+                errors.append("section non-empty on mount")
+
+            resolved = section.open_tab("Alpha", "do a thing")
+            await pilot.pause()
+            results["resolved_first"] = resolved
+            results["after_open_display"] = section.display
+            results["after_open_tabs"] = section.tab_names
+            if resolved != "Alpha":
+                errors.append(
+                    f"first open resolved to {resolved!r}, expected 'Alpha'"
+                )
+            if not section.display:
+                errors.append("section hidden after open_tab")
+
+            dup = section.open_tab("Alpha", "again")
+            await pilot.pause()
+            results["resolved_dup"] = dup
+            if dup != "Alpha 2":
+                errors.append(
+                    f"duplicate name resolved to {dup!r}, expected 'Alpha 2'"
+                )
+
+            tabs = section.query_one("#subagents-tabs", TabbedContent)
+            results["pane_count"] = tabs.tab_count
+            if tabs.tab_count != 2:
+                errors.append(
+                    f"TabbedContent has {tabs.tab_count} panes, expected 2"
+                )
+
+            section.close_tab("Alpha")
+            section.close_tab("Alpha 2")
+            await pilot.pause()
+            results["after_close_display"] = section.display
+            results["after_close_empty"] = section.is_empty
+            if section.display:
+                errors.append("section still visible after closing all tabs")
+            if not section.is_empty:
+                errors.append("section non-empty after closing all tabs")
+
+    asyncio.run(_run())
+
+    if verbose:
+        for key, val in results.items():
+            console.print(f"  {key}: {val}")
+
+    return len(errors) == 0, errors, results
+
+
+def verify_outreach(verbose: bool = False) -> bool:
+    """Verify the Outreach card widgets mount and render.
+
+    Uses synthetic data — does not require the private ``rpa_outreach``
+    extension or a live DB. Confirms layout / rendering parity with the
+    rest of the pane.
+    """
+    from textual.app import App, ComposeResult
+    from textual.containers import Vertical
+
+    from toad.widgets.outreach_cards import (
+        AccountDot,
+        Histogram,
+        RankedBar,
+        StatLine,
+    )
+
+    errors: list[str] = []
+    results: dict[str, object] = {}
+
+    class OutreachHarness(App[None]):
+        CSS = "Screen { overflow: hidden; }"
+
+        def compose(self) -> ComposeResult:
+            with Vertical(id="outreach-container"):
+                yield StatLine(
+                    "Prospects",
+                    total=2044,
+                    segments=(
+                        ("messaged", 845, "success"),
+                        ("pending", 1199, "warning"),
+                    ),
+                    id="stat",
+                )
+                yield Histogram(
+                    "Sends · 24h",
+                    buckets=tuple(range(24)),
+                    total=276,
+                    id="hist",
+                )
+                yield RankedBar(
+                    "Hackathons",
+                    rows=(
+                        ("Alpha Hack", 12, 50),
+                        ("Beta Hack", 40, 80),
+                        ("Gamma Hack", 3, 9),
+                    ),
+                    id="rank",
+                )
+                yield AccountDot(
+                    name="acct-1",
+                    active=True,
+                    sends_per_hour=12.3,
+                    last_sent="5m ago",
+                    id="dot",
+                )
+
+    async def _run() -> None:
+        app = OutreachHarness()
+        async with app.run_test(size=(80, 20)) as pilot:
+            await pilot.pause()
+            stat = app.query_one("#stat", StatLine)
+            hist = app.query_one("#hist", Histogram)
+            rank = app.query_one("#rank", RankedBar)
+            dot = app.query_one("#dot", AccountDot)
+
+            results["stat_text"] = stat.rendered.plain[:40]
+            results["hist_text"] = hist.rendered.plain[:40]
+            results["rank_text"] = rank.rendered.plain[:40]
+            results["dot_text"] = dot.rendered.plain
+
+            if "Prospects" not in stat.rendered.plain:
+                errors.append("StatLine did not render 'Prospects' label")
+            if "2,044" not in stat.rendered.plain:
+                errors.append("StatLine did not render total 2,044")
+            if "Sends" not in hist.rendered.plain:
+                errors.append("Histogram did not render 'Sends' label")
+            if "Hackathons" not in rank.rendered.plain:
+                errors.append("RankedBar did not render 'Hackathons' label")
+            if "acct-1" not in dot.rendered.plain:
+                errors.append("AccountDot did not render account name")
+
+    asyncio.run(_run())
+
+    # Verify discover() returns None when the extension cannot be imported.
+    # Cannot gate on env var alone anymore — provider resolves DSN from its
+    # own shipped .env too, so "env unset" is not a guaranteed None.
+    import sys
+
+    from toad.outreach.registry import discover
+
+    ext_module = "toad.extensions.rpa_outreach"
+    saved_module = sys.modules.pop(ext_module, None)
+    saved_rpa = sys.modules.pop(f"{ext_module}.rpa_outreach", None)
+    real_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __builtins__["__import__"]  # type: ignore[index]
+
+    def _block_import(name: str, *a: object, **kw: object) -> object:
+        if name == ext_module or name.startswith(ext_module + "."):
+            raise ImportError(f"simulated missing submodule: {name}")
+        return real_import(name, *a, **kw)  # type: ignore[misc]
+
+    import builtins
+
+    builtins.__import__ = _block_import  # type: ignore[assignment]
+    try:
+        provider = discover()
+        results["discover_none_when_module_absent"] = provider is None
+        if provider is not None:
+            errors.append("discover() returned non-None with submodule blocked")
+    finally:
+        builtins.__import__ = real_import  # type: ignore[assignment]
+        if saved_module is not None:
+            sys.modules[ext_module] = saved_module
+        if saved_rpa is not None:
+            sys.modules[f"{ext_module}.rpa_outreach"] = saved_rpa
+
+    if verbose:
+        for key, val in results.items():
+            console.print(f"  {key}: {val}")
+
+    return len(errors) == 0, errors, results
+
+
+def verify_plan_execution(verbose: bool = False) -> bool:
+    """Verify ProjectStatePane auto-opens a plan tab on in-session arrival.
+
+    The pane uses a baseline filter: pre-existing plans (those in
+    ``master.json`` at canon launch) are NOT auto-opened. This smoke
+    starts with an empty plan list, mounts the pane, then writes a new
+    plan to ``master.json`` — simulating an orch run started while
+    canon is up. The new slug must auto-open, reveal the pane, and
+    render its tab + status rail.
+    """
+    import json
+    import tempfile
+    from pathlib import Path
+    from typing import Any
+
+    from textual.app import App, ComposeResult
+
+    from toad.data.plan_execution_model import PlanExecutionModel
+    from toad.widgets.plan_execution_section import PlanExecutionSection
+    from toad.widgets.plan_execution_tab import PlanExecutionTab
+    from toad.widgets.plan_status_rail import STATUS_GLYPHS, PlanStatusRail
+    from toad.widgets.project_state_pane import ProjectStatePane
+
+    class _LateTarget:
+        """Proxies ``post_message`` to a real widget bound after mount."""
+
+        def __init__(self) -> None:
+            self.target: Any = None
+
+        def post_message(self, message: Any) -> bool:
+            if self.target is None:
+                return False
+            return bool(self.target.post_message(message))
+
+    late_target = _LateTarget()
+    built_models: list[PlanExecutionModel] = []
+
+    errors: list[str] = []
+    results: dict[str, object] = {}
+
+    SLUG = "20260427-smoke"
+
+    def _state_payload(status: str) -> dict[str, object]:
+        return {
+            "version": 1,
+            "plan": SLUG,
+            "issueNumber": 99,
+            "items": [
+                {
+                    "id": 1,
+                    "description": "task",
+                    "deps": [],
+                    "status": status,
+                }
+            ],
+        }
+
+    def _write_state(plans_dir: Path, status: str) -> None:
+        (plans_dir / "state.json").write_text(
+            json.dumps(_state_payload(status)), encoding="utf-8"
+        )
+
+    def _write_empty_master(project: Path) -> None:
+        master = project / ".orchestrator" / "master.json"
+        master.parent.mkdir(parents=True)
+        master.write_text(json.dumps({"plans": []}), encoding="utf-8")
+
+    def _add_plan_in_session(project: Path) -> None:
+        plans_dir = project / ".orchestrator" / "plans" / SLUG
+        (plans_dir / "logs").mkdir(parents=True)
+        _write_state(plans_dir, "running")
+        state_path = plans_dir / "state.json"
+        (project / ".orchestrator" / "master.json").write_text(
+            json.dumps(
+                {
+                    "plans": [
+                        {
+                            "slug": SLUG,
+                            "status": "running",
+                            "statePath": str(state_path),
+                            "startedAt": "2026-04-27T12:00:00Z",
+                            "updatedAt": "2026-04-27T12:00:00Z",
+                            "progress": {
+                                "total": 1,
+                                "done": 0,
+                                "running": 1,
+                                "failed": 0,
+                            },
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    async def _run() -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            _write_empty_master(project)
+            plans_dir = project / ".orchestrator" / "plans" / SLUG
+
+            class Harness(App[None]):
+                CSS = "Screen { overflow: hidden; }"
+
+                def compose(self) -> ComposeResult:
+                    yield ProjectStatePane(project_path=project)
+
+            app = Harness()
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pane = app.query_one(ProjectStatePane)
+
+                def _factory(slug: str) -> PlanExecutionModel | None:
+                    plan_dir = project / ".orchestrator" / "plans" / slug
+                    if not plan_dir.is_dir():
+                        return None
+                    model = PlanExecutionModel(plan_dir, target=late_target)
+                    model.start()
+                    built_models.append(model)
+                    return model
+
+                pane.configure_plan_execution(_factory)
+                await pilot.pause()
+                # Simulate an orch run starting while canon is already up.
+                _add_plan_in_session(project)
+                await pilot.pause()
+                await pilot.pause()
+                await pilot.pause()
+
+                results["pane_display"] = pane.display
+                if not pane.display:
+                    errors.append(
+                        "ProjectStatePane.display is False after configure_plan_execution"
+                    )
+
+                section = pane.query_one(PlanExecutionSection)
+                results["section_display"] = section.display
+                results["open_slugs"] = sorted(section.open_slugs)
+                if not section.display:
+                    errors.append("PlanExecutionSection hidden after bootstrap")
+                if SLUG not in section.open_slugs:
+                    errors.append(
+                        f"slug {SLUG!r} missing from open_slugs={section.open_slugs}"
+                    )
+
+                tabs = pane.query(PlanExecutionTab)
+                results["tab_count"] = len(tabs)
+                if len(tabs) != 1:
+                    errors.append(
+                        f"expected 1 PlanExecutionTab, found {len(tabs)}"
+                    )
+                else:
+                    tab = tabs.first()
+                    results["tab_id"] = tab.id
+                    expected_id = f"plan-tab-{SLUG}"
+                    if tab.id != expected_id:
+                        errors.append(
+                            f"tab id={tab.id!r}, expected {expected_id!r}"
+                        )
+                    # Bind the late target so model messages reach the tab.
+                    late_target.target = tab
+
+                rails = pane.query(PlanStatusRail)
+                if len(rails) != 1:
+                    errors.append(
+                        f"expected 1 PlanStatusRail, found {len(rails)}"
+                    )
+                else:
+                    rail = rails.first()
+                    glyphs = rail.glyphs_plain()
+                    results["rail_glyphs"] = glyphs
+                    results["rail_verdict"] = rail.verdict_label()
+                    if len(glyphs) != 1:
+                        errors.append(
+                            f"status rail glyph count={len(glyphs)}, expected 1"
+                        )
+                    elif glyphs[0] != STATUS_GLYPHS["running"]:
+                        errors.append(
+                            f"glyph={glyphs[0]!r}, expected running "
+                            f"{STATUS_GLYPHS['running']!r}"
+                        )
+                    if rail.verdict_label() != "running":
+                        errors.append(
+                            f"verdict={rail.verdict_label()!r}, expected 'running'"
+                        )
+
+                    # Mutate state.json — backstop interval (or watcher
+                    # event) should drive an ItemStatusChanged through to
+                    # the rail.
+                    _write_state(plans_dir, "done")
+                    await pilot.pause(3.0)
+
+                    glyphs_after = rail.glyphs_plain()
+                    results["rail_glyphs_after_mutation"] = glyphs_after
+                    if len(glyphs_after) != 1:
+                        errors.append(
+                            f"after mutation glyph count={len(glyphs_after)}, "
+                            f"expected 1"
+                        )
+                    elif glyphs_after[0] != STATUS_GLYPHS["done"]:
+                        errors.append(
+                            f"after mutation glyph={glyphs_after[0]!r}, "
+                            f"expected done {STATUS_GLYPHS['done']!r}"
+                        )
+
+    asyncio.run(_run())
+
+    if verbose:
+        for key, val in results.items():
+            console.print(f"  {key}: {val}")
+
+    return len(errors) == 0, errors, results
+
+
 def verify_imports(verbose: bool = False) -> bool:
     """Verify all key modules import without error."""
     errors: list[str] = []
@@ -451,6 +873,15 @@ def verify_imports(verbose: bool = False) -> bool:
         "toad.widgets.task_detail",
         "toad.widgets.filter_toolbar",
         "toad.screens.task_detail_screen",
+        "toad.widgets.subagent_tab_section",
+        "toad.outreach.protocol",
+        "toad.outreach.registry",
+        "toad.widgets.outreach_cards",
+        "toad.widgets.plan_dep_graph",
+        "toad.widgets.plan_status_rail",
+        "toad.widgets.plan_worker_log_pane",
+        "toad.widgets.plan_execution_tab",
+        "toad.widgets.plan_execution_section",
     ]
     for mod in modules:
         try:
@@ -466,7 +897,17 @@ def main() -> None:
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument(
         "--widget",
-        choices=["gantt", "imports", "pane", "tasks", "live", "all"],
+        choices=[
+            "gantt",
+            "imports",
+            "pane",
+            "tasks",
+            "subagents",
+            "outreach",
+            "plan-execution",
+            "live",
+            "all",
+        ],
         default="all",
     )
     args = parser.parse_args()
@@ -476,6 +917,9 @@ def main() -> None:
         "gantt": verify_gantt,
         "pane": verify_pane_no_default,
         "tasks": verify_tasks,
+        "subagents": verify_subagents,
+        "outreach": verify_outreach,
+        "plan-execution": verify_plan_execution,
     }
     # Live probe only runs when explicitly requested — it hits the network.
     if args.widget == "live":

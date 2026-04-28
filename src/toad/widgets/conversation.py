@@ -164,6 +164,7 @@ _PANEL_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("timeline", "gantt"), "timeline"),
     (("files", "file tree", "project files"), "files"),
     (("build state", "builder", "run state", "the state"), "state"),
+    (("outreach", "rpa", "prospects", "sends"), "outreach"),
 )
 
 

@@ -19,13 +19,12 @@ Upstream: [batrachian/toad](https://github.com/batrachian/toad) (AGPL-3.0)
 | `tests/` | Test files |
 | `tools/` | Dev utilities (echo client, QR generator) |
 | `docs/` | Documentation |
-| `docs/exec-plans/` | Execution plans (active + completed) |
 
 ## Working Conventions
 
 - Language-specific standards load from `~/.claude/rules/` by file type
 - Orchestrator config: `dega-core.yaml` (edit `check_command` for your toolchain)
-- Exec plans: `docs/exec-plans/active/<YYYYMMDD-slug>/plan.md`
+- Exec plans: GitHub Issues with `plan:draft` label on `DEGAorg/canon-tui` (fetched into `.orchestrator/plans/<slug>/` at run time)
 - Runtime: Python 3.14, `uv` for deps, `ruff` for lint/format, `ty` for types
 - Tests: `pytest -q`
 
@@ -98,18 +97,22 @@ Implement the `TimelineProvider` protocol in a new file, then update `ProjectSta
 
 ## Orchestrator
 
-Run execution plans via GitHub Issues:
+Execution plans live **only on GitHub** — no local plan files. Plans are issues on `DEGAorg/canon-tui` with the `plan:draft` label. The orchestrator fetches them into `.orchestrator/plans/<slug>/` at run time; that directory is ephemeral and gitignored.
 
 ```bash
-# Create a plan
+# Create a plan (writes a GitHub issue, not a local file)
 /plan <task description>
 
-# Run it (spawns parallel workers in tmux worktrees)
+# Run a plan from its issue number (spawns parallel workers in tmux worktrees)
 bash ~/.claude/scripts/orch-run.sh <YYYYMMDD-slug> --issue N
 ```
 
-Plans are stored as GitHub Issues with `plan:draft` label. The orchestrator parses the progress log, respects `(deps: N)` annotations, and spawns worker agents.
+The orchestrator parses the progress log, respects `(deps: N)` annotations, and spawns worker agents. PRs target the `canon` branch (configured in `dega-core.yaml`).
 
 ## Session Start
 
-Check `docs/exec-plans/active/` for in-progress plans before starting new work.
+Check open issues with `plan:draft` or `plan:in-progress` on `DEGAorg/canon-tui` before starting new work:
+
+```bash
+gh issue list --repo DEGAorg/canon-tui --label "plan:draft,plan:in-progress"
+```

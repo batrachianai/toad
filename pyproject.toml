@@ -1,6 +1,6 @@
 [project]
 name = "canon-tui"
-version = "0.6.13"
+version = "0.7.1"
 description = "Canon TUI — a unified experience for AI in your terminal."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -25,6 +25,11 @@ dependencies = [
     "psutil>=7.2.1",
     "aiosqlite>=0.22.1",
     "pyyaml>=6.0.2",
+]
+
+[project.optional-dependencies]
+outreach = [
+    "psycopg[binary]>=3.2",
 ]
 
 [project.urls]
@@ -59,5 +64,12 @@ packages = ["src/toad"]
 dev = [
     "mypy>=1.19.1",
     "pyinstrument>=5.1.1",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
     "textual-dev>=1.8.0",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

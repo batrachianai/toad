@@ -1,0 +1,53 @@
+{
+  "name": "textual-tui-marketplace",
+  "owner": {
+    "name": "aperepel",
+    "email": "aperepel@users.noreply.github.com"
+  },
+  "metadata": {
+    "description": "Marketplace for Textual TUI development skills",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "textual-tui",
+      "source": "./",
+      "version": "1.0.0",
+      "description": "Comprehensive skill for Claude Code to build professional terminal user interfaces with Textual. Includes 40+ widgets, layouts, styling, reactive programming, and worker patterns.",
+      "author": {
+        "name": "Textual TUI Skill Contributors",
+        "url": "https://github.com/aperepel/textual-tui-skill"
+      },
+      "license": "MIT",
+      "repository": "https://github.com/aperepel/textual-tui-skill",
+      "homepage": "https://github.com/aperepel/textual-tui-skill",
+      "category": "development",
+      "tags": [
+        "textual",
+        "tui",
+        "terminal",
+        "terminal-ui",
+        "cli",
+        "console",
+        "python",
+        "ui-framework",
+        "widgets",
+        "reactive",
+        "claude-code",
+        "skill"
+      ],
+      "keywords": [
+        "textual",
+        "terminal user interface",
+        "TUI",
+        "CLI application",
+        "console UI",
+        "terminal framework",
+        "Python TUI",
+        "terminal widgets",
+        "reactive UI",
+        "terminal styling"
+      ]
+    }
+  ]
+}

@@ -61,6 +61,39 @@ Panel opens instantly on user submit, before the agent replies.
 - Filter-aware intents: agent / chat can emit `open_panel` with `context.filters={...}` to open a pre-filtered view
 - New skill at `.claude/skills/canon-panel-routing/SKILL.md` documents the registry and gives a 4-step recipe for adding a panel
 
+## Outreach
+
+Optional right-pane section that surfaces live state of the RPA outreach
+pipeline (hackathon contact-participants bot). Ships dark — absent unless
+the operator has the private submodule *and* `CANON_RPA_OUTREACH_DATABASE_URL`
+set *and* a DB probe succeeds. See `docs/contact-participants-panel-brief.md`
+for the full brief.
+
+- New section **Outreach** in `ProjectStatePane` with 30 s refresh
+- Four visual-first cards (no tables):
+  - **Prospects** — total + stacked bar `messaged / pending`
+  - **Sends · 24h** — total + 24-slot hourly histogram
+  - **Hackathons (top 5)** — ranked bars, labeled via
+    `hackathons.url = prospects.source_hackathon` JOIN
+  - **Accounts** — per-account dot + sends/hr + last-sent relative time
+- Graceful degradation: `SELECT to_regclass('send_log')` null → Sends +
+  Accounts cards hide; panel never crashes
+- Public contract in `src/toad/outreach/{protocol,registry}.py`; private
+  implementation in git submodule at
+  `src/toad/extensions/rpa_outreach/` → `DEGAorg/rpa-outreach-view`
+- `PANEL_ROUTES["outreach"]` always registered; chat intents
+  `show me outreach`, `open the outreach panel`, etc. resolve via the
+  existing `_PANEL_KEYWORDS` registry — silent no-op when the section is
+  absent
+- `install.sh` runs `git submodule update --init --recursive || true` and
+  `uv sync --extra outreach || true` — both non-fatal
+- `psycopg[binary]>=3.2` ships as the `outreach` optional extra in
+  `pyproject.toml`
+- `verify-tui --widget outreach` mounts synthetic card data and asserts
+  `discover()` returns `None` when the env var is unset
+- Canon palette only; tokens from `src/toad/theme.py`
+- Read-only: no writes, no `subprocess`, no shell-outs
+
 ## Critique fixes (from v1 PR #23)
 
 - Added `/` and `r` keybindings with a title-search input

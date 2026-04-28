@@ -1,7 +1,13 @@
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import random
+
+if TYPE_CHECKING:
+    from toad.widgets.plan_execution_tab import (
+        PlanExecutionModel as PlanExecutionModelProtocol,
+    )
 
 from textual import on
 from textual.app import ComposeResult
@@ -242,6 +248,33 @@ class MainScreen(Screen, can_focus=False):
         for tree in self.query(DirectoryTree):
             tree.guide_depth = 3
 
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        pane.configure_plan_execution(self._make_plan_execution_factory(pane))
+
+    def _make_plan_execution_factory(
+        self, target: ProjectStatePane
+    ) -> Callable[[str], "PlanExecutionModelProtocol | None"]:
+        """Build the factory passed to ``ProjectStatePane.configure_plan_execution``.
+
+        The factory resolves ``.orchestrator/plans/<slug>/`` under the
+        current project path and constructs a live
+        :class:`PlanExecutionModel` rooted at it. Messages from the
+        model bubble up through the section to the active tab.
+        """
+        from typing import cast
+
+        from toad.data.plan_execution_model import PlanExecutionModel
+
+        def factory(slug: str) -> "PlanExecutionModelProtocol | None":
+            plan_dir = self.project_path / ".orchestrator" / "plans" / slug
+            if not plan_dir.is_dir():
+                return None
+            model = PlanExecutionModel(plan_dir, target=target)
+            model.start()
+            return cast("PlanExecutionModelProtocol", model)
+
+        return factory
+
     @on(OptionList.OptionHighlighted)
     def on_option_list_option_highlighted(
         self, event: OptionList.OptionHighlighted
@@ -308,6 +341,14 @@ class MainScreen(Screen, can_focus=False):
         """Open pane and show State section."""
         self._show_section_tab("section-state", "tab-builder")
 
+    def action_show_outreach(self) -> None:
+        """Open pane and show Outreach section.
+
+        No-op when the private rpa_outreach extension is not installed —
+        the section isn't mounted so ``show_section`` silently returns.
+        """
+        self._show_section_tab("section-outreach", "tab-outreach")
+
     def _hide_section(self, section_id: str) -> None:
         """Hide a section by ID."""
         pane = self.query_one("#project_state_pane", ProjectStatePane)
@@ -328,6 +369,10 @@ class MainScreen(Screen, can_focus=False):
     def action_hide_state(self) -> None:
         """Hide the State section."""
         self._hide_section("section-state")
+
+    def action_hide_outreach(self) -> None:
+        """Hide the Outreach section."""
+        self._hide_section("section-outreach")
 
     # ------------------------------------------------------------------
     # Canon auto-show logic
@@ -419,6 +464,82 @@ class MainScreen(Screen, can_focus=False):
         if mapping:
             pane = self.query_one("#project_state_pane", ProjectStatePane)
             pane.hide_section(mapping[0])
+
+    # ------------------------------------------------------------------
+    # Subagent tab actions (driven by the socket controller)
+    # ------------------------------------------------------------------
+
+    def _default_subagent_factory(
+        self, name: str, objective: str
+    ) -> tuple[Widget, Any]:
+        """Build a ``(Conversation, Agent)`` pair for a new subagent tab.
+
+        The subagent reuses the Conductor's agent descriptor (``self._agent``)
+        so it picks up the same `claude-code-acp` binary/config. Item 6 hooks
+        the agent's ``done`` signal back into Conductor's session.
+        """
+        from toad.acp.agent import Agent as AcpAgent
+
+        conversation = Conversation(
+            self.project_path,
+            self._agent,
+            None,
+            None,
+            initial_prompt=objective,
+        )
+        agent: Any
+        if self._agent is not None:
+            agent = AcpAgent(self.project_path, self._agent, None, None)
+        else:
+            agent = None
+        return conversation, agent
+
+    def _get_subagent_section(self):
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        return pane.ensure_subagent_section(self._default_subagent_factory)
+
+    async def action_open_subagent_tab(
+        self, name: str, objective: dict[str, Any]
+    ) -> str:
+        """Open a subagent tab.
+
+        ``objective`` is the structured payload validated by the socket layer
+        (guaranteed to contain a string ``objective`` key). Returns the
+        resolved unique tab name.
+        """
+        import asyncio
+
+        from toad.acp.agent import watch_subagent_completion
+
+        self.split_enabled = True
+        section = self._get_subagent_section()
+        objective_text = str(objective["objective"])
+        resolved = section.open_tab(name, objective_text)
+        self._show_section_tab(section.SECTION_ID, section._tab_id(resolved))
+
+        subagent = section.get_agent(resolved)
+        conductor = getattr(self.conversation, "agent", None)
+        if subagent is not None and conductor is not None and hasattr(
+            subagent, "done_event"
+        ):
+            asyncio.create_task(
+                watch_subagent_completion(subagent, conductor, resolved)
+            )
+        return resolved
+
+    async def action_close_subagent_tab(self, name: str) -> None:
+        """Close a subagent tab by name."""
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        if pane._subagent_section is None:
+            return
+        pane._subagent_section.close_tab(name)
+
+    def subagent_status(self) -> dict[str, Any]:
+        """Return the list of open subagent tabs and their count."""
+        pane = self.query_one("#project_state_pane", ProjectStatePane)
+        section = pane._subagent_section
+        names = list(section.tab_names) if section is not None else []
+        return {"tabs": names, "count": len(names)}
 
     def action_focus_prompt(self) -> None:
         self.conversation.focus_prompt()

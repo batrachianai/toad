@@ -1,0 +1,32 @@
+textual-tui-skill/
+├── README.md                      # Project overview and documentation
+├── LICENSE                        # MIT License
+├── CONTRIBUTING.md               # Contribution guidelines
+├── .gitignore                    # Git ignore rules
+├── quickstart.sh                 # Quick setup script
+├── textual-tui.skill            # Pre-built skill file (32KB)
+│
+├── skill/                        # Skill source files
+│   ├── SKILL.md                 # Main skill documentation (~5,000 words)
+│   ├── references/              # Reference documentation
+│   │   ├── widgets.md           # Gallery of 40+ widgets (~3,000 words)
+│   │   ├── layouts.md           # Layout patterns (~2,500 words)
+│   │   ├── styling.md           # Complete TCSS guide (~3,000 words)
+│   │   └── official-guides-index.md  # Official docs URLs (~2,500 words)
+│   └── assets/                  # Example applications
+│       ├── todo_app.py          # Todo list (200 lines)
+│       ├── dashboard_app.py     # System monitor (200 lines)
+│       ├── data_viewer.py       # Data viewer (300 lines)
+│       ├── worker_demo.py       # Worker patterns (400 lines)
+│       └── README.md            # Examples guide
+│
+├── examples/                     # Symlink to skill/assets/
+│   └── [same as skill/assets]
+│
+├── docs/                        # Additional documentation
+│   └── SKILL-GUIDE.md          # Complete usage guide
+│
+└── scripts/                     # Build and package scripts
+    └── package.py              # Skill packaging script
+
+Total: ~16,000 words of documentation, 1,100+ lines of example code

@@ -5,7 +5,7 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
-from typing import Any, cast, NamedTuple
+from typing import Any, Callable, cast, NamedTuple
 from copy import deepcopy
 
 import rich.repr
@@ -63,6 +63,29 @@ def generate_datetime_filename(
     for reserved in ' <>:"/\\|?*.':
         file_name_stem = file_name_stem.replace(reserved, "_")
     return file_name_stem + suffix
+
+
+async def inject_subagent_completion(
+    conductor: Any, name: str, summary: str
+) -> None:
+    """Post a synthetic completion message into the Conductor's session.
+
+    Format: ``[subagent <name> completed: <summary>]`` — matches
+    ``docs/subagent-tabs-brief.md``.
+    """
+    await conductor.send_prompt(f"[subagent {name} completed: {summary}]")
+
+
+async def watch_subagent_completion(
+    subagent: Any,
+    conductor: Any,
+    name: str,
+    summary_provider: Callable[[], str] | None = None,
+) -> None:
+    """Await ``subagent.done_event`` and then inject the completion notice."""
+    await subagent.done_event.wait()
+    summary = summary_provider() if summary_provider is not None else ""
+    await inject_subagent_completion(conductor, name, summary)
 
 
 @rich.repr.auto

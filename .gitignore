@@ -27,3 +27,11 @@ sandbox/
 
 # DEGA Core — personal focus config for planner loop
 focus.yaml
+
+# Local scratch: personal notes, runbooks, test checklists — not for commit
+.local/
+
+# Impeccable upstream source repo — clone locally if you want the full toolkit.
+# Only the lean per-skill extracts (impeccable-audit, impeccable-clarify, ...)
+# are tracked; the 11MB source tree is not.
+.claude/skills/impeccable/

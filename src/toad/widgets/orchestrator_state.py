@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from textual.message import Message
@@ -17,6 +19,46 @@ from toad.directory_watcher import DirectoryChanged, DirectoryWatcher
 log = logging.getLogger(__name__)
 
 POLL_INTERVAL = 5
+
+# A plan with status="running" is considered zombie / stale when its
+# updatedAt is older than this many seconds. Orch heartbeats every 30s,
+# so 90s = three missed polls.
+STALE_THRESHOLD_SECONDS = 90
+
+
+def _parse_iso_utc(raw: str) -> datetime | None:
+    """Parse an ISO-8601 timestamp (with optional trailing 'Z') to UTC."""
+    if not raw:
+        return None
+    try:
+        # Python 3.11+ accepts 'Z'; older versions need it stripped.
+        text = raw.replace("Z", "+00:00") if raw.endswith("Z") else raw
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def is_stale(
+    plan: PlanSummary,
+    *,
+    now: datetime | None = None,
+    threshold_seconds: int = STALE_THRESHOLD_SECONDS,
+) -> bool:
+    """Return True if plan is "running" but hasn't been updated recently.
+
+    A stale plan is one whose tmux session likely died (crash, kill, host
+    reboot) leaving an orphan ``status="running"`` entry in master.json.
+    """
+    if plan.status != "running":
+        return False
+    updated = _parse_iso_utc(plan.updated_at)
+    if updated is None:
+        return True  # malformed timestamp on a "running" plan ⇒ treat as stale
+    now = now or datetime.now(timezone.utc)
+    return (now - updated).total_seconds() > threshold_seconds
 
 
 @dataclass(frozen=True)
@@ -80,6 +122,39 @@ def _parse_master(data: dict) -> list[PlanSummary]:
     return plans
 
 
+def _patch_plan_status(data: dict, slug: str, status: str) -> bool:
+    """Set ``status`` on the named plan entry. Returns True if patched."""
+    plans = data.get("plans")
+    if not isinstance(plans, list):
+        return False
+    for entry in plans:
+        if isinstance(entry, dict) and entry.get("slug") == slug:
+            entry["status"] = status
+            entry["updatedAt"] = (
+                datetime.now(timezone.utc)
+                .strftime("%Y-%m-%dT%H:%M:%SZ")
+            )
+            return True
+    return False
+
+
+def _drop_plan(data: dict, slug: str) -> bool:
+    """Remove the named plan entry from ``data["plans"]``. Returns True
+    if a plan was removed.
+    """
+    plans = data.get("plans")
+    if not isinstance(plans, list):
+        return False
+    filtered = [
+        e for e in plans
+        if not (isinstance(e, dict) and e.get("slug") == slug)
+    ]
+    if len(filtered) == len(plans):
+        return False
+    data["plans"] = filtered
+    return True
+
+
 def _parse_items(data: dict) -> list[PlanItem]:
     """Parse per-plan state.json into PlanItem list."""
     items: list[PlanItem] = []
@@ -109,11 +184,23 @@ class OrchestratorStateWidget(Widget):
         """Posted once when master.json is first detected."""
 
     class PlansUpdated(Message):
-        """Posted when the plan list changes."""
+        """Posted when the plan list changes.
 
-        def __init__(self, plans: list[PlanSummary]) -> None:
+        ``baseline_slugs`` is the set of slugs that existed in
+        ``master.json`` the first time the widget read it — i.e. plans
+        that were already there when canon launched. Subscribers use
+        this to skip auto-opening pre-existing plans (only auto-open
+        plans started during the current canon session).
+        """
+
+        def __init__(
+            self,
+            plans: list[PlanSummary],
+            baseline_slugs: frozenset[str],
+        ) -> None:
             super().__init__()
             self.plans = plans
+            self.baseline_slugs = baseline_slugs
 
     class ItemsUpdated(Message):
         """Posted when items for the selected plan change."""
@@ -148,6 +235,11 @@ class OrchestratorStateWidget(Widget):
         self._selected_slug: str | None = None
         self._watcher: DirectoryWatcher | None = None
         self._poll_timer: Timer | None = None
+        # Slugs already present in master.json when canon first read it.
+        # Stays empty until the first successful poll, then frozen for the
+        # rest of the canon session.
+        self._baseline_slugs: frozenset[str] = frozenset()
+        self._baseline_captured = False
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -212,8 +304,13 @@ class OrchestratorStateWidget(Widget):
             return
 
         new_plans = _parse_master(raw)
+        if not self._baseline_captured:
+            self._baseline_slugs = frozenset(p.slug for p in new_plans if p.slug)
+            self._baseline_captured = True
         self.plans = new_plans
-        self.post_message(self.PlansUpdated(new_plans))
+        self.post_message(
+            self.PlansUpdated(new_plans, self._baseline_slugs)
+        )
 
         # Auto-select first plan if none selected
         if self._selected_slug is None and new_plans:
@@ -225,6 +322,56 @@ class OrchestratorStateWidget(Widget):
         """Select a plan and load its items from state.json."""
         self._selected_slug = slug
         self._load_plan_items(slug)
+
+    # ------------------------------------------------------------------
+    # master.json mutations — used for zombie cleanup actions
+    # ------------------------------------------------------------------
+
+    def mark_plan_crashed(self, slug: str) -> bool:
+        """Patch the named plan's entry to ``status: "crashed"``.
+
+        Returns True on success, False if master.json is missing or the
+        slug isn't present. Does not touch the plan's directory.
+        """
+        return self._mutate_master(
+            lambda data: _patch_plan_status(data, slug, "crashed")
+        )
+
+    def remove_plan_from_list(self, slug: str) -> bool:
+        """Drop the named plan from ``master.json.plans``.
+
+        Returns True on success. The plan's ``.orchestrator/plans/<slug>/``
+        directory is left intact so logs survive.
+        """
+        return self._mutate_master(
+            lambda data: _drop_plan(data, slug)
+        )
+
+    def _mutate_master(
+        self, mutator: Callable[[dict], bool]
+    ) -> bool:
+        if not self._master_path.is_file():
+            return False
+        try:
+            data = json.loads(
+                self._master_path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            log.warning("Failed to read master.json for mutation: %s", exc)
+            return False
+        if not mutator(data):
+            return False
+        try:
+            self._master_path.write_text(
+                json.dumps(data, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            log.warning("Failed to write master.json: %s", exc)
+            return False
+        # Refresh state so the UI sees the mutation right away.
+        self._poll_state()
+        return True
 
     def _load_plan_items(self, slug: str) -> None:
         """Read per-plan state.json and update selected_plan_items."""

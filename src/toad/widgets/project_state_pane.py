@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import yaml
@@ -24,6 +25,8 @@ from textual.widgets import (
     TabPane,
 )
 
+from toad.outreach.protocol import OutreachInfoProvider, OutreachSnapshot
+from toad.outreach.registry import discover as discover_outreach
 from toad.widgets.builder_view import BuilderView
 from toad.widgets.canon_state import CanonStateWidget
 from toad.widgets.filter_toolbar import FilterToolbar, FilterState, filter_tasks
@@ -33,8 +36,12 @@ from toad.widgets.github_views.github_timeline_provider import (
 )
 from toad.widgets.github_views.task_provider import TaskItem, TaskProvider
 from toad.widgets.github_views.timeline_data import build_timeline
+from toad.widgets.orchestrator_state import OrchestratorStateWidget
+from toad.widgets.outreach_cards import AccountDot, Histogram, RankedBar, StatLine
 from toad.widgets.plan import Plan
+from toad.widgets.plan_execution_section import ModelFactory, PlanExecutionSection
 from toad.widgets.project_directory_tree import ProjectDirectoryTree
+from toad.widgets.subagent_tab_section import AgentFactory, SubagentTabSection
 from toad.widgets.task_detail import TaskDetail
 from toad.widgets.task_table import TaskTable
 
@@ -71,6 +78,10 @@ def _read_timeline_config(
 SECTION_CONTEXT = "section-context"
 SECTION_PLANNING = "section-planning"
 SECTION_STATE = "section-state"
+SECTION_OUTREACH = "section-outreach"
+SECTION_SUBAGENTS = SubagentTabSection.SECTION_ID
+
+OUTREACH_REFRESH_INTERVAL = 30
 
 
 @dataclass
@@ -113,6 +124,22 @@ PANEL_ROUTES: dict[str, tuple[str, str]] = {
     "status": (SECTION_PLANNING, "tab-tasks"),
     "state": (SECTION_STATE, "tab-builder"),
     "builder": (SECTION_STATE, "tab-builder"),
+    "outreach": (SECTION_OUTREACH, "tab-outreach"),
+    # Plan execution: dynamic tab-per-slug, so the tab id is the
+    # section's stable empty-pane id. The pane handler treats this
+    # as "show the section, surface the running-plans list".
+    "plan_execution": (
+        PlanExecutionSection.SECTION_ID,
+        "plan-exec-empty",
+    ),
+    "plan_run": (
+        PlanExecutionSection.SECTION_ID,
+        "plan-exec-empty",
+    ),
+    "running_plans": (
+        PlanExecutionSection.SECTION_ID,
+        "plan-exec-empty",
+    ),
 }
 
 
@@ -264,17 +291,26 @@ class ProjectStatePane(Vertical):
         self._project_path = project_path or Path(".").resolve()
         self._refresh_timer: Timer | None = None
         self._tasks_refresh_timer: Timer | None = None
+        self._outreach_timer: Timer | None = None
         self._provider = self._make_provider()
         self._task_provider = self._make_task_provider()
+        self._outreach_provider: OutreachInfoProvider | None = discover_outreach()
         self._all_tasks: list[TaskItem] = []
         self._filter_state = FilterState()
         self._selected_task_id: str | None = None
         self._stack_mode: bool = False
+        self._subagent_section: SubagentTabSection | None = None
+        self._sections: list[_SectionDef] = list(SECTIONS)
+        if self._outreach_provider is not None:
+            self._sections.append(_SectionDef(SECTION_OUTREACH, "Outreach"))
+        self._plan_exec_section: PlanExecutionSection | None = None
+        self._plan_model_factory: ModelFactory | None = None
+        self._plan_agent_getter: Callable[[], str] | None = None
 
     def compose(self) -> ComposeResult:
         # Toolbar: one button per section + a stack-mode toggle
         with Horizontal(id="pane-toolbar"):
-            for sec in SECTIONS:
+            for sec in self._sections:
                 yield Button(
                     sec.button_label,
                     id=f"btn-{sec.section_id}",
@@ -325,16 +361,35 @@ class ProjectStatePane(Vertical):
             id="canon-state",
         )
 
+        # Orchestrator state watcher (invisible): tails
+        # ``.orchestrator/master.json`` and posts ``PlansUpdated`` which
+        # drives auto-open of plan-execution tabs below.
+        yield OrchestratorStateWidget(
+            project_path=self._project_path,
+            id="orchestrator-state",
+        )
+
         # --- State section (canon build + run) ---
         with TabbedContent(id=SECTION_STATE, classes="pane-section"):
             with TabPane("State", id="tab-builder"):
                 yield BuilderView(id="builder-view")
 
+        # --- Outreach section (conditional) ---
+        if self._outreach_provider is not None:
+            with TabbedContent(id=SECTION_OUTREACH, classes="pane-section"):
+                with TabPane("Outreach", id="tab-outreach"):
+                    with Vertical(id="outreach-container"):
+                        yield StatLine("Prospects", id="outreach-prospects")
+                        yield Histogram("Sends · 24h", id="outreach-sends")
+                        yield RankedBar(
+                            "Hackathons (top 5)", id="outreach-hackathons"
+                        )
+                        yield Vertical(id="outreach-accounts")
+
     def on_mount(self) -> None:
         # All sections start hidden; the user opens one via toolbar / chat.
-        self.query_one(f"#{SECTION_CONTEXT}").display = False
-        self.query_one(f"#{SECTION_PLANNING}").display = False
-        self.query_one(f"#{SECTION_STATE}").display = False
+        for sec in self._sections:
+            self.query_one(f"#{sec.section_id}").display = False
         self._sync_toolbar()
         self._fetch_timeline()
         self._fetch_tasks()
@@ -344,6 +399,7 @@ class ProjectStatePane(Vertical):
         if not visible:
             self._stop_timeline_timer()
             self._stop_tasks_timer()
+            self._stop_outreach_timer()
 
     def _sync_timeline_timer(self, section_id: str, *, visible: bool) -> None:
         """Start/stop the timeline refresh timer when the Planning section toggles."""
@@ -362,6 +418,24 @@ class ProjectStatePane(Vertical):
         if self._refresh_timer is not None:
             self._refresh_timer.stop()
             self._refresh_timer = None
+
+    def _sync_outreach_timer(self, section_id: str, *, visible: bool) -> None:
+        """Start/stop the Outreach refresh timer when its section toggles."""
+        if section_id != SECTION_OUTREACH or self._outreach_provider is None:
+            return
+        if visible:
+            self._fetch_outreach()
+            if self._outreach_timer is None:
+                self._outreach_timer = self.set_interval(
+                    OUTREACH_REFRESH_INTERVAL, self._fetch_outreach
+                )
+        else:
+            self._stop_outreach_timer()
+
+    def _stop_outreach_timer(self) -> None:
+        if self._outreach_timer is not None:
+            self._outreach_timer.stop()
+            self._outreach_timer = None
 
     @on(TabbedContent.TabActivated, f"#{SECTION_PLANNING}")
     def _on_planning_tab_activated(
@@ -400,7 +474,7 @@ class ProjectStatePane(Vertical):
     def _sync_toolbar(self) -> None:
         """Sync all toolbar buttons and fire AllSectionsHidden if needed."""
         any_visible = False
-        for sec in SECTIONS:
+        for sec in self._sections:
             widget = self.query_one(f"#{sec.section_id}")
             btn = self.query_one(f"#btn-{sec.section_id}", Button)
             if widget.display:
@@ -433,9 +507,30 @@ class ProjectStatePane(Vertical):
 
     def show_section(self, section_id: str) -> None:
         """Show a section by its ID."""
-        self.query_one(f"#{section_id}").display = True
+        # The plan execution section is mounted lazily on first use —
+        # ensure it exists before trying to query it (e.g. for the
+        # ``plan_execution`` panel route, fired before any plan tab
+        # has been opened).
+        if section_id == PlanExecutionSection.SECTION_ID:
+            self._ensure_plan_exec_section()
+        try:
+            self.query_one(f"#{section_id}").display = True
+        except NoMatches:
+            log.debug("show_section: %s not mounted", section_id)
+            return
         self._sync_toolbar()
         self._sync_timeline_timer(section_id, visible=True)
+        self._sync_outreach_timer(section_id, visible=True)
+
+    def show_single_section(self, section_id: str) -> None:
+        """Show ``section_id`` and hide all other sections (accordion)."""
+        for sec in self._sections:
+            visible = sec.section_id == section_id
+            widget = self.query_one(f"#{sec.section_id}")
+            widget.display = visible
+            self._sync_timeline_timer(sec.section_id, visible=visible)
+            self._sync_outreach_timer(sec.section_id, visible=visible)
+        self._sync_toolbar()
 
     def show_single_section(self, section_id: str) -> None:
         """Show ``section_id`` and hide all other sections (accordion)."""
@@ -448,9 +543,13 @@ class ProjectStatePane(Vertical):
 
     def hide_section(self, section_id: str) -> None:
         """Hide a section by its ID."""
-        self.query_one(f"#{section_id}").display = False
+        try:
+            self.query_one(f"#{section_id}").display = False
+        except NoMatches:
+            return
         self._sync_toolbar()
         self._sync_timeline_timer(section_id, visible=False)
+        self._sync_outreach_timer(section_id, visible=False)
 
     def toggle_section(self, section_id: str) -> None:
         """Toggle a section's visibility."""
@@ -458,16 +557,176 @@ class ProjectStatePane(Vertical):
         widget.display = not widget.display
         self._sync_toolbar()
         self._sync_timeline_timer(section_id, visible=widget.display)
+        self._sync_outreach_timer(section_id, visible=widget.display)
 
     def hide_all_sections(self) -> None:
         """Hide every section."""
-        for sec in SECTIONS:
+        for sec in self._sections:
             self.query_one(f"#{sec.section_id}").display = False
         self._sync_toolbar()
 
     # ------------------------------------------------------------------
     # Public API — tab activation
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Public API — subagents (on-demand section)
+    # ------------------------------------------------------------------
+
+    def ensure_subagent_section(
+        self, agent_factory: AgentFactory
+    ) -> SubagentTabSection:
+        """Return the subagent section, mounting it on first use.
+
+        The section is added lazily so the pane stays untouched when no
+        subagents are active. The factory is captured on first call; later
+        calls reuse the already-mounted section.
+        """
+        if self._subagent_section is None:
+            section = SubagentTabSection(
+                project_path=self._project_path,
+                agent_factory=agent_factory,
+                id=SECTION_SUBAGENTS,
+                classes="pane-section",
+            )
+            self.mount(section)
+            self._subagent_section = section
+        return self._subagent_section
+
+    # ------------------------------------------------------------------
+    # Public API — plan execution (auto-opened from master.json)
+    # ------------------------------------------------------------------
+
+    def configure_plan_execution(
+        self,
+        model_factory: ModelFactory,
+        get_current_agent: Callable[[], str] | None = None,
+    ) -> None:
+        """Register the Phase B model factory + agent getter.
+
+        Called by Canon's ACP bootstrap when the ``PlanExecutionModel``
+        factory is ready. Mounts the section lazily, pushes the
+        factory into it, registers the ``Plans`` toolbar button, and
+        replays any plans already known to the orchestrator watcher
+        so tabs appear even if ``PlansUpdated`` fired before this call.
+        """
+        self._plan_model_factory = model_factory
+        self._plan_agent_getter = get_current_agent
+        section = self._ensure_plan_exec_section()
+        section.set_model_factory(model_factory)
+        self._register_plan_exec_section()
+        self._replay_pending_plans(section)
+
+    def _register_plan_exec_section(self) -> None:
+        """Append the plan-exec section to ``_sections`` and mount its button."""
+        sec_id = PlanExecutionSection.SECTION_ID
+        if any(s.section_id == sec_id for s in self._sections):
+            return
+        sec_def = _SectionDef(sec_id, "Plans")
+        self._sections.append(sec_def)
+        try:
+            toolbar = self.query_one("#pane-toolbar", Horizontal)
+        except NoMatches:
+            return
+        btn = Button(sec_def.button_label, id=f"btn-{sec_id}")
+        try:
+            stack_btn = toolbar.query_one("#btn-stack-toggle", Button)
+            toolbar.mount(btn, before=stack_btn)
+        except NoMatches:
+            toolbar.mount(btn)
+        self._sync_toolbar()
+
+    def _replay_pending_plans(self, section: PlanExecutionSection) -> None:
+        """Push the current plan snapshot into the section's running list.
+
+        Plans already running when canon launched are pre-existing — they
+        are NOT auto-opened. The user can pick them from the running-plans
+        list (rendered as the section's empty state) or call the
+        ``plan_execution`` panel route. This keeps canon launch silent
+        when reattaching to a project with live orch state.
+        """
+        try:
+            widget = self.query_one(
+                "#orchestrator-state", OrchestratorStateWidget
+            )
+        except NoMatches:
+            return
+        section.set_plan_summaries(list(widget.plans))
+
+    def _ensure_plan_exec_section(self) -> PlanExecutionSection:
+        if self._plan_exec_section is None:
+            section = PlanExecutionSection(
+                model_factory=self._plan_model_factory,
+                get_current_agent=self._plan_agent_getter,
+                id=PlanExecutionSection.SECTION_ID,
+                classes="pane-section",
+            )
+            self.mount(section)
+            self._plan_exec_section = section
+        return self._plan_exec_section
+
+    @on(OrchestratorStateWidget.PlansUpdated)
+    def _on_plans_updated(
+        self, event: OrchestratorStateWidget.PlansUpdated
+    ) -> None:
+        """Auto-open tabs only for plans started during this canon session.
+
+        Pre-existing plans (those already in ``master.json`` when canon
+        launched) and completed plans are skipped — they are reachable
+        via the explicit ``plan_execution`` panel route. Without this
+        filter every old plan in master.json would mount a tab.
+
+        The section itself is mounted regardless so the running-plans
+        list (rendered as the section's empty state) stays current.
+        """
+        event.stop()
+        section = self._ensure_plan_exec_section()
+        section.set_plan_summaries(event.plans)
+        if not event.plans:
+            return
+        baseline = event.baseline_slugs
+        new_active = [
+            p for p in event.plans
+            if p.slug
+            and p.slug not in baseline
+            and p.status not in ("completed", "crashed")
+        ]
+        if not new_active:
+            return
+        # A plan was started while canon was running — reveal the pane
+        # and mount its tab.
+        self.display = True
+        self.show_section(PlanExecutionSection.SECTION_ID)
+        for plan in new_active:
+            section.open_tab(plan.slug)
+
+    @on(PlanExecutionSection.PlanCrashRequested)
+    def _on_plan_crash_requested(
+        self, event: PlanExecutionSection.PlanCrashRequested
+    ) -> None:
+        """Forward zombie cleanup → master.json mutation."""
+        event.stop()
+        try:
+            widget = self.query_one(
+                "#orchestrator-state", OrchestratorStateWidget
+            )
+        except NoMatches:
+            return
+        widget.mark_plan_crashed(event.slug)
+
+    @on(PlanExecutionSection.PlanRemoveRequested)
+    def _on_plan_remove_requested(
+        self, event: PlanExecutionSection.PlanRemoveRequested
+    ) -> None:
+        """Forward remove-from-list → master.json mutation."""
+        event.stop()
+        try:
+            widget = self.query_one(
+                "#orchestrator-state", OrchestratorStateWidget
+            )
+        except NoMatches:
+            return
+        widget.remove_plan_from_list(event.slug)
 
     def activate_tab(self, tab_id: str) -> None:
         """Switch to a specific tab by its pane id."""
@@ -516,6 +775,69 @@ class ProjectStatePane(Vertical):
     def refresh_timeline(self) -> None:
         """Re-fetch timeline data. Called via socket controller."""
         self._fetch_timeline()
+
+    # ------------------------------------------------------------------
+    # Outreach fetch — async provider pipeline
+    # ------------------------------------------------------------------
+
+    @work(exclusive=True, exit_on_error=False, group="fetch-outreach")
+    async def _fetch_outreach(self) -> None:
+        """Fetch an outreach snapshot and render it into the cards."""
+        if self._outreach_provider is None:
+            return
+        try:
+            if not await self._outreach_provider.available():
+                return
+            snapshot = await self._outreach_provider.snapshot()
+        except Exception as exc:
+            log.warning("Outreach fetch failed: %s", exc)
+            return
+        self._render_outreach(snapshot)
+
+    def _render_outreach(self, snapshot: OutreachSnapshot) -> None:
+        """Push a snapshot into the 4 outreach cards."""
+        try:
+            prospects = self.query_one("#outreach-prospects", StatLine)
+            sends = self.query_one("#outreach-sends", Histogram)
+            hackathons = self.query_one("#outreach-hackathons", RankedBar)
+            accounts_box = self.query_one("#outreach-accounts", Vertical)
+        except NoMatches:
+            return
+
+        p = snapshot.prospects
+        prospects.set_data(
+            p.total,
+            (
+                ("messaged", p.messaged, "success"),
+                ("pending", p.pending, "warning"),
+            ),
+        )
+
+        if snapshot.sends is None:
+            sends.display = False
+        else:
+            sends.display = True
+            sends.set_data(tuple(snapshot.sends.hourly), snapshot.sends.total_24h)
+
+        hackathons.set_data(
+            tuple((h.name, h.messaged, h.total) for h in snapshot.hackathons)
+        )
+
+        if snapshot.accounts is None:
+            accounts_box.display = False
+        else:
+            accounts_box.display = True
+            for child in list(accounts_box.children):
+                child.remove()
+            for acct in snapshot.accounts:
+                accounts_box.mount(
+                    AccountDot(
+                        name=acct.name,
+                        active=acct.online,
+                        sends_per_hour=acct.sends_per_hour,
+                        last_sent=acct.last_sent_relative,
+                    )
+                )
 
     # ------------------------------------------------------------------
     # Tasks — provider → filter → table → detail

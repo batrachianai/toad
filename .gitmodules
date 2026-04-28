@@ -1,0 +1,3 @@
+[submodule "src/toad/extensions/rpa_outreach"]
+	path = src/toad/extensions/rpa_outreach
+	url = https://github.com/DEGAorg/rpa-outreach-view.git

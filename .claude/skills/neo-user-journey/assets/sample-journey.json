@@ -1,0 +1,149 @@
+{
+  "name": "E-commerce Checkout Journey",
+  "persona": "First-time Buyer",
+  "goal": "Purchase a product and complete checkout successfully",
+  "metadata": {
+    "product": "E-commerce Platform",
+    "version": "1.0",
+    "author": "UX Journey Architect",
+    "date": "2024-01-15"
+  },
+  "steps": [
+    {
+      "name": "Product Discovery",
+      "action": "Browses product catalog",
+      "touchpoint": "Homepage / Category Page",
+      "emotion": 1,
+      "emotion_label": "Curious",
+      "pain_points": [],
+      "opportunities": [
+        "Personalized recommendations",
+        "Clear category navigation"
+      ],
+      "notes": "Entry point varies: search, ads, direct link"
+    },
+    {
+      "name": "Product Selection",
+      "action": "Views product details, reads reviews",
+      "touchpoint": "Product Detail Page",
+      "emotion": 2,
+      "emotion_label": "Interested",
+      "pain_points": [
+        "Missing size guide",
+        "Limited product images"
+      ],
+      "opportunities": [
+        "360-degree product view",
+        "Size recommendation tool"
+      ],
+      "notes": "Key decision point - needs confidence builders"
+    },
+    {
+      "name": "Add to Cart",
+      "action": "Selects options, clicks Add to Cart",
+      "touchpoint": "Product Page / Cart Modal",
+      "emotion": 2,
+      "emotion_label": "Confident",
+      "pain_points": [],
+      "opportunities": [
+        "Cross-sell relevant items",
+        "Show cart summary without leaving page"
+      ],
+      "notes": "Micro-conversion point"
+    },
+    {
+      "name": "Cart Review",
+      "action": "Reviews cart, adjusts quantities",
+      "touchpoint": "Cart Page",
+      "emotion": 0,
+      "emotion_label": "Neutral",
+      "pain_points": [
+        "Shipping cost unknown until checkout",
+        "Promo code field hard to find"
+      ],
+      "opportunities": [
+        "Show shipping estimate early",
+        "Display savings prominently"
+      ],
+      "notes": "48% abandon due to unexpected costs (Baymard)"
+    },
+    {
+      "name": "Start Checkout",
+      "action": "Clicks checkout button",
+      "touchpoint": "Cart to Checkout Transition",
+      "emotion": -1,
+      "emotion_label": "Uncertain",
+      "pain_points": [
+        "Forced account creation",
+        "Long form visible"
+      ],
+      "opportunities": [
+        "Guest checkout option",
+        "Progress indicator"
+      ],
+      "notes": "35% abandon if forced to create account"
+    },
+    {
+      "name": "Shipping Information",
+      "action": "Enters shipping address",
+      "touchpoint": "Checkout - Shipping Step",
+      "emotion": -1,
+      "emotion_label": "Tedious",
+      "pain_points": [
+        "Too many required fields",
+        "No address autocomplete"
+      ],
+      "opportunities": [
+        "Address autocomplete",
+        "Save address for future"
+      ],
+      "notes": "Each field removed = ~3% conversion increase"
+    },
+    {
+      "name": "Payment",
+      "action": "Enters payment information",
+      "touchpoint": "Checkout - Payment Step",
+      "emotion": -2,
+      "emotion_label": "Anxious",
+      "pain_points": [
+        "Security concerns",
+        "Limited payment options"
+      ],
+      "opportunities": [
+        "Trust badges visible",
+        "Multiple payment methods",
+        "Apple Pay / Google Pay"
+      ],
+      "notes": "Peak anxiety moment - needs maximum reassurance"
+    },
+    {
+      "name": "Order Review",
+      "action": "Reviews order before confirming",
+      "touchpoint": "Checkout - Review Step",
+      "emotion": 0,
+      "emotion_label": "Cautious",
+      "pain_points": [
+        "Can't easily edit from review"
+      ],
+      "opportunities": [
+        "Inline editing",
+        "Clear order summary"
+      ],
+      "notes": "Last chance to catch errors"
+    },
+    {
+      "name": "Order Confirmation",
+      "action": "Submits order, sees confirmation",
+      "touchpoint": "Confirmation Page",
+      "emotion": 3,
+      "emotion_label": "Relieved/Happy",
+      "pain_points": [],
+      "opportunities": [
+        "Share order tracking",
+        "Encourage account creation (post-purchase)",
+        "Referral program"
+      ],
+      "notes": "Peak-End Rule: End on positive note"
+    }
+  ]
+}

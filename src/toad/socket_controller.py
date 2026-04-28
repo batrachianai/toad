@@ -33,6 +33,27 @@ if TYPE_CHECKING:
 
 SOCKET_DIR = Path("/tmp")
 
+RESERVED_OBJECTIVE_KEYS = frozenset(
+    {"objective", "output_format", "tool_scope", "boundary"}
+)
+
+
+def _validate_objective_payload(payload: Any) -> str | None:
+    """Return an error string if ``payload`` is not a valid objective dict.
+
+    v1 requires a string ``objective`` key. ``output_format``, ``tool_scope``,
+    and ``boundary`` are accepted but not yet consumed. Unknown keys are
+    rejected so typos surface early.
+    """
+    if not isinstance(payload, dict):
+        return "objective payload must be a dict"
+    if "objective" not in payload or not isinstance(payload["objective"], str):
+        return "objective payload must contain a string 'objective'"
+    extras = set(payload) - RESERVED_OBJECTIVE_KEYS
+    if extras:
+        return f"unknown objective keys: {sorted(extras)}"
+    return None
+
 
 def _socket_path() -> Path:
     return SOCKET_DIR / f"toad-{os.getpid()}.sock"
@@ -111,8 +132,40 @@ async def _dispatch(app: App, request: dict[str, Any]) -> dict[str, Any]:
         name = request.get("name")
         if not name:
             return {"error": "missing 'name'"}
+        # Strip the optional "screen." namespace so Conductor's agent can use
+        # either bare (``open_subagent_tab``) or namespaced
+        # (``screen.open_subagent_tab``) names.
+        bare_name = name.split(".", 1)[1] if name.startswith("screen.") else name
+        if bare_name in ("open_subagent_tab", "close_subagent_tab"):
+            args = request.get("args")
+            if not isinstance(args, dict):
+                return {"error": f"'{bare_name}' requires 'args' object"}
+            tab_name = args.get("name")
+            if not isinstance(tab_name, str) or not tab_name:
+                return {"error": f"'{bare_name}' requires 'args.name' string"}
+            if bare_name == "open_subagent_tab":
+                objective = args.get("objective")
+                if objective is None:
+                    return {"error": "'open_subagent_tab' requires 'args.objective'"}
+                err = _validate_objective_payload(objective)
+                if err is not None:
+                    return {"error": err}
+                await app.screen.action_open_subagent_tab(
+                    name=tab_name, objective=objective
+                )
+            else:
+                await app.screen.action_close_subagent_tab(name=tab_name)
+            return {"ok": True}
         await app.run_action(name)
         return {"ok": True}
+
+    if cmd == "subagent_status":
+        status = app.screen.subagent_status()
+        return {
+            "ok": True,
+            "tabs": list(status.get("tabs", [])),
+            "count": int(status.get("count", 0)),
+        }
 
     if cmd == "update":
         selector = request.get("selector")
