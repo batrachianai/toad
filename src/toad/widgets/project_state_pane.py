@@ -532,6 +532,15 @@ class ProjectStatePane(Vertical):
             self._sync_outreach_timer(sec.section_id, visible=visible)
         self._sync_toolbar()
 
+    def show_single_section(self, section_id: str) -> None:
+        """Show ``section_id`` and hide all other sections (accordion)."""
+        for sec in SECTIONS:
+            visible = sec.section_id == section_id
+            widget = self.query_one(f"#{sec.section_id}")
+            widget.display = visible
+            self._sync_timeline_timer(sec.section_id, visible=visible)
+        self._sync_toolbar()
+
     def hide_section(self, section_id: str) -> None:
         """Hide a section by its ID."""
         try:
