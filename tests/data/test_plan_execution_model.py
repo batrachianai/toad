@@ -53,6 +53,7 @@ def _state_payload(
     verdict: str | None = None,
     issue_number: int | None = 42,
     slug: str = "20260427-test-plan",
+    status: str | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "version": 1,
@@ -61,7 +62,12 @@ def _state_payload(
         "items": list(items),
     }
     if verdict is not None:
-        payload["finalReview"] = {"verdict": verdict}
+        # Engine writes finalReview.result; the parameter is named ``verdict``
+        # for readability in test bodies.
+        payload["finalReview"] = {"result": verdict, "status": "done"}
+        payload["status"] = status or "completed"
+    elif status is not None:
+        payload["status"] = status
     return payload
 
 

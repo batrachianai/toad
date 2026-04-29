@@ -24,18 +24,22 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.timer import Timer
 from textual.widgets import Static, TabPane
 
 from toad.directory_watcher import DirectoryChanged, DirectoryWatcher
 from toad.widgets.plan_dep_graph import DepGraphItem, PlanDepGraph
+from toad.widgets.plan_donut import PlanDonut
 from toad.widgets.plan_status_rail import PlanStatusRail, RailItem
 from toad.widgets.plan_worker_log_pane import PlanWorkerLogPane
+
+if TYPE_CHECKING:
+    from toad.data.plan_execution_model import TerminalInfo
 
 
 _POLL_INTERVAL_SECONDS = 2.5
@@ -76,11 +80,21 @@ class PlanExecutionTab(TabPane):
     """One-plan tab composing header + dep graph + worker log + status rail."""
 
     DEFAULT_CSS = """
-    PlanExecutionTab #plan-exec-header {
-        height: 1;
+    PlanExecutionTab #plan-exec-header-row {
+        height: 2;
+        background: $panel;
+    }
+    PlanExecutionTab #plan-exec-header-text {
+        height: 2;
         background: $panel;
         color: $text;
         padding: 0 1;
+        width: 1fr;
+    }
+    PlanExecutionTab PlanDonut {
+        width: 12;
+        height: 2;
+        margin: 0 1 0 0;
     }
     PlanExecutionTab Vertical.plan-exec-body {
         height: 1fr;
@@ -103,11 +117,26 @@ class PlanExecutionTab(TabPane):
             self.status = status
 
     class PlanFinished(Message):
-        """Plan reached terminal state; verdict is SHIP or REVISE."""
+        """Plan reached terminal state.
 
-        def __init__(self, verdict: str) -> None:
+        ``verdict`` carries the rail badge label — typically ``SHIP`` or
+        ``REVISE`` from ``finalReview.result``, or ``FAILED`` / ``ABORTED``
+        when the engine bails out without a final review.
+
+        ``terminal`` carries the structured snapshot (PR URL, verification,
+        summary) the tab uses to render the completion banner. ``None``
+        when the message comes from a caller that hasn't built one (some
+        tests post a bare verdict).
+        """
+
+        def __init__(
+            self,
+            verdict: str,
+            terminal: "TerminalInfo | None" = None,
+        ) -> None:
             super().__init__()
             self.verdict = verdict
+            self.terminal = terminal
 
     def __init__(
         self,
@@ -127,6 +156,7 @@ class PlanExecutionTab(TabPane):
         self._get_current_agent = get_current_agent
         self._items: list[DepGraphItem] = list(model.items)
         self._verdict: str = model.verdict
+        self._terminal: "TerminalInfo | None" = getattr(model, "terminal", None)
         self._selected_item_id: int | None = None
         self._poll_timer: Timer | None = None
         self._watcher: DirectoryWatcher | None = None
@@ -162,7 +192,15 @@ class PlanExecutionTab(TabPane):
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="plan-exec-body"):
-            yield Static(self._compute_header_text(), id="plan-exec-header")
+            with Horizontal(id="plan-exec-header-row"):
+                yield Static(
+                    self._compute_header_text(),
+                    id="plan-exec-header-text",
+                )
+                yield PlanDonut(
+                    items=self._items,
+                    id="plan-exec-donut",
+                )
             yield PlanDepGraph(items=self._items, id="plan-exec-graph")
             yield PlanWorkerLogPane(
                 model=self._model,
@@ -205,6 +243,7 @@ class PlanExecutionTab(TabPane):
         self._items = list(event.items)
         self.query_one(PlanDepGraph).set_items(self._items)
         self.query_one(PlanStatusRail).set_items(self._rail_items())
+        self.query_one(PlanDonut).set_items(self._items)
         self._refresh_header()
 
     def on_plan_execution_tab_item_status_changed(
@@ -224,13 +263,17 @@ class PlanExecutionTab(TabPane):
         self.query_one(PlanStatusRail).post_message(
             PlanStatusRail.ItemStatusChanged(event.item_id, event.status)
         )
+        self.query_one(PlanDonut).set_items(self._items)
         self._refresh_header()
 
     def on_plan_execution_tab_plan_finished(self, event: PlanFinished) -> None:
         """Flip verdict on completion. Tab stays mounted."""
         event.stop()
         self._verdict = event.verdict
+        if event.terminal is not None:
+            self._terminal = event.terminal
         self.query_one(PlanStatusRail).set_verdict(event.verdict)
+        self.query_one(PlanDonut).set_items(self._items)
         self._refresh_header()
 
     # ------------------------------------------------------------------
@@ -241,7 +284,7 @@ class PlanExecutionTab(TabPane):
         return [RailItem(id=i.id, status=i.status) for i in self._items]
 
     def _refresh_header(self) -> None:
-        header = self.query_one("#plan-exec-header", Static)
+        header = self.query_one("#plan-exec-header-text", Static)
         header.update(self._compute_header_text())
 
     def _compute_header_text(self) -> str:
@@ -254,15 +297,67 @@ class PlanExecutionTab(TabPane):
         agent = (
             self._get_current_agent() if self._get_current_agent else _DEFAULT_AGENT
         )
-        parts = [slug]
+        phase = getattr(self._model, "phase", _phase_from_verdict(self._verdict))
+        first_line_parts = [slug]
         if issue is not None:
-            parts.append(f"#{issue}")
-        parts.append(self._verdict)
+            first_line_parts.append(f"#{issue}")
+        first_line_parts.append(f"[{phase}]")
+        first_line_parts.append(self._verdict)
         counters = [f"✓{done}/{total}"]
         if running:
             counters.append(f"◉{running}")
         if failed:
             counters.append(f"✗{failed}")
-        parts.append(" ".join(counters))
-        parts.append(f"agent: {agent}")
-        return "  ".join(parts)
+        first_line_parts.append(" ".join(counters))
+        first_line_parts.append(f"agent: {agent}")
+        first_line = "  ".join(first_line_parts)
+
+        terminal_line = self._format_terminal_line()
+        if terminal_line:
+            return f"{first_line}\n{terminal_line}"
+        return first_line
+
+    def _format_terminal_line(self) -> str:
+        terminal = self._terminal
+        if terminal is None:
+            return ""
+        bits: list[str] = []
+        if terminal.pr_number is not None:
+            label = f"PR #{terminal.pr_number}"
+            if terminal.pr_url:
+                bits.append(f"{label}  {terminal.pr_url}")
+            else:
+                bits.append(label)
+        elif terminal.pr_url:
+            bits.append(f"PR  {terminal.pr_url}")
+        if terminal.verification_status:
+            verify = f"verify: {terminal.verification_status}"
+            if terminal.verification_unchecked:
+                verify += f" ({terminal.verification_unchecked} unchecked)"
+            bits.append(verify)
+        summary = (
+            f"{terminal.items_shipped}/{terminal.items_total} shipped"
+        )
+        if terminal.items_reworked:
+            summary += f", {terminal.items_reworked} reworked"
+        bits.append(summary)
+        if terminal.elapsed_seconds is not None:
+            bits.append(f"elapsed: {_format_elapsed(terminal.elapsed_seconds)}")
+        return "  ".join(bits)
+
+
+def _phase_from_verdict(verdict: str) -> str:
+    if verdict == "SHIP":
+        return "Done"
+    if verdict in {"REVISE", "FAILED", "ABORTED"}:
+        return "Failed"
+    return "Running"
+
+
+def _format_elapsed(seconds: float) -> str:
+    total = int(seconds)
+    minutes, sec = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m {sec:02d}s"
+    return f"{minutes}m {sec:02d}s"

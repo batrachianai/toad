@@ -254,7 +254,8 @@ def _state_payload(
         "items": items,
     }
     if verdict is not None:
-        payload["finalReview"] = {"verdict": verdict}
+        payload["finalReview"] = {"result": verdict, "status": "done"}
+        payload["status"] = "completed"
     return payload
 
 
