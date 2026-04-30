@@ -33,7 +33,6 @@ from toad.data.plan_execution_model import PlanExecutionModel
 from toad.directory_watcher import DirectoryWatcher
 from toad.widgets.plan_dep_graph import DepGraphItem, PlanDepGraph
 from toad.widgets.plan_execution_tab import PlanExecutionTab
-from toad.widgets.plan_status_rail import STATUS_GLYPHS, PlanStatusRail
 from toad.widgets.plan_worker_log_pane import PlanWorkerLogPane
 
 
@@ -214,8 +213,6 @@ class TestPlanFinishedPersists:
             # Tab is still mounted and queryable.
             still_there = app.query_one(PlanExecutionTab)
             assert still_there is tab
-            rail = tab.query_one(PlanStatusRail)
-            assert rail.verdict_label() == "SHIP"
             assert "SHIP" in tab.header_text()
 
     @pytest.mark.asyncio
@@ -227,8 +224,6 @@ class TestPlanFinishedPersists:
             tab = app.query_one(PlanExecutionTab)
             tab.post_message(PlanExecutionTab.PlanFinished("REVISE"))
             await pilot.pause()
-            rail = tab.query_one(PlanStatusRail)
-            assert rail.verdict_label() == "REVISE"
             assert "REVISE" in tab.header_text()
             # Still mounted inside the TabbedContent.
             tabs = app.query_one(TabbedContent)
@@ -342,7 +337,7 @@ class TestLiveUpdates:
             assert tab._watcher is None  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    async def test_state_mutation_drives_status_change_to_rail(
+    async def test_state_mutation_drives_status_change_through_tab(
         self, live_plan_dir: Path
     ) -> None:
         target = _LateTarget()
@@ -353,12 +348,9 @@ class TestLiveUpdates:
             await pilot.pause()
             tab = app.query_one(PlanExecutionTab)
             target.target = tab
-            rail = tab.query_one(PlanStatusRail)
 
-            assert rail.glyphs_plain() == [
-                STATUS_GLYPHS["queued"],
-                STATUS_GLYPHS["queued"],
-            ]
+            # Two queued items with no done; header shows "0/2".
+            assert "0/2" in tab.header_text()
 
             # Backstop poll catches this even if watcher misses.
             await pilot.pause()
@@ -384,7 +376,8 @@ class TestLiveUpdates:
             # Allow the 2.5s backstop to fire and the message to drain.
             await pilot.pause(3.0)
 
-            assert rail.glyphs_plain() == [
-                STATUS_GLYPHS["running"],
-                STATUS_GLYPHS["queued"],
-            ]
+            # One running, one queued — header counter still 0/2 done plus
+            # an active marker on the live row.
+            text = tab.header_text()
+            assert "0/2" in text
+            assert "◉1" in text

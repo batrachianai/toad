@@ -35,7 +35,6 @@ from textual.widgets import Static, TabPane
 from toad.directory_watcher import DirectoryChanged, DirectoryWatcher
 from toad.widgets.plan_dep_graph import DepGraphItem, PlanDepGraph
 from toad.widgets.plan_donut import PlanDonut
-from toad.widgets.plan_status_rail import PlanStatusRail, RailItem
 from toad.widgets.plan_worker_log_pane import PlanWorkerLogPane
 
 if TYPE_CHECKING:
@@ -81,11 +80,12 @@ class PlanExecutionTab(TabPane):
 
     DEFAULT_CSS = """
     PlanExecutionTab #plan-exec-header-row {
-        height: 2;
+        height: auto;
+        max-height: 3;
         background: $panel;
     }
     PlanExecutionTab #plan-exec-header-text {
-        height: 2;
+        height: auto;
         background: $panel;
         color: $text;
         padding: 0 1;
@@ -207,11 +207,6 @@ class PlanExecutionTab(TabPane):
                 item_id=None,
                 id="plan-exec-log",
             )
-            yield PlanStatusRail(
-                items=self._rail_items(),
-                verdict=self._verdict,
-                id="plan-exec-rail",
-            )
 
     # ------------------------------------------------------------------
     # Public helpers
@@ -242,7 +237,6 @@ class PlanExecutionTab(TabPane):
         event.stop()
         self._items = list(event.items)
         self.query_one(PlanDepGraph).set_items(self._items)
-        self.query_one(PlanStatusRail).set_items(self._rail_items())
         self.query_one(PlanDonut).set_items(self._items)
         self._refresh_header()
 
@@ -260,9 +254,6 @@ class PlanExecutionTab(TabPane):
                 )
                 break
         self.query_one(PlanDepGraph).set_items(self._items)
-        self.query_one(PlanStatusRail).post_message(
-            PlanStatusRail.ItemStatusChanged(event.item_id, event.status)
-        )
         self.query_one(PlanDonut).set_items(self._items)
         self._refresh_header()
 
@@ -272,16 +263,12 @@ class PlanExecutionTab(TabPane):
         self._verdict = event.verdict
         if event.terminal is not None:
             self._terminal = event.terminal
-        self.query_one(PlanStatusRail).set_verdict(event.verdict)
         self.query_one(PlanDonut).set_items(self._items)
         self._refresh_header()
 
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
-
-    def _rail_items(self) -> list[RailItem]:
-        return [RailItem(id=i.id, status=i.status) for i in self._items]
 
     def _refresh_header(self) -> None:
         header = self.query_one("#plan-exec-header-text", Static)
@@ -297,52 +284,74 @@ class PlanExecutionTab(TabPane):
         agent = (
             self._get_current_agent() if self._get_current_agent else _DEFAULT_AGENT
         )
-        phase = getattr(self._model, "phase", _phase_from_verdict(self._verdict))
-        first_line_parts = [slug]
-        if issue is not None:
-            first_line_parts.append(f"#{issue}")
-        first_line_parts.append(f"[{phase}]")
-        first_line_parts.append(self._verdict)
-        counters = [f"✓{done}/{total}"]
-        if running:
-            counters.append(f"◉{running}")
-        if failed:
-            counters.append(f"✗{failed}")
-        first_line_parts.append(" ".join(counters))
-        first_line_parts.append(f"agent: {agent}")
-        first_line = "  ".join(first_line_parts)
+        terminal = self._terminal
 
-        terminal_line = self._format_terminal_line()
-        if terminal_line:
-            return f"{first_line}\n{terminal_line}"
+        parts: list[str] = [slug]
+        if issue is not None:
+            parts.append(f"#{issue}")
+        parts.append(self._status_badge(terminal))
+        parts.append(f"{done}/{total}")
+        if terminal is None and running:
+            parts.append(f"◉{running}")
+        if failed:
+            parts.append(f"✗{failed}")
+        if terminal is not None and terminal.pr_number is not None:
+            parts.append(f"PR #{terminal.pr_number}")
+        if terminal is not None and terminal.elapsed_seconds is not None:
+            parts.append(_format_elapsed(terminal.elapsed_seconds))
+        parts.append(f"agent: {agent}")
+        first_line = "  ".join(parts)
+
+        details = self._format_terminal_details()
+        if details:
+            return f"{first_line}\n{details}"
         return first_line
 
-    def _format_terminal_line(self) -> str:
+    def _status_badge(self, terminal: "TerminalInfo | None") -> str:
+        """One-token state for the header — keeps the rail's signal at the top."""
+        if terminal is not None:
+            if terminal.status == "completed":
+                if terminal.result == "SHIP" or self._verdict == "SHIP":
+                    return "✓ Completed (SHIP)"
+                if terminal.result == "REVISE" or self._verdict == "REVISE":
+                    return "✗ Completed (REVISE)"
+                return "✓ Completed"
+            if terminal.status == "failed":
+                return f"✗ Failed ({self._verdict})" if self._verdict not in {
+                    "running", "FAILED"
+                } else "✗ Failed"
+            if terminal.status == "aborted":
+                return "⊘ Aborted"
+        # No terminal payload — the verdict alone may carry the result if a
+        # caller posted ``PlanFinished("SHIP")`` without building a snapshot.
+        if self._verdict == "SHIP":
+            return "✓ Completed (SHIP)"
+        if self._verdict == "REVISE":
+            return "✗ Completed (REVISE)"
+        if self._verdict in {"FAILED", "ABORTED"}:
+            return f"✗ {self._verdict.title()}"
+        # Live run: prefer model.phase (lowercased so existing fixtures stay
+        # green and the badge reads as a state, not a heading).
+        phase = getattr(self._model, "phase", _phase_from_verdict(self._verdict))
+        return f"⟲ {phase.lower()}" if phase else self._verdict
+
+    def _format_terminal_details(self) -> str:
+        """Second header line — only used when there's something extra to say."""
         terminal = self._terminal
         if terminal is None:
             return ""
         bits: list[str] = []
-        if terminal.pr_number is not None:
-            label = f"PR #{terminal.pr_number}"
-            if terminal.pr_url:
-                bits.append(f"{label}  {terminal.pr_url}")
-            else:
-                bits.append(label)
-        elif terminal.pr_url:
-            bits.append(f"PR  {terminal.pr_url}")
+        if terminal.pr_url:
+            bits.append(terminal.pr_url)
         if terminal.verification_status:
             verify = f"verify: {terminal.verification_status}"
             if terminal.verification_unchecked:
                 verify += f" ({terminal.verification_unchecked} unchecked)"
             bits.append(verify)
-        summary = (
-            f"{terminal.items_shipped}/{terminal.items_total} shipped"
-        )
         if terminal.items_reworked:
-            summary += f", {terminal.items_reworked} reworked"
-        bits.append(summary)
-        if terminal.elapsed_seconds is not None:
-            bits.append(f"elapsed: {_format_elapsed(terminal.elapsed_seconds)}")
+            bits.append(f"{terminal.items_reworked} reworked")
+        if terminal.review_iterations:
+            bits.append(f"{terminal.review_iterations} reviews")
         return "  ".join(bits)
 
 

@@ -663,7 +663,6 @@ def verify_plan_execution(verbose: bool = False) -> bool:
     from toad.data.plan_execution_model import PlanExecutionModel
     from toad.widgets.plan_execution_section import PlanExecutionSection
     from toad.widgets.plan_execution_tab import PlanExecutionTab
-    from toad.widgets.plan_status_rail import STATUS_GLYPHS, PlanStatusRail
     from toad.widgets.project_state_pane import ProjectStatePane
 
     class _LateTarget:
@@ -805,48 +804,31 @@ def verify_plan_execution(verbose: bool = False) -> bool:
                     # Bind the late target so model messages reach the tab.
                     late_target.target = tab
 
-                rails = pane.query(PlanStatusRail)
-                if len(rails) != 1:
+                # Header text replaces the status rail as the primary live
+                # signal — it carries the badge, the count and the active
+                # marker.
+                header_before = tab.header_text()
+                results["header_initial"] = header_before
+                if "running" not in header_before:
                     errors.append(
-                        f"expected 1 PlanStatusRail, found {len(rails)}"
+                        f"header missing 'running' state: {header_before!r}"
                     )
-                else:
-                    rail = rails.first()
-                    glyphs = rail.glyphs_plain()
-                    results["rail_glyphs"] = glyphs
-                    results["rail_verdict"] = rail.verdict_label()
-                    if len(glyphs) != 1:
-                        errors.append(
-                            f"status rail glyph count={len(glyphs)}, expected 1"
-                        )
-                    elif glyphs[0] != STATUS_GLYPHS["running"]:
-                        errors.append(
-                            f"glyph={glyphs[0]!r}, expected running "
-                            f"{STATUS_GLYPHS['running']!r}"
-                        )
-                    if rail.verdict_label() != "running":
-                        errors.append(
-                            f"verdict={rail.verdict_label()!r}, expected 'running'"
-                        )
+                if "0/1" not in header_before:
+                    errors.append(
+                        f"header missing '0/1' count: {header_before!r}"
+                    )
 
-                    # Mutate state.json — backstop interval (or watcher
-                    # event) should drive an ItemStatusChanged through to
-                    # the rail.
-                    _write_state(plans_dir, "done")
-                    await pilot.pause(3.0)
-
-                    glyphs_after = rail.glyphs_plain()
-                    results["rail_glyphs_after_mutation"] = glyphs_after
-                    if len(glyphs_after) != 1:
-                        errors.append(
-                            f"after mutation glyph count={len(glyphs_after)}, "
-                            f"expected 1"
-                        )
-                    elif glyphs_after[0] != STATUS_GLYPHS["done"]:
-                        errors.append(
-                            f"after mutation glyph={glyphs_after[0]!r}, "
-                            f"expected done {STATUS_GLYPHS['done']!r}"
-                        )
+                # Mutate state.json — backstop interval (or watcher event)
+                # should drive an ItemStatusChanged through to the header.
+                _write_state(plans_dir, "done")
+                await pilot.pause(3.0)
+                header_after = tab.header_text()
+                results["header_after_mutation"] = header_after
+                if "1/1" not in header_after:
+                    errors.append(
+                        f"after mutation header missing '1/1': "
+                        f"{header_after!r}"
+                    )
 
     asyncio.run(_run())
 
