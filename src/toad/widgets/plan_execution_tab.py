@@ -26,11 +26,13 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+import webbrowser
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.timer import Timer
-from textual.widgets import Static, TabPane
+from textual.widgets import Button, Static, TabPane
 
 from toad.directory_watcher import DirectoryChanged, DirectoryWatcher
 from toad.widgets.plan_dep_graph import DepGraphItem, PlanDepGraph
@@ -96,6 +98,24 @@ class PlanExecutionTab(TabPane):
         height: 2;
         margin: 0 1 0 0;
     }
+    PlanExecutionTab #plan-exec-header-row Button {
+        height: 1;
+        min-width: 5;
+        border: none;
+        background: $surface;
+        color: $text;
+        margin: 0 1 0 0;
+    }
+    PlanExecutionTab #plan-exec-header-row Button.hidden {
+        display: none;
+    }
+    PlanExecutionTab #plan-exec-pr-btn {
+        color: $accent;
+    }
+    PlanExecutionTab #plan-exec-close-btn {
+        min-width: 3;
+        color: $error;
+    }
     PlanExecutionTab Vertical.plan-exec-body {
         height: 1fr;
     }
@@ -115,6 +135,13 @@ class PlanExecutionTab(TabPane):
             super().__init__()
             self.item_id = item_id
             self.status = status
+
+    class CloseRequested(Message):
+        """User clicked the tab's close button."""
+
+        def __init__(self, slug: str) -> None:
+            super().__init__()
+            self.slug = slug
 
     class PlanFinished(Message):
         """Plan reached terminal state.
@@ -174,6 +201,7 @@ class PlanExecutionTab(TabPane):
         self._poll_timer = self.set_interval(
             _POLL_INTERVAL_SECONDS, self._model.poll_now
         )
+        self._refresh_pr_button()
 
     def on_unmount(self) -> None:
         if self._watcher is not None:
@@ -200,6 +228,17 @@ class PlanExecutionTab(TabPane):
                 yield PlanDonut(
                     items=self._items,
                     id="plan-exec-donut",
+                )
+                yield Button(
+                    "→ PR",
+                    id="plan-exec-pr-btn",
+                    classes="hidden",
+                    tooltip="Open the PR for this plan in your browser",
+                )
+                yield Button(
+                    "✕",
+                    id="plan-exec-close-btn",
+                    tooltip="Close this plan tab",
                 )
             yield PlanDepGraph(items=self._items, id="plan-exec-graph")
             yield PlanWorkerLogPane(
@@ -264,7 +303,18 @@ class PlanExecutionTab(TabPane):
         if event.terminal is not None:
             self._terminal = event.terminal
         self.query_one(PlanDonut).set_items(self._items)
+        self._refresh_pr_button()
         self._refresh_header()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "plan-exec-close-btn":
+            event.stop()
+            self.post_message(self.CloseRequested(self._model.slug))
+        elif event.button.id == "plan-exec-pr-btn":
+            event.stop()
+            url = self._terminal.pr_url if self._terminal else None
+            if url:
+                webbrowser.open(url)
 
     # ------------------------------------------------------------------
     # Internals
@@ -273,6 +323,17 @@ class PlanExecutionTab(TabPane):
     def _refresh_header(self) -> None:
         header = self.query_one("#plan-exec-header-text", Static)
         header.update(self._compute_header_text())
+
+    def _refresh_pr_button(self) -> None:
+        try:
+            btn = self.query_one("#plan-exec-pr-btn", Button)
+        except Exception:
+            return
+        has_pr = self._terminal is not None and bool(self._terminal.pr_url)
+        if has_pr:
+            btn.remove_class("hidden")
+        else:
+            btn.add_class("hidden")
 
     def _compute_header_text(self) -> str:
         slug = self._model.slug
@@ -336,18 +397,16 @@ class PlanExecutionTab(TabPane):
         return f"⟲ {phase.lower()}" if phase else self._verdict
 
     def _format_terminal_details(self) -> str:
-        """Second header line — only used when there's something extra to say."""
+        """Second header line — only used when there's something extra to say.
+
+        PR URL is reachable through the ``→ PR`` button, so it's not echoed
+        here. Verify state is intentionally hidden — it's advisory in the
+        engine and renders confusingly next to ``✓ Completed (SHIP)``.
+        """
         terminal = self._terminal
         if terminal is None:
             return ""
         bits: list[str] = []
-        if terminal.pr_url:
-            bits.append(terminal.pr_url)
-        if terminal.verification_status:
-            verify = f"verify: {terminal.verification_status}"
-            if terminal.verification_unchecked:
-                verify += f" ({terminal.verification_unchecked} unchecked)"
-            bits.append(verify)
         if terminal.items_reworked:
             bits.append(f"{terminal.items_reworked} reworked")
         if terminal.review_iterations:

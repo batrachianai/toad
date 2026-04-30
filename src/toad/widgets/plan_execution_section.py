@@ -307,9 +307,21 @@ class PlanExecutionSection(Vertical):
     # Empty-state list — open / mark-crashed / remove buttons
     # ------------------------------------------------------------------
 
+    @on(PlanExecutionTab.CloseRequested)
+    def _on_plan_close_requested(
+        self, event: PlanExecutionTab.CloseRequested
+    ) -> None:
+        event.stop()
+        self.close_tab(event.slug)
+
     @on(Button.Pressed)
     def _on_plan_list_button(self, event: Button.Pressed) -> None:
         btn_id = event.button.id or ""
+        # Buttons inside an open plan tab (close, open-PR) are handled in
+        # PlanExecutionTab — ignore them at the section level so we don't
+        # mis-route their presses through the empty-state list.
+        if btn_id.startswith("plan-exec-"):
+            return
         slug: str | None = None
         action: str | None = None
         for prefix, name in (
