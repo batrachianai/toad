@@ -55,6 +55,9 @@ class _StubModel:
     issue_number: int | None = None
     items: list[Any] = field(default_factory=list)
     verdict: str = "running"
+    plan_dir: Path = field(
+        default_factory=lambda: Path("/nonexistent-stub-plan")
+    )
     _unsub_calls: list[int] = field(default_factory=list)
 
     def subscribe_log(
@@ -66,6 +69,12 @@ class _StubModel:
             self._unsub_calls.append(item_id)
 
         return _unsubscribe
+
+    def poll_now(self) -> None:
+        return None
+
+    def set_target(self, target: Any) -> None:
+        del target
 
 
 def _make_factory() -> Callable[[str], _StubModel]:

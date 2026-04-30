@@ -33,6 +33,8 @@ back without the contradiction:
 
 Decision needed before re-enabling.
 
+- not visible now
+
 ### 2. PR button: open in browser vs. switch to in-TUI PR view?
 
 Today the button uses `webbrowser.open(pr_url)`. The TUI also has a PR
@@ -42,6 +44,8 @@ there instead — but it lists *all* PRs, not just this run's. Best path
 is probably both: primary action = browser; secondary = "show in PR
 list" with a filter.
 
+-  we should route to the tui pr view in state view. something clean. nice and local, dry, reuse, not awkward.
+
 ### 3. Close button visibility while a plan is still running
 
 Should `✕` close a *running* plan tab? Right now it always closes —
@@ -49,20 +53,30 @@ the orchestrator process is detached (tmux), so closing the tab does
 not stop the run. May need a confirm dialog if the run is still live.
 Easy follow-up.
 
+- yeah we can add a confirmation, stating the process will continue you are just closing the view. could we reopen if we request it to the agent?
+
 ### 4. Donut name vs. shape
 
 The widget is `PlanDonut` but renders a flat 2-row gauge. Kept the
 name to avoid churn on imports. Worth renaming in a sweep when
 nothing else is in flight.
 
+- rename it to progress bar or something more appropiare
+
 ### 5. Pre-existing test failures on develop
 
-Five tests in `tests/widgets/test_plan_execution_section.py` plus
-sixteen in `tests/test_gantt_timeline.py` and a handful in
-`tests/test_canon_sections.py` fail on `develop` independent of any
-recent work — `_StubModel` doesn't satisfy the
-`PlanExecutionModel` protocol (missing `plan_dir`), and the gantt
-fixtures look stale. Not blocking, but worth a clean-up pass.
+- ✅ **`test_plan_execution_section.py` (5 tests).** Fixed in this PR
+  by extending `_StubModel` to satisfy the full `PlanExecutionModel`
+  protocol (`plan_dir`, `poll_now`, `set_target`).
+- ⏭ **`test_gantt_timeline.py` (16 tests).** The render functions
+  changed signature — `render_bar_row` / `render_group_header` /
+  `render_gantt` now return single `Text` objects, not
+  `(label, track)` tuples — but the tests still unpack tuples. Needs
+  a wholesale rewrite. Deferred to its own PR; not blocking.
+- ⏭ **`test_canon_sections.py` (7 tests).** Tests assert that
+  `_render_log` emits the level token (`INFO`, `WARN`, …) inline,
+  but the current implementation only varies colour. Either
+  reintroduce the token or rewrite the assertions. Deferred.
 
 ## Abstract / placeholder implementations
 

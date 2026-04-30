@@ -26,21 +26,85 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-import webbrowser
-
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
+from textual.screen import ModalScreen
 from textual.timer import Timer
-from textual.widgets import Button, Static, TabPane
+from textual.widgets import Button, Label, Static, TabPane
 
+from toad.acp import messages as acp_messages
 from toad.directory_watcher import DirectoryChanged, DirectoryWatcher
 from toad.widgets.plan_dep_graph import DepGraphItem, PlanDepGraph
-from toad.widgets.plan_donut import PlanDonut
+from toad.widgets.plan_progress import PlanProgress
 from toad.widgets.plan_worker_log_pane import PlanWorkerLogPane
 
 if TYPE_CHECKING:
     from toad.data.plan_execution_model import TerminalInfo
+
+
+class _CloseRunningPlanModal(ModalScreen[bool]):
+    """Confirm closing a tab while the orchestrator run is still live.
+
+    The tmux session keeps running regardless — closing only hides the
+    view. This modal makes that explicit and lets the user back out.
+    """
+
+    DEFAULT_CSS = """
+    _CloseRunningPlanModal {
+        align: center middle;
+    }
+    _CloseRunningPlanModal #dialog {
+        width: 60;
+        height: auto;
+        max-height: 12;
+        padding: 1 2;
+        background: $panel;
+        border: thick $primary;
+    }
+    _CloseRunningPlanModal #dialog Label.title {
+        text-style: bold;
+        color: $text;
+        margin-bottom: 1;
+    }
+    _CloseRunningPlanModal #dialog Label.body {
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+    _CloseRunningPlanModal #dialog Horizontal {
+        height: auto;
+        align: right middle;
+    }
+    _CloseRunningPlanModal #dialog Button {
+        margin-left: 1;
+    }
+    """
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, slug: str) -> None:
+        super().__init__()
+        self._slug = slug
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label(f"Close “{self._slug}” view?", classes="title")
+            yield Label(
+                "The orchestrator process keeps running in tmux. Closing "
+                "only hides this tab — ask the agent to reopen it later "
+                "(e.g. “show me the plan tab”).",
+                classes="body",
+            )
+            with Horizontal():
+                yield Button("Cancel", id="cancel")
+                yield Button("Close view", id="confirm", variant="warning")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        self.dismiss(event.button.id == "confirm")
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
 
 
 _POLL_INTERVAL_SECONDS = 2.5
@@ -93,7 +157,7 @@ class PlanExecutionTab(TabPane):
         padding: 0 1;
         width: 1fr;
     }
-    PlanExecutionTab PlanDonut {
+    PlanExecutionTab PlanProgress {
         width: 12;
         height: 2;
         margin: 0 1 0 0;
@@ -225,7 +289,7 @@ class PlanExecutionTab(TabPane):
                     self._compute_header_text(),
                     id="plan-exec-header-text",
                 )
-                yield PlanDonut(
+                yield PlanProgress(
                     items=self._items,
                     id="plan-exec-donut",
                 )
@@ -276,7 +340,7 @@ class PlanExecutionTab(TabPane):
         event.stop()
         self._items = list(event.items)
         self.query_one(PlanDepGraph).set_items(self._items)
-        self.query_one(PlanDonut).set_items(self._items)
+        self.query_one(PlanProgress).set_items(self._items)
         self._refresh_header()
 
     def on_plan_execution_tab_item_status_changed(
@@ -293,7 +357,7 @@ class PlanExecutionTab(TabPane):
                 )
                 break
         self.query_one(PlanDepGraph).set_items(self._items)
-        self.query_one(PlanDonut).set_items(self._items)
+        self.query_one(PlanProgress).set_items(self._items)
         self._refresh_header()
 
     def on_plan_execution_tab_plan_finished(self, event: PlanFinished) -> None:
@@ -302,19 +366,42 @@ class PlanExecutionTab(TabPane):
         self._verdict = event.verdict
         if event.terminal is not None:
             self._terminal = event.terminal
-        self.query_one(PlanDonut).set_items(self._items)
+        self.query_one(PlanProgress).set_items(self._items)
         self._refresh_pr_button()
         self._refresh_header()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "plan-exec-close-btn":
             event.stop()
-            self.post_message(self.CloseRequested(self._model.slug))
+            self._handle_close()
         elif event.button.id == "plan-exec-pr-btn":
             event.stop()
-            url = self._terminal.pr_url if self._terminal else None
-            if url:
-                webbrowser.open(url)
+            self._open_pr_view()
+
+    def _open_pr_view(self) -> None:
+        """Switch the right pane to the in-TUI PR list, narrowed if possible."""
+        slug = self._model.slug
+        # Try to narrow to this run's PR by title — orch-engine titles PRs
+        # ``plan: <slug>``. If the user's PR-list filter doesn't match by
+        # substring it'll just open the unfiltered list.
+        filters: dict[str, Any] = {"title": slug} if slug else {}
+        context = {"filters": filters} if filters else None
+        self.post_message(acp_messages.OpenPanel("prs", context=context))
+
+    def _handle_close(self) -> None:
+        if self._terminal is not None:
+            # Plan already reached terminal — closing is harmless.
+            self.post_message(self.CloseRequested(self._model.slug))
+            return
+
+        def _on_dismiss(confirmed: bool | None) -> None:
+            if confirmed:
+                self.post_message(self.CloseRequested(self._model.slug))
+
+        self.app.push_screen(
+            _CloseRunningPlanModal(self._model.slug),
+            _on_dismiss,
+        )
 
     # ------------------------------------------------------------------
     # Internals

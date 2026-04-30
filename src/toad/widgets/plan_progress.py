@@ -1,16 +1,16 @@
-"""PlanDonut — compact 2-row progress gauge for the plan-execution header.
+"""PlanProgress — compact 2-row progress gauge for the plan-execution header.
 
 Two-row stacked layout:
 
-- Row 0 — segmented bar of fixed width. Each cell is coloured by the
-  plan item it represents (proportional mapping from cell index to
-  item index), so a glance at the bar shows the run's overall
-  composition: how many done, running, queued, failed.
-- Row 1 — bold percentage centered under the bar (``done/total``).
+- Row 0 — 12-cell segmented bar. Each cell is coloured by the plan
+  item it represents (proportional mapping from cell index to item
+  index), so a glance at the bar shows the run's overall composition:
+  how many done, running, queued, failed.
+- Row 1 — bold ``done/total <pct>%`` label centred under the bar.
 
-Despite the historical class name (the first cut was a circular donut)
-the widget is now a horizontal gauge — terminal cells aren't square so
-a real ring rendered poorly. The flat bar reads cleanly at any zoom.
+This widget started life as a circular donut; terminal cells aren't
+square, so the ring rendered lopsided. The flat horizontal gauge reads
+cleanly at any zoom.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from toad.widgets.plan_dep_graph import DepGraphItem
 from toad.widgets.plan_status_rail import STATUS_COLORS
 
 
-__all__ = ["PlanDonut"]
+__all__ = ["PlanProgress"]
 
 
 _BAR_WIDTH = 12
@@ -34,11 +34,11 @@ _EMPTY_COLOR = "grey30"
 _FALLBACK_COLOR = "white"
 
 
-class PlanDonut(Static):
+class PlanProgress(Static):
     """Compact 2-row gauge — segmented bar plus percent label."""
 
     DEFAULT_CSS = """
-    PlanDonut {
+    PlanProgress {
         width: 12;
         height: 2;
         background: $panel;
