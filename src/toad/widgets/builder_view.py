@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
@@ -55,12 +56,51 @@ def _status_bar(phase: str, status: str) -> str:
     return f"  Phase: {phase_text}    Status: {status_text}"
 
 
-def _render_log(entry: LogEntry) -> str:
-    """Format a single log entry with level-based coloring."""
+def _render_log(entry: LogEntry, *, now: datetime | None = None) -> str:
+    """Format a single log entry with level-based coloring.
+
+    Timestamp renders friendly: "just now" / "12s ago" / "4m ago" /
+    "17:12" / "Apr 30 17:12" depending on age. Falls back to the raw
+    timestamp's last 8 chars if it can't be parsed as ISO.
+    """
     color = LOG_LEVEL_COLORS.get(entry.level, "white")
-    ts = entry.timestamp[-8:] if entry.timestamp else ""
-    ts_markup = f"[dim]{ts}[/] " if ts else ""
+    ts = _format_friendly_timestamp(entry.timestamp, now=now)
+    ts_markup = f"[dim]{ts:<10}[/] " if ts else ""
     return f"  {ts_markup}[{color}]{entry.message}[/]"
+
+
+def _format_friendly_timestamp(
+    raw: str, *, now: datetime | None = None
+) -> str:
+    """Convert an ISO timestamp into a human-friendly relative/clock label."""
+    if not raw:
+        return ""
+    parsed = _parse_iso(raw)
+    if parsed is None:
+        # Last-resort: trim long timestamps to HH:MM:SS so the column stays narrow.
+        return raw[-8:] if len(raw) >= 8 else raw
+    current = now or datetime.now(timezone.utc)
+    delta = (current - parsed).total_seconds()
+    if delta < 5:
+        return "just now"
+    if delta < 60:
+        return f"{int(delta)}s ago"
+    if delta < 3600:
+        return f"{int(delta // 60)}m ago"
+    if delta < 86400:
+        return parsed.astimezone().strftime("%H:%M")
+    return parsed.astimezone().strftime("%b %d %H:%M")
+
+
+def _parse_iso(raw: str) -> datetime | None:
+    text = raw.replace("Z", "+00:00") if raw.endswith("Z") else raw
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _render_metrics(metrics: tuple[tuple[str, object], ...]) -> str:
@@ -177,9 +217,16 @@ class BuilderView(Widget, can_focus=True):
                 )
             )
         else:
-            widgets = [Static(_render_log(entry)) for entry in logs]
+            # Reverse so the newest entry sits at the top of the scroll
+            # area; older entries scroll down. The scroll position stays
+            # at home (0,0) by default which keeps the most recent line
+            # visible without yanking the user back when new lines land.
+            now = datetime.now(timezone.utc)
+            widgets = [
+                Static(_render_log(entry, now=now)) for entry in reversed(logs)
+            ]
             await scroll.mount_all(widgets)
-            scroll.scroll_end(animate=False)
+            scroll.scroll_home(animate=False)
 
         # Metrics
         metrics_widget = self.query_one("#builder-metrics", Static)
