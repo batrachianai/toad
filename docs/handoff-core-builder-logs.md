@@ -55,26 +55,28 @@ signals: 18          errors: 0
 games: 0             markets: 0
 ```
 
-`cycles` and `signals` are template-internal terminology. From a
-user's perspective those keys should describe outcomes:
+`cycles` and `signals` are template-internal terminology. Agreed
+user-facing names — natural language, no underscores:
 
-| Current key | Suggested key | Why |
-|-------------|---------------|-----|
-| `cycles`  | `passes` or `runs` | "How many times did the strategy run?" |
-| `signals` | `opportunities` or `signals_found` | What does a signal *mean* to the user? |
-| `games`   | `games_tracked` or `games` (keep) | Already clear if the audience knows the domain |
-| `markets` | `markets_checked` | Verb makes the count's meaning explicit |
-| `errors`  | `errors` (keep) | Already clear |
-| `mode`    | `mode` (keep) | Already clear |
+| Current key | New key       |
+|-------------|---------------|
+| `cycles`    | `runs`        |
+| `signals`   | `opportunities` |
+| `games`     | `games` (keep) |
+| `markets`   | `markets` (keep) |
+| `errors`    | `errors` (keep) |
+| `mode`      | `mode` (keep) |
 
 Keys are written to `state.metrics` as a flat dict by the strategy
 runner. Renaming is a one-line change wherever the metric is bumped
-(e.g. `state.metrics.cycles += 1` → `state.metrics.passes += 1`).
+(e.g. `state.metrics.cycles += 1` → `state.metrics.runs += 1`).
 
-If you want units alongside numbers — e.g. show
-`signals_found: 18 today` instead of `signals: 18` — encode the unit
-in the key (`signals_found_today`) or post a string value
-(`metrics.signals = "18 (last 1h)"`). The TUI renders strings as-is.
+**TUI-side stopgap already shipped (canon-tui ≥ 0.7.10).** Until core
+lands, the TUI renders the labels via an alias map in
+`src/toad/widgets/builder_view.py::METRIC_LABEL_ALIASES`. So the
+panel reads "Runs / Opportunities / Games / Markets / Errors / Mode"
+even if `state.metrics` still uses the old keys. Once core renames
+the keys, drop the obsolete entries from the alias map.
 
 ### 3. Optional: log levels
 

@@ -47,6 +47,32 @@ LOG_LEVEL_COLORS: dict[str, str] = {
 }
 
 
+# Core writes raw metric keys (cycles, signals, markets, …) into
+# state.metrics. The TUI applies these aliases at render time so the
+# panel reads naturally even before core renames the keys. When core
+# updates the key, drop the alias here.
+METRIC_LABEL_ALIASES: dict[str, str] = {
+    "cycles": "Runs",
+    "runs": "Runs",
+    "signals": "Opportunities",
+    "opportunities": "Opportunities",
+    "games": "Games",
+    "markets": "Markets",
+    "errors": "Errors",
+    "mode": "Mode",
+}
+
+
+def _humanize_metric_key(raw: str) -> str:
+    """Map a core-written metric key to its user-facing label."""
+    aliased = METRIC_LABEL_ALIASES.get(raw.lower())
+    if aliased is not None:
+        return aliased
+    # Fallback: turn snake_case / kebab-case into Title Case so unknown
+    # keys still look intentional.
+    return raw.replace("_", " ").replace("-", " ").strip().title() or raw
+
+
 def _status_bar(phase: str, status: str) -> str:
     """Render phase + status as a single-line bar."""
     phase_color = PHASE_COLORS.get(phase, "dim")
@@ -104,11 +130,11 @@ def _parse_iso(raw: str) -> datetime | None:
 
 
 def _render_metrics(metrics: tuple[tuple[str, object], ...]) -> str:
-    """Render metrics as a key-value grid."""
+    """Render metrics as a key-value grid with humanised labels."""
     if not metrics:
         return "  [dim]No metrics[/]"
     lines: list[str] = []
-    pairs = list(metrics)
+    pairs = [(_humanize_metric_key(k), v) for k, v in metrics]
     for i in range(0, len(pairs), 2):
         k1, v1 = pairs[i]
         left = f"  [bold]{k1}:[/] {v1}"
