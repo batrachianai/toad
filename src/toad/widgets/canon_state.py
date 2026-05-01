@@ -85,7 +85,9 @@ def _parse_state(
         LogEntry(
             level=entry.get("level", "info"),
             message=entry.get("msg", entry.get("message", "")),
-            timestamp=entry.get("timestamp", ""),
+            # Core writes "ts"; older fixtures used "timestamp". Accept either
+            # so the State view shows friendly relative times either way.
+            timestamp=entry.get("ts") or entry.get("timestamp") or "",
         )
         for entry in logs_raw
     )
