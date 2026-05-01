@@ -347,5 +347,104 @@ def about() -> None:
     print(about.render(app))
 
 
+_CANON_GIT_URL = "git+https://github.com/DEGAorg/canon-tui.git"
+
+
+@main.command("update")
+@click.option(
+    "--branch",
+    default="main",
+    show_default=True,
+    help="Branch (or tag) to install from the canon-tui repo.",
+)
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Print local + remote versions without installing.",
+)
+def update(branch: str, check: bool) -> None:
+    """Update canon to the latest published build from GitHub."""
+    import shutil
+    import subprocess
+
+    from toad import get_version
+
+    local_version = get_version()
+
+    if check:
+        click.echo(f"Local:  canon-tui {local_version}")
+        remote = _fetch_remote_version(branch)
+        click.echo(
+            f"Remote: canon-tui {remote} (branch={branch})"
+            if remote
+            else f"Remote: unknown (could not fetch pyproject.toml @ {branch})"
+        )
+        return
+
+    if shutil.which("uv") is None:
+        click.echo(
+            "error: uv is not on PATH. Install uv first: "
+            "curl -LsSf https://astral.sh/uv/install.sh | sh",
+            err=True,
+        )
+        sys.exit(1)
+
+    spec = f"canon-tui @ {_CANON_GIT_URL}@{branch}"
+    click.echo(f"Updating from {branch} (local: {local_version})…")
+    try:
+        subprocess.run(
+            ["uv", "tool", "install", spec, "--force", "--reinstall"],
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        click.echo(f"error: uv tool install failed (exit {exc.returncode})", err=True)
+        sys.exit(exc.returncode)
+
+    new_version = _read_installed_version()
+    if new_version and new_version != local_version:
+        click.echo(f"updated: {local_version} → {new_version}")
+    elif new_version:
+        click.echo(f"already up to date: {new_version}")
+    else:
+        click.echo("update complete (version check failed)")
+
+
+def _fetch_remote_version(branch: str) -> str | None:
+    """Best-effort read of the remote pyproject.toml version field."""
+    import re
+    import urllib.error
+    import urllib.request
+
+    url = (
+        "https://raw.githubusercontent.com/DEGAorg/canon-tui/"
+        f"{branch}/pyproject.toml"
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return None
+    match = re.search(r'^version\s*=\s*"([^"]+)"', body, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _read_installed_version() -> str | None:
+    """Read the version of the canon-tui install that's currently on PATH."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["canon", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    out = (result.stdout or "").strip() or (result.stderr or "").strip()
+    return out or None
+
+
 if __name__ == "__main__":
     main()
