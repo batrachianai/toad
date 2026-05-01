@@ -1,6 +1,10 @@
 from typing import Literal, Mapping
 import platform
 
+from toad._textual_key_patch import apply as _apply_textual_key_patch
+
+_apply_textual_key_patch()
+
 NAME = "canon"
 TITLE = "Canon"
 

@@ -7,8 +7,9 @@ plan-execution widgets already handle:
 - :class:`toad.widgets.plan_execution_tab.PlanExecutionTab.ItemStatusChanged`
   whenever an item's ``status`` field flips,
 - :class:`toad.widgets.plan_execution_tab.PlanExecutionTab.PlanFinished`
-  the first time ``finalReview.verdict`` reaches a terminal value
-  (``SHIP`` or ``REVISE``),
+  the first time the plan reaches a terminal state — either
+  ``finalReview.result`` becomes ``SHIP``/``REVISE`` or top-level
+  ``status`` becomes ``completed``/``failed``/``aborted``,
 - log chunks delivered through callbacks registered via
   :meth:`subscribe_log` — the path the
   :class:`toad.widgets.plan_worker_log_pane.PlanWorkerLogPane` already
@@ -31,6 +32,8 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -38,11 +41,34 @@ from toad.widgets.plan_dep_graph import DepGraphItem
 from toad.widgets.plan_execution_tab import PlanExecutionTab
 
 
-__all__ = ["PlanExecutionModel"]
+__all__ = ["PlanExecutionModel", "TerminalInfo"]
 
 
 _TERMINAL_VERDICTS = frozenset({"SHIP", "REVISE"})
+_TERMINAL_STATUSES = frozenset({"completed", "failed", "aborted"})
 _DEFAULT_VERDICT = "running"
+_PHASE_RUNNING = "Running"
+_PHASE_REVIEW = "Review"
+_PHASE_VERIFY = "Verify"
+_PHASE_DONE = "Done"
+_PHASE_FAILED = "Failed"
+
+
+@dataclass(frozen=True)
+class TerminalInfo:
+    """Snapshot of a plan's terminal state — what the panel renders on completion."""
+
+    status: str  # "completed" | "failed" | "aborted"
+    result: str | None  # "SHIP" | "REVISE" | None (engine bailed before review)
+    pr_url: str | None
+    pr_number: int | None
+    verification_status: str | None  # "passed" | "failed" | None
+    verification_unchecked: int
+    items_shipped: int
+    items_reworked: int
+    items_total: int
+    elapsed_seconds: float | None
+    review_iterations: int
 
 
 class _MessageTarget(Protocol):
@@ -70,6 +96,10 @@ class PlanExecutionModel:
         self._issue_number: int | None = None
         self._items: list[DepGraphItem] = []
         self._verdict: str = _DEFAULT_VERDICT
+        self._status: str = "running"
+        self._phase: str = _PHASE_RUNNING
+        self._final_review_status: str = "pending"
+        self._terminal: TerminalInfo | None = None
         self._finished_emitted: bool = False
         self._started: bool = False
 
@@ -102,6 +132,21 @@ class PlanExecutionModel:
     @property
     def verdict(self) -> str:
         return self._verdict
+
+    @property
+    def status(self) -> str:
+        """Top-level orch status — running / verifying / completed / failed / aborted."""
+        return self._status
+
+    @property
+    def phase(self) -> str:
+        """Human-readable phase label: Running / Review / Verify / Done / Failed."""
+        return self._phase
+
+    @property
+    def terminal(self) -> TerminalInfo | None:
+        """Snapshot of terminal state once the plan has finished. ``None`` while running."""
+        return self._terminal
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -171,11 +216,11 @@ class PlanExecutionModel:
         issue = payload.get("issueNumber")
         self._issue_number = int(issue) if isinstance(issue, int) else None
         self._items = [self._item_from_dict(it) for it in payload.get("items", [])]
-        verdict = self._extract_verdict(payload)
-        self._verdict = verdict
-        if verdict in _TERMINAL_VERDICTS:
+        self._absorb_state_meta(payload)
+        if self._is_terminal():
             # Treat plans that are already terminal at construction as
             # having been announced — we don't replay history.
+            self._terminal = self._build_terminal_info(payload)
             self._finished_emitted = True
 
     def _scan_state(self) -> None:
@@ -191,12 +236,121 @@ class PlanExecutionModel:
                     PlanExecutionTab.ItemStatusChanged(item.id, item.status)
                 )
         self._items = new_items
-
-        verdict = self._extract_verdict(payload)
-        self._verdict = verdict
-        if verdict in _TERMINAL_VERDICTS and not self._finished_emitted:
+        self._absorb_state_meta(payload)
+        if self._is_terminal() and not self._finished_emitted:
+            self._terminal = self._build_terminal_info(payload)
             self._finished_emitted = True
-            self._target.post_message(PlanExecutionTab.PlanFinished(verdict))
+            self._target.post_message(
+                PlanExecutionTab.PlanFinished(self._verdict, terminal=self._terminal)
+            )
+
+    def _absorb_state_meta(self, payload: dict[str, Any]) -> None:
+        """Refresh status, finalReview.result, finalReview.status, derived phase."""
+        status = payload.get("status")
+        self._status = status if isinstance(status, str) and status else "running"
+        review = payload.get("finalReview")
+        if isinstance(review, dict):
+            result = review.get("result")
+            review_status = review.get("status")
+        else:
+            result = None
+            review_status = None
+        self._final_review_status = (
+            review_status if isinstance(review_status, str) and review_status else "pending"
+        )
+        if isinstance(result, str) and result:
+            self._verdict = result
+        elif self._status in _TERMINAL_STATUSES and self._status != "completed":
+            # Engine bailed without a final review — surface the status as the verdict
+            # so the rail badge has something distinct to colour.
+            self._verdict = self._status.upper()
+        else:
+            self._verdict = _DEFAULT_VERDICT
+        self._phase = self._derive_phase()
+
+    def _is_terminal(self) -> bool:
+        if self._status in _TERMINAL_STATUSES:
+            return True
+        if self._verdict in _TERMINAL_VERDICTS:
+            return True
+        return False
+
+    def _derive_phase(self) -> str:
+        if self._status == "completed":
+            return _PHASE_DONE
+        if self._status in {"failed", "aborted"}:
+            return _PHASE_FAILED
+        if self._status == "verifying":
+            return _PHASE_VERIFY
+        if self._final_review_status == "running":
+            return _PHASE_REVIEW
+        if any(item.status == "review" for item in self._items):
+            return _PHASE_REVIEW
+        return _PHASE_RUNNING
+
+    def _build_terminal_info(self, payload: dict[str, Any]) -> TerminalInfo:
+        review = payload.get("finalReview") if isinstance(payload, dict) else None
+        review = review if isinstance(review, dict) else {}
+        verification = payload.get("verification") if isinstance(payload, dict) else None
+        verification = verification if isinstance(verification, dict) else {}
+
+        result = review.get("result") if isinstance(review.get("result"), str) else None
+        pr_url = review.get("prUrl") if isinstance(review.get("prUrl"), str) else None
+        pr_number_raw = review.get("prNumber")
+        pr_number = int(pr_number_raw) if isinstance(pr_number_raw, int) else None
+
+        rework_items = review.get("reworkItems")
+        items_reworked = (
+            len(rework_items)
+            if isinstance(rework_items, list)
+            else 0
+        )
+        items_shipped = sum(1 for it in self._items if it.status == "done")
+
+        review_iters_raw = payload.get("reviewIterations")
+        review_iterations = (
+            int(review_iters_raw) if isinstance(review_iters_raw, int) else 0
+        )
+
+        verification_status_raw = verification.get("status")
+        verification_status = (
+            verification_status_raw
+            if isinstance(verification_status_raw, str) and verification_status_raw
+            else None
+        )
+        unchecked = verification.get("unchecked")
+        if isinstance(unchecked, list):
+            verification_unchecked = len(unchecked)
+        elif isinstance(unchecked, int):
+            verification_unchecked = unchecked
+        else:
+            verification_unchecked = 0
+
+        elapsed = self._elapsed_seconds(payload)
+
+        return TerminalInfo(
+            status=self._status,
+            result=result,
+            pr_url=pr_url,
+            pr_number=pr_number,
+            verification_status=verification_status,
+            verification_unchecked=verification_unchecked,
+            items_shipped=items_shipped,
+            items_reworked=items_reworked,
+            items_total=len(self._items),
+            elapsed_seconds=elapsed,
+            review_iterations=review_iterations,
+        )
+
+    @staticmethod
+    def _elapsed_seconds(payload: dict[str, Any]) -> float | None:
+        started = payload.get("startedAt") if isinstance(payload, dict) else None
+        updated = payload.get("updatedAt") if isinstance(payload, dict) else None
+        start_dt = _parse_iso(started)
+        end_dt = _parse_iso(updated)
+        if start_dt is None or end_dt is None:
+            return None
+        return max(0.0, (end_dt - start_dt).total_seconds())
 
     def _scan_logs(self) -> None:
         with self._lock:
@@ -238,15 +392,6 @@ class PlanExecutionModel:
         return data if isinstance(data, dict) else None
 
     @staticmethod
-    def _extract_verdict(payload: dict[str, Any]) -> str:
-        review = payload.get("finalReview")
-        if isinstance(review, dict):
-            value = review.get("verdict")
-            if isinstance(value, str) and value:
-                return value
-        return _DEFAULT_VERDICT
-
-    @staticmethod
     def _item_from_dict(data: dict[str, Any]) -> DepGraphItem:
         return DepGraphItem(
             id=int(data["id"]),
@@ -254,3 +399,17 @@ class PlanExecutionModel:
             status=str(data.get("status", "queued")),
             deps=tuple(int(d) for d in data.get("deps", [])),
         )
+
+
+def _parse_iso(raw: object) -> datetime | None:
+    """Parse an ISO-8601 timestamp (with optional trailing 'Z') to UTC."""
+    if not isinstance(raw, str) or not raw:
+        return None
+    text = raw.replace("Z", "+00:00") if raw.endswith("Z") else raw
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)

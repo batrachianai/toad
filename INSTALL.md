@@ -57,8 +57,20 @@ canon-ctl        # Manage Canon TUI configuration
 
 ## Updating
 
-Run `/apply-canon-tui` from any directory, or:
+Once canon is installed, the easiest path is the built-in command:
 
 ```bash
+canon update              # pull + reinstall from main
+canon update --check      # show local vs remote version, no install
+canon update --branch develop  # install from a different branch / tag
+```
+
+Equivalent manual paths if you'd rather not use the subcommand:
+
+```bash
+# Slash command (works from any directory in your AI agent harness):
+/apply-canon-tui
+
+# Raw uv invocation:
 uv tool install "canon-tui @ git+https://github.com/DEGAorg/canon-tui.git@main" --force --reinstall
 ```

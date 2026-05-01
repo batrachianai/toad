@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -40,12 +41,21 @@ class _StubModel:
     issue_number: int | None = 7
     items: list[Any] = field(default_factory=list)
     verdict: str = "running"
+    plan_dir: Path = field(
+        default_factory=lambda: Path("/nonexistent-stub-plan")
+    )
 
     def subscribe_log(
         self, item_id: int, callback: Callable[[str], None]
     ) -> Callable[[], None]:
         del item_id, callback
         return lambda: None
+
+    def poll_now(self) -> None:
+        return None
+
+    def set_target(self, target: Any) -> None:
+        del target
 
 
 def _factory(slug: str) -> _StubModel:

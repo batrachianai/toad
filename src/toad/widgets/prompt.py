@@ -99,25 +99,18 @@ See on-screen instructions for details.
     BINDINGS = [
         Binding(
             "enter",
-            "submit",
+            "enter_pressed",
             "Send",
             key_display="⏎",
             priority=True,
-            tooltip="Send the prompt to the agent",
+            tooltip="Single-line: send. Multi-line: insert newline.",
         ),
         Binding(
-            "ctrl+j,shift+enter",
-            "newline",
+            "alt+enter,ctrl+j,shift+enter",
+            "shift_enter_pressed",
             "Line",
-            key_display="⇧+⏎",
-            tooltip="Insert a new line character",
-        ),
-        Binding(
-            "ctrl+j,shift+enter",
-            "multiline_submit",
-            "Send",
-            key_display="⇧+⏎",
-            tooltip="Send the prompt to the agent",
+            key_display="⌥+⏎",
+            tooltip="Single-line: insert newline. Multi-line: send.",
         ),
         Binding(
             "tab",
@@ -228,14 +221,11 @@ See on-screen instructions for details.
                     if self.text not in completes:
                         self.suggestion = completes[-1]
 
-    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        if action == "newline" and self.multi_line:
-            return False
-        if action == "submit" and self.multi_line:
-            return False
-        if action == "multiline_submit":
-            return self.multi_line
-        return True
+    def action_enter_pressed(self) -> None:
+        self.action_submit()
+
+    def action_shift_enter_pressed(self) -> None:
+        self.action_newline()
 
     def action_multiline_submit(self) -> None:
         if not self.agent_ready:

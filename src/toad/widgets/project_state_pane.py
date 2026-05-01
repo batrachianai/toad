@@ -523,22 +523,26 @@ class ProjectStatePane(Vertical):
         self._sync_outreach_timer(section_id, visible=True)
 
     def show_single_section(self, section_id: str) -> None:
-        """Show ``section_id`` and hide all other sections (accordion)."""
+        """Show ``section_id`` and hide every other section (accordion).
+
+        Iterates ``self._sections`` (the live list) so dynamically-added
+        sections — Outreach when its provider is detected, Plans when
+        the orchestrator is configured — participate in the toggle the
+        same way as the static Context / Planning / State trio.
+        """
+        # The plan-exec section is mounted lazily; ensure it exists if
+        # the user clicks its toolbar button before any plan is opened.
+        if section_id == PlanExecutionSection.SECTION_ID:
+            self._ensure_plan_exec_section()
         for sec in self._sections:
             visible = sec.section_id == section_id
-            widget = self.query_one(f"#{sec.section_id}")
+            try:
+                widget = self.query_one(f"#{sec.section_id}")
+            except NoMatches:
+                continue
             widget.display = visible
             self._sync_timeline_timer(sec.section_id, visible=visible)
             self._sync_outreach_timer(sec.section_id, visible=visible)
-        self._sync_toolbar()
-
-    def show_single_section(self, section_id: str) -> None:
-        """Show ``section_id`` and hide all other sections (accordion)."""
-        for sec in SECTIONS:
-            visible = sec.section_id == section_id
-            widget = self.query_one(f"#{sec.section_id}")
-            widget.display = visible
-            self._sync_timeline_timer(sec.section_id, visible=visible)
         self._sync_toolbar()
 
     def hide_section(self, section_id: str) -> None:
