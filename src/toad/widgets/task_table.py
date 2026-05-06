@@ -40,15 +40,17 @@ _PRIORITY_LABELS: dict[Priority, str] = {
 # header; the second is a lambda (task) → cell string.
 COLUMN_SETS: dict[str, tuple[tuple[str, Any], ...]] = {
     "all": (
+        ("#", lambda t: f"#{t.number}"),
         ("Status", lambda t: _format_status(t.status)),
-        ("Title", lambda t: _truncate(t.title, 60)),
+        ("Title", lambda t: _truncate(t.title, 55)),
         ("Milestone", lambda t: t.milestone_title),
         ("Priority", lambda t: _format_priority(t.priority)),
         ("Assignee", lambda t: _format_assignees(t.assignees)),
     ),
     "plan": (
+        ("#", lambda t: f"#{t.number}"),
         ("Status", lambda t: _format_status(t.status)),
-        ("Title", lambda t: _truncate(t.title, 50)),
+        ("Title", lambda t: _truncate(t.title, 45)),
         ("Progress", lambda t: _format_progress(t.progress_pct)),
         ("Milestone", lambda t: t.milestone_title),
         ("Priority", lambda t: _format_priority(t.priority)),
@@ -62,15 +64,17 @@ COLUMN_SETS: dict[str, tuple[tuple[str, Any], ...]] = {
         ("Author", lambda t: t.author or ""),
     ),
     "bug": (
+        ("#", lambda t: f"#{t.number}"),
         ("Status", lambda t: _format_status(t.status)),
-        ("Title", lambda t: _truncate(t.title, 55)),
+        ("Title", lambda t: _truncate(t.title, 50)),
         ("Priority", lambda t: _format_priority(t.priority)),
         ("Assignee", lambda t: _format_assignees(t.assignees)),
         ("Age", lambda t: _format_age(t.created_at)),
     ),
     "feature": (
+        ("#", lambda t: f"#{t.number}"),
         ("Status", lambda t: _format_status(t.status)),
-        ("Title", lambda t: _truncate(t.title, 55)),
+        ("Title", lambda t: _truncate(t.title, 50)),
         ("Milestone", lambda t: t.milestone_title),
         ("Priority", lambda t: _format_priority(t.priority)),
         ("Assignee", lambda t: _format_assignees(t.assignees)),
