@@ -22,8 +22,7 @@ github:
   pr_target: canon
 
 timeline:
-  repo: DEGAorg/claude-code-config
-  project_number: 8
+  repo: DEGAorg/canon-tui
 
 success_criteria:
   - "tests pass"

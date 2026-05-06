@@ -65,10 +65,14 @@ def _read_timeline_config(
         tl = config.get("timeline", {})
         repo = tl.get("repo")
         project_number = tl.get("project_number")
-        if repo and project_number is not None:
+        if repo:
             return {
                 "repo": str(repo),
-                "project_number": int(project_number),
+                "project_number": (
+                    int(project_number)
+                    if project_number is not None
+                    else None
+                ),
             }
     except Exception as exc:
         log.warning("Failed to read timeline config: %s", exc)

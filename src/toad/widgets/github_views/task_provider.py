@@ -204,7 +204,7 @@ class TaskProvider:
         project_number: GitHub Projects V2 board number.
     """
 
-    def __init__(self, repo: str, project_number: int) -> None:
+    def __init__(self, repo: str, project_number: int | None) -> None:
         if "/" not in repo:
             msg = f"repo must be owner/name, got: {repo!r}"
             raise ValueError(msg)
@@ -344,6 +344,8 @@ class TaskProvider:
             return []
 
     async def _fetch_project_data(self) -> dict[str, Any]:
+        if self._project_number is None:
+            return {}
         raw = await _run_gh(
             "api",
             "graphql",

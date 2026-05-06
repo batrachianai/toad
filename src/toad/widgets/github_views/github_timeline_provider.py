@@ -143,7 +143,7 @@ class GitHubTimelineProvider:
         project_number: GitHub Projects V2 board number.
     """
 
-    def __init__(self, repo: str, project_number: int) -> None:
+    def __init__(self, repo: str, project_number: int | None) -> None:
         if "/" not in repo:
             msg = f"repo must be owner/name, got: {repo!r}"
             raise ValueError(msg)
@@ -240,6 +240,8 @@ class GitHubTimelineProvider:
 
     async def fetch_fields(self) -> list[ProviderField]:
         """Fetch project board field metadata (cached per session)."""
+        if self._project_number is None:
+            return []
         if self._cached_fields is not None:
             return self._cached_fields
 
@@ -300,8 +302,16 @@ class GitHubTimelineProvider:
         import asyncio
 
         issues_task = asyncio.create_task(self._fetch_issues())
-        project_task = asyncio.create_task(self._fetch_project_data())
-        issues, project = await asyncio.gather(issues_task, project_task)
+        if self._project_number is not None:
+            project_task = asyncio.create_task(
+                self._fetch_project_data()
+            )
+            issues, project = await asyncio.gather(
+                issues_task, project_task
+            )
+        else:
+            issues = await issues_task
+            project = {}
         return issues, project
 
     async def _fetch_issues(self) -> list[dict[str, Any]]:
@@ -323,6 +333,8 @@ class GitHubTimelineProvider:
 
     async def _fetch_project_data(self) -> dict[str, Any]:
         """Fetch project board items and fields via GraphQL."""
+        if self._project_number is None:
+            return {}
         raw = await _run_gh(
             "api",
             "graphql",
