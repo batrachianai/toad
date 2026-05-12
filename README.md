@@ -284,14 +284,14 @@ To discuss Toad, see the Discussions tab, or join the #toad channel on the [Text
 
 Some planned features:
 
-- UI for MCP servers
-- Expose model selection (waiting on ACP update)
-- Sessions (resume)
-- Multiple agents
-- Windows native support
-- Builtin editor
-- Sidebar (widgets)
-  - Git pending changes
+- [ ] UI for MCP servers
+- [ ] Expose model selection (waiting on ACP update)
+- [x] Sessions (resume)
+- [x] Multiple agents
+- [ ] Windows native support
+- [ ] Builtin editor
+- [ ] Sidebar (widgets)
+  - [ ] Git pending changes
 
 ### Reporting bugs
 
