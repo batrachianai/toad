@@ -41,7 +41,6 @@ from toad.agent_schema import Agent as AgentData
 from toad.acp import messages as acp_messages
 from toad.app import ToadApp
 from toad.acp import protocol as acp_protocol
-from toad.acp.agent import Mode
 from toad.answer import Answer
 from toad.agent import AgentBase, AgentReady, AgentFail
 from toad.format_path import format_path
@@ -62,7 +61,7 @@ from toad.menus import MenuItem
 from toad.widgets.shell_terminal import ShellTerminal
 
 if TYPE_CHECKING:
-    from toad.session_tracker import SessionState
+    from toad.acp.agent import Mode
     from toad.widgets.terminal import Terminal
     from toad.widgets.agent_response import AgentResponse
     from toad.widgets.agent_thought import AgentThought

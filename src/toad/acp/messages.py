@@ -11,9 +11,9 @@ import rich.repr
 from toad.answer import Answer
 from toad.acp import protocol
 from toad.acp.encode_tool_call_id import encode_tool_call_id
-from toad.acp.agent import Mode
 
 if TYPE_CHECKING:
+    from toad.acp.agent import Mode
     from toad.widgets.terminal_tool import ToolState
 
 

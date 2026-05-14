@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from pathlib import Path
 import shlex
-from typing import Callable, Literal, Self
+from typing import TYPE_CHECKING, Callable, Literal, Self
 
 from textual import on
 from textual.reactive import var, Initialize
@@ -30,8 +32,10 @@ from toad.widgets.slash_complete import SlashComplete
 from toad.messages import UserInputSubmitted
 from toad.slash_command import SlashCommand
 from toad.prompt.extract import extract_paths_from_prompt
-from toad.acp.agent import Mode
 from toad.path_complete import PathComplete
+
+if TYPE_CHECKING:
+    from toad.acp.agent import Mode
 
 
 class ModeSwitcher(OptionList):
