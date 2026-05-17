@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.6.18] - 2026-05-17
+
+### Fixed
+
+- Fixed issue that affected OpenCode
+
 ## [0.6.17] - 2026-05-14
 
 ### Fixed
@@ -433,6 +440,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release. This document will be updated for subsequent releases.
 
+
+[0.6.18]: https://github.com/batrachianai/toad/compare/v0.6.17...v0.6.18
 [0.6.17]: https://github.com/batrachianai/toad/compare/v0.6.16...v0.6.17
 [0.6.16]: https://github.com/batrachianai/toad/compare/v0.6.15...v0.6.16
 [0.6.15]: https://github.com/batrachianai/toad/compare/v0.6.14...v0.6.15
