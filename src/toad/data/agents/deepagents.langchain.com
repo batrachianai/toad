@@ -10,7 +10,7 @@ publisher_url = "https://www.langchain.com/"
 type = "coding"
 description = "LangChain's open-source terminal coding agent built on LangGraph. File operations, shell access, sub-agents, and MCP tool support."
 tags = ["open-source"]
-run_command."*" = "deepagents --acp"
+run_command."*" = "deepagents-code --acp"
 
 help = '''
 # Deep Agents
