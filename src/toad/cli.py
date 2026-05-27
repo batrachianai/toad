@@ -38,7 +38,8 @@ async def get_agent_data(launch_agent) -> Agent | None:
     from toad.agents import read_agents, AgentReadError
 
     try:
-        agents = await read_agents()
+        result = await read_agents()
+        agents = result.agents
     except AgentReadError:
         agents = {}
 
