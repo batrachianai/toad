@@ -1,0 +1,32 @@
+# Schema defined in agent_schema.py
+
+identity = "agent.minimax.io"
+name = "MiniMax Code"
+short_name = "mcode"
+url = "https://agent.minimax.io"
+protocol = "acp"
+author_name = "MiniMax"
+author_url = "https://www.minimax.io"
+publisher_name = "SaladDay"
+publisher_url = "https://github.com/SaladDay"
+type = "coding"
+description = "MiniMax Code is a coding agent for your terminal."
+tags = []
+run_command."*" = "mcode acp"
+
+help = '''
+# MiniMax Code
+
+MiniMax Code is a coding agent for your terminal.
+
+Follow the [CLI installation instructions](https://www.npmjs.com/package/@minimax-ai/code), including the Node.js requirements and npm script permissions. Run `mcode login` in a terminal before connecting.
+
+'''
+
+[actions."*".install]
+command = "npm install -g @minimax-ai/code --allow-scripts=@minimax-ai/code,better-sqlite3"
+description = "Install MiniMax Code"
+
+[actions."*".update]
+command = "npm install -g @minimax-ai/code@latest --allow-scripts=@minimax-ai/code,better-sqlite3"
+description = "Upgrade MiniMax Code"
