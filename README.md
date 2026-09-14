@@ -38,7 +38,7 @@ See [Getting Started](#getting-started) if you have any problems.
 
 ## What is Toad?
 
-Toad is an interface to coding agents, such as Claude, Gemini, Codex, OpenHand, and many more. 
+Toad is an interface to coding agents, such as Claude, Gemini, Codex, OpenHand, [MiniMax Code](https://agent.minimax.io), and many more.
 
 Toad blends a traditional shell based workflow and powerful agentic AI, with an intuitive Terminal User Interface.
 
