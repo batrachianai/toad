@@ -68,3 +68,7 @@ class Agent(TypedDict):
     """Command to run the agent, by OS or wildcard."""
     actions: dict[OS, dict[Action, Command]]
     """Scripts to perform actions, typically at least to install the agent."""
+    acp_version: NotRequired[int]
+    """Preferred ACP protocol version (see `toad.acp.handshake.SUPPORTED_VERSIONS`;
+    defaults to `DEFAULT_VERSION`). If the agent doesn't support it, Toad falls back to
+    v1. For agents launched with `toad acp`, set it with `--acp-version`."""

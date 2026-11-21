@@ -3,6 +3,7 @@ import sys
 import click
 from toad.app import ToadApp
 from toad.agent_schema import Agent
+from toad.acp import handshake as acp_handshake
 
 
 def set_process_title(title: str) -> None:
@@ -190,6 +191,13 @@ def run(
     help="Host to use in conjunction with --serve",
 )
 @click.option("-s", "--serve", is_flag=True, help="Serve Toad as a web application")
+@click.option(
+    "--acp-version",
+    metavar="VERSION",
+    type=click.Choice(acp_handshake.SUPPORTED_VERSIONS),
+    default=None,
+    help="ACP protocol version to request (falls back to v1 if unsupported)",
+)
 def acp(
     command: str,
     host: str,
@@ -197,6 +205,7 @@ def acp(
     title: str | None,
     project_dir: str | None,
     serve: bool = False,
+    acp_version: int | None = None,
 ) -> None:
     """Run an ACP agent from a command."""
 
@@ -224,6 +233,8 @@ def acp(
         "run_command": {"*": command},
         "actions": {},
     }
+    if acp_version is not None:
+        agent_data["acp_version"] = acp_version
     if serve:
         import shlex
         from textual_serve.server import Server
@@ -231,6 +242,8 @@ def acp(
         command_components = [sys.argv[0], "acp", command]
         if project_dir:
             command_components.append(f"--project-dir={project_dir}")
+        if acp_version is not None:
+            command_components.append(f"--acp-version={acp_version}")
         serve_command = shlex.join(command_components)
 
         server = Server(

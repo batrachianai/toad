@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextvars import ContextVar
 import json
 from asyncio import Future, get_running_loop
 from dataclasses import dataclass
@@ -24,6 +25,11 @@ type JSONObject = dict[str, JSONType]
 type JSONList = list[JSONType]
 
 log = logging.getLogger("jsonrpc")
+
+current_request_id: ContextVar[int | str | None] = ContextVar(
+    "current_request_id", default=None
+)
+"""The id of the incoming request currently being handled (`None` for notifications)."""
 
 
 def expose(name: str = "", prefix: str = ""):
@@ -250,6 +256,7 @@ class Server:
             if inspect.isclass(parameter.type) and issubclass(parameter.type, Server):
                 arguments[name] = self
 
+        current_request_id.set(request_id)
         try:
             call_result = method.callable(**arguments)
             if inspect.isawaitable(call_result):
@@ -444,7 +451,7 @@ class API:
                 except KeyError:
                     if (error := response.get("error")) is not None:
                         if isinstance(error, dict):
-                            code = error.get("error", -1)
+                            code = error.get("code", -1)
                             if not isinstance(code, int):
                                 code = -1
                             message = str(error.get("message", "unknown error"))
@@ -488,7 +495,7 @@ class API:
                 call_parameters = {}
                 for arg, parameter_name in zip(args, parameters):
                     call_parameters[parameter_name] = arg
-                for parameter_name, arg in kwargs:
+                for parameter_name, arg in kwargs.items():
                     call_parameters[parameter_name] = arg
                 if notification:
                     method_call = MethodCall(name, None, call_parameters)

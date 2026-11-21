@@ -61,7 +61,8 @@ from toad.menus import MenuItem
 from toad.widgets.shell_terminal import ShellTerminal
 
 if TYPE_CHECKING:
-    from toad.acp.agent import Mode
+    from toad.acp.session import Mode
+    from toad.widgets.question import Ask
     from toad.widgets.terminal import Terminal
     from toad.widgets.agent_response import AgentResponse
     from toad.widgets.agent_thought import AgentThought
@@ -1233,7 +1234,8 @@ class Conversation(containers.Vertical):
                 )
                 self.post_message(messages.SessionUpdate(state="busy"))
                 self.app.terminal_alert(False)
-                result_future.set_result(result)
+                if not result_future.done():
+                    result_future.set_result(result)
                 return
 
         from toad.widgets.acp_content import ACPToolCallContent
@@ -1249,7 +1251,7 @@ class Conversation(containers.Vertical):
                 self.post_message(messages.SessionUpdate(state="busy"))
 
         tool_call_content = tool_call_update.get("content", None) or []
-        self.ask(
+        ask = self.ask(
             options,
             title or "",
             (
@@ -1259,6 +1261,15 @@ class Conversation(containers.Vertical):
             ),
             answer_callback,
         )
+
+        def on_result(future: Future[Answer]) -> None:
+            """The agent may cancel the request (ACP v2), which withdraws the question."""
+            if future.cancelled():
+                self.prompt.withdraw_ask(ask)
+                if not self.prompt.ask_queue:
+                    self.post_message(messages.SessionUpdate(state="busy"))
+
+        result_future.add_done_callback(on_result)
         return
 
     async def post_tool_call(
@@ -1297,7 +1308,7 @@ class Conversation(containers.Vertical):
         title: str = "",
         get_content: Callable[[], Widget] | None = None,
         callback: Callable[[Answer], Any] | None = None,
-    ) -> None:
+    ) -> Ask:
         """Replace the prompt with a dialog to ask a question
 
         Args:
@@ -1316,7 +1327,9 @@ class Conversation(containers.Vertical):
         notify_message = "\n".join(f" • {option.text}" for option in options)
         self.app.system_notify(notify_message, title=notify_title, sound="question")
 
-        self.prompt.ask(Ask(title, options, get_content, callback))
+        ask = Ask(title, options, get_content, callback)
+        self.prompt.ask(ask)
+        return ask
 
     def _build_slash_commands(self) -> list[SlashCommand]:
         slash_commands = [

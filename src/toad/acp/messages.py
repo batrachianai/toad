@@ -14,7 +14,7 @@ from toad.acp.encode_tool_call_id import encode_tool_call_id
 
 if TYPE_CHECKING:
     from textual.content import Content
-    from toad.acp.agent import Mode
+    from toad.acp.session import Mode
     from toad.widgets.terminal_tool import ToolState
 
 

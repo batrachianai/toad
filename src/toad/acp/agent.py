@@ -5,9 +5,6 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
-from typing import Any, cast, NamedTuple
-from copy import deepcopy
-from math import floor
 import rich.repr
 
 from textual.content import Content
@@ -19,73 +16,22 @@ from toad import jsonrpc
 import toad
 from toad.agent_schema import Agent as AgentData
 from toad.agent import AgentBase, AgentReady, AgentFail
-from toad.acp import protocol
-from toad.acp import api
 from toad.acp.api import API
-from toad.acp import messages
+from toad.acp.handshake import DEFAULT_VERSION, SUPPORTED_VERSIONS, negotiate
 from toad.acp.prompt import build as build_prompt
+from toad.acp.session import Session
+from toad.acp.session_v1 import SessionV1
+from toad.acp.session_v2 import SessionV2
 from toad.db import DB
 from toad import paths
 from toad import constants
-from toad.answer import Answer
 
-PROTOCOL_VERSION = 1
-
-
-class Mode(NamedTuple):
-    """An agent mode."""
-
-    id: str
-    name: str
-    description: str | None
-
-
-class ContextUsage(NamedTuple):
-    """Context window usage."""
-
-    used: int
-    size: int
-    cost: Cost | None = None
-
-    @property
-    def percentage_used(self) -> float:
-        try:
-            return (self.used / self.size) * 100.0
-        except ZeroDivisionError:
-            # Sanity check. If size is 0, then 100% is always used?
-            return 100.0
-
-    @property
-    def percentage_display(self) -> str:
-        return f"{floor(self.percentage_used * 10) / 10:.1f}%"
-
-
-class Cost(NamedTuple):
-    """A cost with associated currency."""
-
-    amount: float
-    currency: str
-
-    def __str__(self) -> str:
-        return f"{self:}"
-
-    def __format__(self, _specifier: str) -> str:
-        from format_currency import format_currency
-
-        amount, currency = self
-        currency_text = format_currency(amount, currency_code=currency).replace(" ", "")
-        return currency_text
-
-
-class TokenUsage(NamedTuple):
-    """Tokens used for a single prompt (per-turn)."""
-
-    total_tokens: int
-    input_tokens: int
-    output_tokens: int
-    thought_tokens: int | None
-    cached_read_tokens: int | None
-    cached_write_tokens: int | None
+SESSION_TYPES: dict[int, type[Session]] = {
+    SessionV1.PROTOCOL_VERSION: SessionV1,
+    SessionV2.PROTOCOL_VERSION: SessionV2,
+}
+"""Session implementations, by negotiated protocol version."""
+assert set(SESSION_TYPES) == set(SUPPORTED_VERSIONS)
 
 
 def generate_datetime_filename(
@@ -115,7 +61,11 @@ def generate_datetime_filename(
 
 @rich.repr.auto
 class Agent(AgentBase):
-    """An agent that speaks the APC (https://agentclientprotocol.com/overview/introduction) protocol."""
+    """An agent that speaks the APC (https://agentclientprotocol.com/overview/introduction) protocol.
+
+    The agent manages the process and transport. After the handshake negotiates a
+    protocol version, everything protocol-specific is delegated to a `Session`.
+    """
 
     def __init__(
         self,
@@ -128,35 +78,27 @@ class Agent(AgentBase):
 
         Args:
             project_root: Project root path.
-            command: Command to launch agent.
+            agent: Agent data.
+            session_id: Session id to resume, or `None` for a new session.
+            session_pk: Primary key of the session to resume.
         """
         super().__init__(project_root)
 
         self._agent_data = agent
-        self.session_id = session_id
+        self._session_id = session_id
+        self._session_pk = session_pk
 
         self.server = jsonrpc.Server()
-        self.server.expose_instance(self)
+        self.session: Session | None = None
+        """The protocol session, created after the handshake."""
+        self._session_ready = asyncio.Event()
 
         self._agent_task: asyncio.Task | None = None
         self._task: asyncio.Task | None = None
         self._process: asyncio.subprocess.Process | None = None
         self.done_event = asyncio.Event()
 
-        self.agent_capabilities: protocol.AgentCapabilities = {
-            "loadSession": False,
-            "promptCapabilities": {
-                "audio": False,
-                "embeddedContent": False,
-                "image": False,
-            },
-        }
-        self.auth_methods: list[protocol.AuthMethod] = []
-        self.session_pk: int | None = session_pk
-        self.tool_calls: dict[str, protocol.ToolCall] = {}
         self._message_target: MessagePump | None = None
-
-        self._terminal_count: int = 0
 
         log_filename: str = generate_datetime_filename(f"{agent['name']}", ".txt")
         if log_path := os.environ.get("TOAD_LOG"):
@@ -166,9 +108,6 @@ class Agent(AgentBase):
         else:
             self._log_file_path = paths.get_log() / log_filename
 
-        self._token_usage: TokenUsage | None = None
-        self._context_usage: ContextUsage | None = None
-
     @property
     def command(self) -> str | None:
         """The command used to launch the agent, or `None` if there isn't one."""
@@ -176,9 +115,14 @@ class Agent(AgentBase):
         return acp_command
 
     @property
-    def supports_load_session(self) -> bool:
-        """Does the agent support loading sessions?"""
-        return self.agent_capabilities.get("loadSession", False)
+    def protocol_version(self) -> int | None:
+        """The negotiated protocol version, or `None` before the handshake."""
+        return None if self.session is None else self.session.PROTOCOL_VERSION
+
+    @property
+    def session_pk(self) -> int | None:
+        """Primary key of the session in the database, if it was saved."""
+        return self._session_pk if self.session is None else self.session.session_pk
 
     def __rich_repr__(self) -> rich.repr.Result:
         yield self.project_root_path
@@ -265,280 +209,21 @@ class Agent(AgentBase):
             return False
         return message_target.post_message(message)
 
-    @jsonrpc.expose("session/update")
-    def rpc_session_update(
-        self,
-        sessionId: str,
-        update: protocol.SessionUpdate,
-        _meta: dict[str, Any] | None = None,
-    ):
-        """Agent requests an update.
-
-        https://agentclientprotocol.com/protocol/schema
-        """
-
-        match update:
-            case {
-                "sessionUpdate": "user_message_chunk",
-                "content": {"type": type, "text": text},
-            }:
-                if text:
-                    self.post_message(messages.UserMessage(type, text))
-
-            case {
-                "sessionUpdate": "agent_message_chunk",
-                "content": {"type": type, "text": text},
-            }:
-                self.post_message(messages.Update(type, text))
-
-            case {
-                "sessionUpdate": "agent_thought_chunk",
-                "content": {"type": type, "text": text},
-            }:
-                self.post_message(messages.Thinking(type, text))
-
-            case {
-                "sessionUpdate": "tool_call",
-                "toolCallId": tool_call_id,
-            }:
-                self.tool_calls[tool_call_id] = update
-                self.post_message(messages.ToolCall(update))
-
-            case {"sessionUpdate": "plan", "entries": entries}:
-                self.post_message(messages.Plan(entries))
-
-            case {
-                "sessionUpdate": "tool_call_update",
-                "toolCallId": tool_call_id,
-            }:
-                if tool_call_id in self.tool_calls:
-                    current_tool_call = self.tool_calls[tool_call_id]
-                    for key, value in update.items():
-                        if value is not None:
-                            current_tool_call[key] = value
-
-                    self.post_message(
-                        messages.ToolCallUpdate(deepcopy(current_tool_call), update)
-                    )
-                else:
-                    # The agent can send a tool call update, without previously sending the tool call *rolls eyes*
-                    current_tool_call: protocol.ToolCall = {
-                        "sessionUpdate": "tool_call",
-                        "toolCallId": tool_call_id,
-                        "title": "Tool call",
-                    }
-                    for key, value in update.items():
-                        if value is not None:
-                            current_tool_call[key] = value
-
-                    self.tool_calls[tool_call_id] = current_tool_call
-                    self.post_message(messages.ToolCall(current_tool_call))
-
-            case {
-                "sessionUpdate": "available_commands_update",
-                "availableCommands": available_commands,
-            }:
-                self.post_message(messages.AvailableCommandsUpdate(available_commands))
-
-            case {"sessionUpdate": "current_mode_update", "currentModeId": mode_id}:
-                self.post_message(messages.ModeUpdate(mode_id))
-
-            case {"sessionUpdate": "usage_update", "used": used, "size": size}:
-                match update.get("cost"):
-                    case {"amount": amount, "currency": currency}:
-                        self._context_usage = ContextUsage(
-                            used, size, Cost(amount, currency)
-                        )
-                    case _:
-                        self._context_usage = ContextUsage(used, size)
-                self.update_status_line()
-
-    def update_status_line(self) -> None:
-        """Update the current status line."""
-
-        if (usage := self._context_usage) is not None:
-            status: list[Content] = []
-            status.append(
-                Content.assemble(
-                    f"{usage.used / 1000:.1f}K",
-                    " (",
-                    (f"{usage.percentage_display}", "bold"),
-                    ")",
-                )
-            )
-            if (cost := usage.cost) is not None:
-                status.append(Content.assemble((f"{cost}", "bold")))
-
-            status_line = Content(" • ").join(status)
-            self.post_message(messages.UpdateStatusLine(status_line))
-
-    @jsonrpc.expose("session/request_permission")
-    async def rpc_request_permission(
-        self,
-        sessionId: str,
-        options: list[protocol.PermissionOption],
-        toolCall: protocol.ToolCallUpdatePermissionRequest,
-        _meta: dict | None = None,
-    ) -> protocol.RequestPermissionResponse:
-        """Agent requests permission to make a tool call.
-
-        Args:
-            sessionId: The session ID.
-            options: A list of permission options (potential replies).
-            toolCall: The tool or tools the agent is requesting permission to call.
-            _meta: Optional meta information.
-
-        Returns:
-            The response to the permission request.
-        """
-        result_future: asyncio.Future[Answer] = asyncio.Future()
-        tool_call_id = toolCall["toolCallId"]
-
-        permission_tool_call = toolCall.copy()
-        permission_tool_call.pop("sessionUpdate", None)
-        tool_call = cast(protocol.ToolCall, permission_tool_call)
-        if tool_call_id in self.tool_calls:
-            self.tool_calls[tool_call_id] |= tool_call
-        else:
-            self.tool_calls[tool_call_id] = deepcopy(tool_call)
-
-        tool_call = deepcopy(self.tool_calls[tool_call_id])
-
-        message = messages.RequestPermission(options, tool_call, result_future)
-        self.post_message(message)
-        await result_future
-        ask_result = result_future.result()
-
-        request_permission_outcome: protocol.OutcomeSelected = {
-            "optionId": ask_result.id,
-            "outcome": "selected",
-        }
-        result: protocol.RequestPermissionResponse = {
-            "outcome": request_permission_outcome
-        }
-        return result
-
-    @jsonrpc.expose("fs/read_text_file")
-    def rpc_read_text_file(
-        self,
-        sessionId: str,
-        path: str,
-        line: int | None = None,
-        limit: int | None = None,
-    ) -> dict[str, str]:
-        """Read a file in the project."""
-        # TODO: what if the read is outside of the project path?
-        # https://agentclientprotocol.com/protocol/file-system#reading-files
-        read_path = self.project_root_path / path
-        try:
-            text = read_path.read_text(encoding="utf-8", errors="ignore")
-        except IOError:
-            text = ""
-        if line is not None:
-            line = max(0, line - 1)
-            if limit is None:
-                text = "\n".join(text.splitlines()[line:])
-            else:
-                text = "\n".join(text.splitlines()[line : line + limit])
-        return {"content": text}
-
-    @jsonrpc.expose("fs/write_text_file")
-    def rpc_write_text_file(self, sessionId: str, path: str, content: str) -> None:
-        # TODO: What if the agent wants to write outside of the project path?
-        # https://agentclientprotocol.com/protocol/file-system#writing-files
-
-        write_path = self.project_root_path / path
-        write_path.write_text(content, encoding="utf-8", errors="ignore")
-
-    # https://agentclientprotocol.com/protocol/schema#createterminalrequest
-    @jsonrpc.expose("terminal/create")
-    async def rpc_terminal_create(
-        self,
-        command: str,
-        _meta: dict | None = None,
-        args: list[str] | None = None,
-        cwd: str | None = None,
-        env: list[protocol.EnvVariable] | None = None,
-        outputByteLimit: int | None = None,
-        sessionId: str | None = None,
-    ) -> protocol.CreateTerminalResponse:
-        # Assign a terminal id
-        self._terminal_count = self._terminal_count + 1
-        terminal_id = f"terminal-{self._terminal_count}"
-
-        terminal_env = (
-            {variable["name"]: variable["value"] for variable in env} if env else {}
+    def _open_session(
+        self, session_type: type[Session], initialize_response: dict
+    ) -> Session:
+        """Create the session for the negotiated protocol, and expose its methods."""
+        session = self.session = session_type(
+            self,
+            self._agent_data,
+            self.project_root_path,
+            initialize_response,
+            self._session_id,
+            self._session_pk,
         )
-        result_future: asyncio.Future[bool] = asyncio.Future()
-        self.post_message(
-            messages.CreateTerminal(
-                terminal_id,
-                command=command,
-                args=args,
-                cwd=cwd,
-                env=terminal_env,
-                output_byte_limit=outputByteLimit,
-                result_future=result_future,
-            )
-        )
-        await result_future
-        if not result_future.result():
-            raise jsonrpc.JSONRPCError("Failed to create a terminal.")
-        return {"terminalId": terminal_id}
-
-    # https://agentclientprotocol.com/protocol/schema#killterminalcommandrequest
-    @jsonrpc.expose("terminal/kill")
-    def rpc_terminal_kill(
-        self, sessionID: str, terminalId: str, _meta: dict | None = None
-    ) -> protocol.KillTerminalCommandResponse:
-        self.post_message(messages.KillTerminal(terminalId))
-        return {}
-
-    # https://agentclientprotocol.com/protocol/schema#terminal%2Foutput
-    @jsonrpc.expose("terminal/output")
-    async def rpc_terminal_output(
-        self, sessionId: str, terminalId: str, _meta: dict | None = None
-    ) -> protocol.TerminalOutputResponse:
-        from toad.widgets.terminal_tool import ToolState
-
-        result_future: asyncio.Future[ToolState] = asyncio.Future()
-
-        if not self.post_message(messages.GetTerminalState(terminalId, result_future)):
-            raise RuntimeError("Unable to get terminal output")
-
-        await result_future
-        terminal_state = result_future.result()
-
-        result: protocol.TerminalOutputResponse = {
-            "output": terminal_state.output,
-            "truncated": terminal_state.truncated,
-        }
-        if (return_code := terminal_state.return_code) is not None:
-            result["exitStatus"] = {"exitCode": return_code}
-        return result
-
-    # https://agentclientprotocol.com/protocol/schema#terminal%2Frelease
-    @jsonrpc.expose("terminal/release")
-    def rpc_terminal_release(
-        self, sessionId: str, terminalId: str, _meta: dict | None = None
-    ) -> protocol.ReleaseTerminalResponse:
-        self.post_message(messages.ReleaseTerminal(terminalId))
-        return {}
-
-    # https://agentclientprotocol.com/protocol/schema#terminal%2Fwait-for-exit
-    @jsonrpc.expose("terminal/wait_for_exit")
-    async def rpc_terminal_wait_for_exit(
-        self, sessionId: str, terminalId: str, _meta: dict | None = None
-    ) -> protocol.WaitForTerminalExitResponse:
-        result_future: asyncio.Future[tuple[int, str | None]] = asyncio.Future()
-        if not self.post_message(
-            messages.WaitForTerminalExit(terminalId, result_future)
-        ):
-            raise RuntimeError("Unable to wait for terminal exit; no terminal found")
-
-        await result_future
-        return_code, signal = result_future.result()
-        return {"exitCode": return_code, "signal": signal}
+        self.server.expose_instance(session)
+        self._session_ready.set()
+        return session
 
     async def _run_agent(self) -> None:
         """Task to communicate with the agent subprocess."""
@@ -575,6 +260,9 @@ class Agent(AgentBase):
 
         async def call_jsonrpc(request: jsonrpc.JSONObject | jsonrpc.JSONList) -> None:
             try:
+                # The agent's requests are handled by the session, which exists
+                # once the protocol version has been negotiated.
+                await self._session_ready.wait()
                 if (result := await self.server.call(request)) is not None:
                     result_json = json.dumps(result).encode("utf-8")
                     if process.stdin is not None:
@@ -636,6 +324,9 @@ class Agent(AgentBase):
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
+        if self.session is not None:
+            self.session.connection_lost()
+
         if process.returncode:
             assert process.stderr is not None
             fail_details = (await process.stderr.read()).decode("utf-8", "replace")
@@ -662,43 +353,66 @@ class Agent(AgentBase):
 
     async def run(self) -> None:
         """The main logic of the Agent."""
-        if constants.ACP_INITIALIZE:
-            try:
-                # Boilerplate to initialize comms
-                await self.acp_initialize()
+        if not constants.ACP_INITIALIZE:
+            # No handshake (e.g. replaying a log); assume the default version
+            self._open_session(SESSION_TYPES[DEFAULT_VERSION], {})
+            self.post_message(AgentReady())
+            return
+        try:
+            # Boilerplate to initialize comms
+            requested = self._agent_data.get("acp_version", DEFAULT_VERSION)
+            if requested not in SUPPORTED_VERSIONS:
+                self._notify(
+                    f"ACP v{requested} isn't supported; using v{DEFAULT_VERSION}.",
+                    title="ACP version",
+                )
+                requested = DEFAULT_VERSION
+            handshake = await negotiate(self, requested)
+            if handshake.fell_back:
+                self._notify(
+                    f"{self._agent_data['name']} doesn't support "
+                    f"ACP v{handshake.requested}; using v{handshake.version}.",
+                    title="ACP version",
+                )
+            session = self._open_session(
+                SESSION_TYPES[handshake.version], handshake.response
+            )
 
-                if self.session_id is None:
-                    # Create a new session
-                    await self.acp_new_session()
-                else:
-                    # Load existing session
-                    if not self.agent_capabilities.get("loadSession", False):
-                        self.post_message(
-                            AgentFail(
-                                "Resume not supported",
-                                f"{self._agent_data['name']} does not currently support resuming sessions.",
-                                help="no_resume",
-                            )
+            if self._session_id is None:
+                # Create a new session
+                await session.new_session()
+            else:
+                # Load existing session
+                if not session.supports_resume:
+                    self.post_message(
+                        AgentFail(
+                            "Resume not supported",
+                            f"{self._agent_data['name']} does not currently support resuming sessions.",
+                            help="no_resume",
                         )
-                        return
-                    await self.acp_load_session()
-                    if self.session_pk is not None:
-                        db = DB()
-                        await db.session_update_last_used(self.session_pk)
-            except jsonrpc.APIError as error:
-                if isinstance(error.data, dict):
-                    reason = str(
-                        error.data.get("reason") or "Failed to initialize agent"
                     )
-                    details = str(
-                        error.data.get("details") or error.data.get("error") or ""
-                    )
-                else:
-                    reason = "Failed to initialize agent"
-                    details = ""
-                self.post_message(AgentFail(reason, details))
+                    return
+                await session.resume_session()
+                if session.session_pk is not None:
+                    db = DB()
+                    await db.session_update_last_used(session.session_pk)
+        except jsonrpc.APIError as error:
+            if isinstance(error.data, dict):
+                reason = str(error.data.get("reason") or "Failed to initialize agent")
+                details = str(
+                    error.data.get("details") or error.data.get("error") or ""
+                )
+            else:
+                reason = "Failed to initialize agent"
+                details = ""
+            self.post_message(AgentFail(reason, details))
 
         self.post_message(AgentReady())
+
+    def _notify(self, message: str, title: str = "") -> None:
+        """Show a notification, if the message target supports it."""
+        if (notify := getattr(self._message_target, "notify", None)) is not None:
+            notify(message, title=title)
 
     async def send_prompt(self, prompt: str) -> str | None:
         """Send a prompt to the agent.
@@ -709,165 +423,17 @@ class Agent(AgentBase):
         Args:
             prompt: Prompt text.
         """
+        if self.session is None:
+            return None
         prompt_content_blocks = await asyncio.to_thread(
             build_prompt, self.project_root_path, prompt
         )
-        return await self.acp_session_prompt(prompt_content_blocks)
-
-    async def acp_initialize(self):
-        """Initialize agent."""
-        with self.request():
-            initialize_response = api.initialize(
-                PROTOCOL_VERSION,
-                {
-                    "fs": {
-                        "readTextFile": True,
-                        "writeTextFile": True,
-                    },
-                    "terminal": True,
-                },
-                {
-                    "name": toad.NAME,
-                    "title": toad.TITLE,
-                    "version": toad.get_version(),
-                },
-            )
-
-        response = await initialize_response.wait()
-        assert response is not None
-
-        # Store agents capabilities
-        if agent_capabilities := response.get("agentCapabilities"):
-            self.agent_capabilities = agent_capabilities
-        if auth_methods := response.get("authMethods"):
-            self.auth_methods = auth_methods
-
-    async def acp_new_session(self) -> None:
-        """Create a new session."""
-        with self.request():
-            session_new_response = api.session_new(
-                str(self.project_root_path),
-                [],
-            )
-        response = await session_new_response.wait()
-        assert response is not None
-        self.session_id = response["sessionId"]
-
-        if self.supports_load_session:
-            db = DB()
-            session_name = "New Session"
-            self.session_pk = await db.session_new(
-                session_name,
-                self._agent_data["name"],
-                self._agent_data["identity"],
-                self.session_id,
-                protocol="acp",
-                meta={
-                    "cwd": str(self.project_root_path),
-                    "agent_data": self._agent_data,
-                },
-            )
-
-        if (modes := response.get("modes", None)) is not None:
-            current_mode = modes["currentModeId"]
-            available_modes = modes["availableModes"]
-            modes_update = {
-                mode["id"]: Mode(
-                    mode["id"], mode["name"], mode.get("description", None)
-                )
-                for mode in available_modes
-            }
-            self.post_message(messages.SetModes(current_mode, modes_update))
-
-    async def acp_load_session(self) -> None:
-        assert self.session_id is not None, "Session id must be set"
-        cwd = str(self.project_root_path)
-        if self.session_pk is not None:
-            db = DB()
-            if (session := await db.session_get(self.session_pk)) is not None:
-                if session["meta_json"]:
-                    meta = json.loads(session["meta_json"])
-                    if session_cwd := meta.get("cwd", None):
-                        cwd = session_cwd
-                    if agent_data := meta.get("agent_data"):
-                        self._agent_data = agent_data
-
-        with self.request():
-            session_load_response = api.session_load(cwd, [], self.session_id)
-        response = await session_load_response.wait()
-
-        if (modes := response.get("modes", None)) is not None:
-            current_mode = modes["currentModeId"]
-            available_modes = modes["availableModes"]
-            modes_update = {
-                mode["id"]: Mode(
-                    mode["id"], mode["name"], mode.get("description", None)
-                )
-                for mode in available_modes
-            }
-            self.post_message(messages.SetModes(current_mode, modes_update))
-
-    async def acp_session_prompt(
-        self, prompt: list[protocol.ContentBlock]
-    ) -> str | None:
-        """Send the prompt to the agent.
-
-        Returns:
-            The stop reason.
-
-        """
-        with self.request():
-            session_prompt = api.session_prompt(prompt, self.session_id)
-        try:
-            result = await session_prompt.wait()
-        except jsonrpc.APIError as error:
-            details = ""
-            match error.data:
-                case {"details": details}:
-                    pass
-
-            self.post_message(
-                AgentFail(
-                    "Failed to send prompt" or error.message,
-                    (
-                        str(details)
-                        if details
-                        else f"{self._agent_data['name']} returned an error"
-                    ),
-                )
-            )
-            return None
-        except jsonrpc.JSONRPCError as error:
-            self.post_message(
-                AgentFail(
-                    "Failed to send prompt" or error.message,
-                    (error.message or f"{self._agent_data['name']} returned an error"),
-                )
-            )
-            return None
-
-        assert result is not None
-        # TODO: Where to display this?
-        token_usage = result.get("usage")
-
-        return result.get("stopReason")
-
-    async def acp_session_set_mode(self, mode_id: str) -> str | None:
-        """Update the current mode with the agent."""
-        with self.request():
-            response = api.session_set_mode(self.session_id, mode_id)
-        try:
-            await response.wait()
-        except jsonrpc.APIError as error:
-            match error.data:
-                case {"details": details}:
-                    return details if isinstance(details, str) else "Failed to set mode"
-            return "Failed to set mode"
-        else:
-            return None
+        return await self.session.prompt(prompt_content_blocks)
 
     async def set_mode(self, mode_id: str) -> str | None:
-        return await self.acp_session_set_mode(mode_id)
+        if self.session is None:
+            return "Agent is not ready"
+        return await self.session.set_mode(mode_id)
 
     async def set_session_name(self, name: str) -> None:
         if self.session_pk is None:
@@ -875,15 +441,7 @@ class Agent(AgentBase):
         db = DB()
         await db.session_update_title(self.session_pk, name)
 
-    async def acp_session_cancel(self) -> bool:
-        with self.request():
-            response = api.session_cancel(self.session_id, {})
-        try:
-            await response.wait()
-        except jsonrpc.APIError:
-            # No-op if there is nothing to cancel
-            return False
-        return True
-
     async def cancel(self) -> bool:
-        return await self.acp_session_cancel()
+        if self.session is None:
+            return False
+        return await self.session.cancel()
