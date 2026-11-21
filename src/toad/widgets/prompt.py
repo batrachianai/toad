@@ -35,7 +35,7 @@ from toad.prompt.extract import extract_paths_from_prompt
 from toad.path_complete import PathComplete
 
 if TYPE_CHECKING:
-    from toad.acp.agent import Mode
+    from toad.acp.session import Mode
 
 
 class ModeSwitcher(OptionList):
@@ -513,6 +513,21 @@ class Prompt(containers.VerticalGroup):
         self.app.terminal_alert()
         if self._ask is None:
             self._ask = self.ask_queue.pop(0)
+
+    def withdraw_ask(self, ask: Ask) -> None:
+        """Remove a question that no longer needs an answer.
+
+        Args:
+            ask: An `Ask` previously passed to `ask`.
+        """
+        for index, queued_ask in enumerate(self.ask_queue):
+            if queued_ask is ask:
+                del self.ask_queue[index]
+                return
+        if self._ask is ask:
+            self._ask = self.ask_queue.pop(0) if self.ask_queue else None
+            if self._ask is None:
+                self.app.terminal_alert(False)
 
     @on(events.Click, "ModeInfo")
     def on_click(self):

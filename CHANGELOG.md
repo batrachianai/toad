@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Opt-in support for the ACP v2 draft protocol (`schema-v2.0.0-beta.3`): set `acp_version = 2` in agent data, or use `toad acp --acp-version 2`. Falls back to v1 if the agent doesn't support v2
+
 ### Changed
 
 - Style tweak for compact prompt
